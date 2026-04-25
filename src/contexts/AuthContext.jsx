@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Restore session on mount
   useEffect(() => {
     const saved = localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session')
     if (saved) {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }) {
     const pwMatch = data.password_plain === password || atob(data.password_hash || '') === password
     if (!pwMatch) throw new Error('Incorrect password')
 
+    // Update last login timestamp
     await supabase.from('app_users').update({ last_login: new Date().toISOString() }).eq('id', data.id)
 
     const session = {
