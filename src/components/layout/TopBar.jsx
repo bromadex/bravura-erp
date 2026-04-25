@@ -12,7 +12,6 @@ export default function TopBar() {
         <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1 }}>KAMATIVI OPERATIONS</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {/* Search placeholder – will be implemented later */}
         <div style={{ position: 'relative' }}>
           <span className="material-icons" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--text-dim)' }}>search</span>
           <input type="text" placeholder="Search..." style={{ padding: '8px 8px 8px 36px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 20, color: 'var(--text)', fontSize: 13, width: 200 }} />
