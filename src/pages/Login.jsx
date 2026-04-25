@@ -28,14 +28,11 @@ export default function Login() {
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)', padding:16 }}>
       <div style={{ width:'100%', maxWidth:400 }}>
-        {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:40 }}>
-          <div style={{ fontSize:36, marginBottom:8 }}>⚙️</div>
-          <h1 style={{ fontSize:28, fontWeight:800, color:'var(--gold)' }}>BRAVURA</h1>
+          <span className="material-icons" style={{ fontSize:56, color:'var(--gold)' }}>settings</span>
+          <h1 style={{ fontSize:28, fontWeight:800, marginTop:8, color:'var(--gold)' }}>BRAVURA</h1>
           <p style={{ color:'var(--text-dim)', fontSize:13, fontFamily:'var(--mono)', letterSpacing:2 }}>KAMATIVI ERP</p>
         </div>
-
-        {/* Form */}
         <div className="card" style={{ padding:28 }}>
           <h2 style={{ fontSize:18, fontWeight:700, marginBottom:24 }}>Sign In</h2>
           <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -59,6 +56,7 @@ export default function Login() {
             </div>
             {error && <div style={{ background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', borderRadius:8, padding:'10px 14px', fontSize:13, color:'var(--red)' }}>✕ {error}</div>}
             <button className="btn btn-primary" type="submit" disabled={loading} style={{ width:'100%', justifyContent:'center', padding:'12px', fontSize:14 }}>
+              <span className="material-icons" style={{ fontSize:18 }}>login</span>
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
