@@ -1,16 +1,16 @@
 import { useAuth } from '../contexts/AuthContext'
 
 const MODULES = [
-  { id:'dashboard',      icon:'📊', label:'Dashboard',          color:'#f4a261', desc:'KPIs & overview' },
-  { id:'procurement',    icon:'🛒', label:'Procurement',         color:'#a78bfa', desc:'Suppliers & orders' },
-  { id:'inventory',      icon:'📦', label:'Inventory',           color:'#2dd4bf', desc:'Stock & warehouse' },
-  { id:'logistics',      icon:'🚛', label:'Logistics',           color:'#60a5fa', desc:'GRN, Batch Plant' },
-  { id:'fuel',           icon:'⛽', label:'Fuel Management',     color:'#fbbf24', desc:'Tanks & issuance' },
-  { id:'fleet',          icon:'🚜', label:'Fleet & Assets',      color:'#34d399', desc:'Vehicles & generators' },
-  { id:'hr',             icon:'👥', label:'Human Resources',     color:'#f87171', desc:'Employees & payroll' },
-  { id:'accounting',     icon:'🧾', label:'Accounting',          color:'#818cf8', desc:'Journals & reports' },
-  { id:'reports',        icon:'📈', label:'Reports',             color:'#38bdf8', desc:'Analytics & exports' },
-  { id:'project',        icon:'📋', label:'Project Management',  color:'#94a3b8', desc:'Coming soon' },
+  { id:'dashboard',      icon:'dashboard',          label:'Dashboard',          color:'#f4a261', desc:'KPIs & overview' },
+  { id:'procurement',    icon:'shopping_cart',      label:'Procurement',        color:'#a78bfa', desc:'Suppliers & orders' },
+  { id:'inventory',      icon:'inventory',          label:'Inventory',          color:'#2dd4bf', desc:'Stock & warehouse' },
+  { id:'logistics',      icon:'local_shipping',     label:'Logistics',          color:'#60a5fa', desc:'GRN, Batch Plant' },
+  { id:'fuel',           icon:'local_gas_station',  label:'Fuel Management',    color:'#fbbf24', desc:'Tanks & issuance' },
+  { id:'fleet',          icon:'directions_car',     label:'Fleet & Assets',     color:'#34d399', desc:'Vehicles & generators' },
+  { id:'hr',             icon:'badge',              label:'Human Resources',    color:'#f87171', desc:'Employees & payroll' },
+  { id:'accounting',     icon:'receipt',            label:'Accounting',         color:'#818cf8', desc:'Journals & reports' },
+  { id:'reports',        icon:'bar_chart',          label:'Reports',            color:'#38bdf8', desc:'Analytics & exports' },
+  { id:'project',        icon:'construction',       label:'Project Management', color:'#94a3b8', desc:'Coming soon' },
 ]
 
 export default function HomeGrid() {
@@ -19,7 +19,7 @@ export default function HomeGrid() {
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg)' }}>
       {/* Top Bar */}
-      <div style={{ background:'var(--surface)', borderBottom:'1px solid var(--border)', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50 }}>
+      <div style={{ background:'var(--surface)', borderBottom:'1px solid var(--border)', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50, flexWrap:'wrap', gap:10 }}>
         <div>
           <div style={{ fontSize:16, fontWeight:800, color:'var(--gold)' }}>BRAVURA ERP</div>
           <div style={{ fontSize:10, color:'var(--text-dim)', fontFamily:'var(--mono)', letterSpacing:1 }}>KAMATIVI OPERATIONS</div>
@@ -34,7 +34,9 @@ export default function HomeGrid() {
               <div style={{ fontSize:9, color:'var(--text-dim)', fontFamily:'var(--mono)' }}>{user?.role?.replace('_',' ').toUpperCase()}</div>
             </div>
           </div>
-          <button className="btn btn-secondary btn-sm" onClick={logout}>⏻ Logout</button>
+          <button className="btn btn-secondary btn-sm" onClick={logout}>
+            <span className="material-icons" style={{ fontSize:16 }}>logout</span> Logout
+          </button>
         </div>
       </div>
 
@@ -45,13 +47,13 @@ export default function HomeGrid() {
       </div>
 
       {/* Module Grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, padding:'16px 24px 40px', maxWidth:900, margin:'0 auto' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, padding:'16px 24px 40px', maxWidth:1000, margin:'0 auto' }}>
         {MODULES.map(m => (
           <button key={m.id} onClick={() => alert(`${m.label} — coming in Stage 3`)}
             style={{ background:'var(--surface)', border:`1px solid var(--border)`, borderRadius:16, padding:24, cursor:'pointer', transition:'all .2s', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}
             onMouseOver={e => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${m.color}22`; }}
             onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
-            <div style={{ fontSize:36 }}>{m.icon}</div>
+            <span className="material-icons" style={{ fontSize:44, color:m.color }}>{m.icon}</span>
             <div>
               <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:4 }}>{m.label}</div>
               <div style={{ fontSize:10, color:'var(--text-dim)' }}>{m.desc}</div>
