@@ -21,7 +21,7 @@
   --shadow: 0 4px 24px rgba(0,0,0,.4);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
 a { text-decoration: none; color: inherit; }
 input, select, textarea, button { font-family: var(--font); }
@@ -119,3 +119,15 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 .gap-12 { gap: 12px; }
 .mt-16 { margin-top: 16px; }
 .mb-16 { margin-bottom: 16px; }
+
+/* Material Icon helpers */
+.material-icons { vertical-align: middle; font-size: 20px; }
+.material-icons.md-16 { font-size: 16px; }
+.material-icons.md-18 { font-size: 18px; }
+.material-icons.md-24 { font-size: 24px; }
+.material-icons.md-36 { font-size: 36px; }
+.material-icons.md-48 { font-size: 48px; }
+
+/* Module card hover effect */
+.module-card-hover { transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+.module-card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
