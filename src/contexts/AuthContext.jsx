@@ -8,7 +8,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Restore session on mount
     const saved = localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session')
     if (saved) {
       try { setUser(JSON.parse(saved)) } catch {}
@@ -27,11 +26,9 @@ export function AuthProvider({ children }) {
 
     if (error || !data) throw new Error('User not found or inactive')
 
-    // Check password (plain for now)
     const pwMatch = data.password_plain === password || atob(data.password_hash || '') === password
     if (!pwMatch) throw new Error('Incorrect password')
 
-    // Update last login
     await supabase.from('app_users').update({ last_login: new Date().toISOString() }).eq('id', data.id)
 
     const session = {
