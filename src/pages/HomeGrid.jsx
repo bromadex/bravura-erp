@@ -1,25 +1,27 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const MODULES = [
-  { id:'dashboard',      icon:'dashboard',          label:'Dashboard',          color:'#f4a261', desc:'KPIs & overview' },
-  { id:'procurement',    icon:'shopping_cart',      label:'Procurement',        color:'#a78bfa', desc:'Suppliers & orders' },
-  { id:'inventory',      icon:'inventory',          label:'Inventory',          color:'#2dd4bf', desc:'Stock & warehouse' },
-  { id:'logistics',      icon:'local_shipping',     label:'Logistics',          color:'#60a5fa', desc:'GRN, Batch Plant' },
-  { id:'fuel',           icon:'local_gas_station',  label:'Fuel Management',    color:'#fbbf24', desc:'Tanks & issuance' },
-  { id:'fleet',          icon:'directions_car',     label:'Fleet & Assets',     color:'#34d399', desc:'Vehicles & generators' },
-  { id:'hr',             icon:'badge',              label:'Human Resources',    color:'#f87171', desc:'Employees & payroll' },
-  { id:'accounting',     icon:'receipt',            label:'Accounting',         color:'#818cf8', desc:'Journals & reports' },
-  { id:'reports',        icon:'bar_chart',          label:'Reports',            color:'#38bdf8', desc:'Analytics & exports' },
-  { id:'project',        icon:'construction',       label:'Project Management', color:'#94a3b8', desc:'Coming soon' },
+  { id:'dashboard',      icon:'dashboard',          label:'Dashboard',          color:'#f4a261', desc:'KPIs & overview', route:'/module/dashboard' },
+  { id:'procurement',    icon:'shopping_cart',      label:'Procurement',        color:'#a78bfa', desc:'Suppliers & orders', route:'/module/procurement/suppliers' },
+  { id:'inventory',      icon:'inventory',          label:'Inventory',          color:'#2dd4bf', desc:'Stock & warehouse', route:'/module/inventory/stock-balance' },
+  { id:'logistics',      icon:'local_shipping',     label:'Logistics',          color:'#60a5fa', desc:'GRN, Batch Plant', route:'/module/logistics/goods-received' },
+  { id:'fuel',           icon:'local_gas_station',  label:'Fuel Management',    color:'#fbbf24', desc:'Tanks & issuance', route:'/module/fuel/fuel-tanks' },
+  { id:'fleet',          icon:'directions_car',     label:'Fleet & Assets',     color:'#34d399', desc:'Vehicles & generators', route:'/module/fleet/vehicles' },
+  { id:'hr',             icon:'badge',              label:'Human Resources',    color:'#f87171', desc:'Employees & payroll', route:'/module/hr/employees' },
+  { id:'accounting',     icon:'receipt',            label:'Accounting',         color:'#818cf8', desc:'Journals & reports', route:'/module/accounting/chart-of-accounts' },
+  { id:'reports',        icon:'bar_chart',          label:'Reports',            color:'#38bdf8', desc:'Analytics & exports', route:'/module/reports/analytics' },
+  { id:'project',        icon:'construction',       label:'Project Management', color:'#94a3b8', desc:'Coming soon', route:'#' },
 ]
 
 export default function HomeGrid() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg)' }}>
-      {/* Top Bar */}
-      <div style={{ background:'var(--surface)', borderBottom:'1px solid var(--border)', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:50, flexWrap:'wrap', gap:10 }}>
+      {/* Top Bar (same as before) – you can reuse TopBar component or keep inline */}
+      <div style={{ background:'var(--surface)', borderBottom:'1px solid var(--border)', padding:'12px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div>
           <div style={{ fontSize:16, fontWeight:800, color:'var(--gold)' }}>BRAVURA ERP</div>
           <div style={{ fontSize:10, color:'var(--text-dim)', fontFamily:'var(--mono)', letterSpacing:1 }}>KAMATIVI OPERATIONS</div>
@@ -49,7 +51,7 @@ export default function HomeGrid() {
       {/* Module Grid */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, padding:'16px 24px 40px', maxWidth:1000, margin:'0 auto' }}>
         {MODULES.map(m => (
-          <button key={m.id} onClick={() => alert(`${m.label} — coming in Stage 3`)}
+          <button key={m.id} onClick={() => { if (m.route && m.route !== '#') navigate(m.route); else alert('Coming soon'); }}
             style={{ background:'var(--surface)', border:`1px solid var(--border)`, borderRadius:16, padding:24, cursor:'pointer', transition:'all .2s', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}
             onMouseOver={e => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${m.color}22`; }}
             onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}>
