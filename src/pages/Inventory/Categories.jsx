@@ -2,22 +2,22 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
-// Map category names to Material Icons (you can customize)
-const getIconForCategory = (name) => {
-  const lower = name.toLowerCase()
-  if (lower.includes('construct')) return 'construction'
-  if (lower.includes('electrical')) return 'electrical_services'
-  if (lower.includes('mechanic')) return 'handyman'
-  if (lower.includes('ppe') || lower.includes('safety')) return 'safety_vest'
-  if (lower.includes('general')) return 'category'
+// Map category name to a Material Icon name
+const getMaterialIcon = (name) => {
+  const n = name.toLowerCase()
+  if (n.includes('construct')) return 'construction'
+  if (n.includes('electrical')) return 'electrical_services'
+  if (n.includes('mechanic') || n.includes('maintenar')) return 'handyman'
+  if (n.includes('ppe') || n.includes('safe')) return 'safety_vest'
+  if (n.includes('general')) return 'category'
   return 'category'
 }
 
 export default function Categories() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
   const [newName, setNewName] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
 
   useEffect(() => { fetchCategories() }, [])
 
@@ -29,11 +29,16 @@ export default function Categories() {
   }
 
   const handleAdd = async () => {
-    if (!newName.trim()) return toast.error('Name required')
-    const icon = getIconForCategory(newName)
+    if (!newName.trim()) return toast.error('Enter category name')
+    const icon = getMaterialIcon(newName)
     const { error } = await supabase.from('categories').insert([{ name: newName.trim(), icon }])
     if (error) toast.error(error.message)
-    else { toast.success('Added'); setNewName(''); setShowAdd(false); fetchCategories() }
+    else {
+      toast.success('Category added')
+      setNewName('')
+      setShowModal(false)
+      fetchCategories()
+    }
   }
 
   const handleDelete = async (name) => {
@@ -46,38 +51,44 @@ export default function Categories() {
 
   return (
     <div>
-      {/* Compact header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Categories</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)} style={{ gap: 4 }}>
+      {/* Header – compact */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Categories</h2>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
           <span className="material-icons" style={{ fontSize: 16 }}>add</span> Add
         </button>
       </div>
 
-      {/* Compact table – minimal padding */}
+      {/* Table – narrow, left-aligned icon column */}
       <div className="table-wrap">
-        <table>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              <th style={{ width: 40, padding: '6px 4px', fontSize: 11 }}>Icon</th>
-              <th style={{ padding: '6px 4px', fontSize: 11 }}>Name</th>
-              <th style={{ width: 50, padding: '6px 4px', fontSize: 11 }}>Act</th>
+              <th style={{ width: 40, padding: '6px 4px', textAlign: 'left', fontSize: 11 }}>Icon</th>
+              <th style={{ padding: '6px 4px', textAlign: 'left', fontSize: 11 }}>Name</th>
+              <th style={{ width: 50, padding: '6px 4px', textAlign: 'left', fontSize: 11 }}>Act</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 16 }}>Loading...</td></tr>
+              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 20 }}>Loading...</td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 16 }}>No categories</td></tr>
+              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 20 }}>No categories</td></tr>
             ) : (
               categories.map(cat => (
                 <tr key={cat.name} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '4px 4px', textAlign: 'center' }}>
-                    <span className="material-icons" style={{ fontSize: 18, color: 'var(--gold)' }}>{cat.icon || getIconForCategory(cat.name)}</span>
+                  <td style={{ padding: '4px 4px', textAlign: 'left' }}>
+                    <span className="material-icons" style={{ fontSize: 18, color: 'var(--gold)' }}>
+                      {cat.icon || getMaterialIcon(cat.name)}
+                    </span>
                   </td>
-                  <td style={{ padding: '4px 4px', fontWeight: 500, fontSize: 13 }}>{cat.name}</td>
+                  <td style={{ padding: '4px 4px', fontWeight: 500 }}>{cat.name}</td>
                   <td style={{ padding: '4px 4px' }}>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(cat.name)} style={{ padding: '0 6px', minHeight: 28 }}>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDelete(cat.name)}
+                      style={{ padding: '0 6px', minHeight: 28 }}
+                    >
                       <span className="material-icons" style={{ fontSize: 14 }}>delete</span>
                     </button>
                   </td>
@@ -88,10 +99,10 @@ export default function Categories() {
         </table>
       </div>
 
-      {/* Minimal add modal */}
-      {showAdd && (
-        <div className="overlay" onClick={() => setShowAdd(false)}>
-          <div className="modal" style={{ maxWidth: 320, padding: 16 }} onClick={e => e.stopPropagation()}>
+      {/* Add Modal – tiny */}
+      {showModal && (
+        <div className="overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" style={{ maxWidth: 320, padding: 20 }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
               <span className="material-icons" style={{ fontSize: 18, marginRight: 4 }}>add</span> New Category
             </div>
@@ -100,11 +111,11 @@ export default function Categories() {
               placeholder="Category name"
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              style={{ padding: '6px 8px', fontSize: 13, marginBottom: 12 }}
+              style={{ padding: '6px 8px', fontSize: 13, marginBottom: 16 }}
               autoFocus
             />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary btn-sm" onClick={handleAdd}>Add</button>
             </div>
           </div>
