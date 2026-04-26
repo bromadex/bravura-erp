@@ -66,6 +66,7 @@ const MODULE_NAV = {
         { id: 'generators',         label: 'Generators',          icon: 'bolt' },
         { id: 'heavy-equipment',    label: 'Heavy Equipment',     icon: 'construction' },
         { id: 'maintenance-alerts', label: 'Maintenance Alerts',  icon: 'notifications_active' },
+        { id: 'asset-issues',       label: 'Asset Issues',        icon: 'bug_report' },
       ]}
     ]
   },
