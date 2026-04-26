@@ -82,7 +82,6 @@ export default function StoreRequisitions() {
         </button>
       </div>
 
-      {/* Status filter tabs */}
       <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
         {['all','draft','submitted','approved','rejected','fulfilled'].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
@@ -103,60 +102,60 @@ export default function StoreRequisitions() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8" style={{ textAlign:'center', padding:40 }}>Loading...</td></tr>
+              <tr><td colSpan="8" style={{ textAlign:'center', padding:40 }}>Loading...<\/td><\/tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan="8" style={{ textAlign:'center', padding:40 }}>No requisitions found</td></tr>
+              <tr><td colSpan="8" style={{ textAlign:'center', padding:40 }}>No requisitions found<\/td><\/tr>
             ) : filtered.map((r, idx) => {
               const items = typeof r.items === 'string' ? JSON.parse(r.items || '[]') : (r.items || [])
               return (
                 <tr key={r.id} style={{ cursor:'pointer' }} onClick={() => setViewReq(r)}>
-                  <td style={{ fontFamily:'var(--mono)', color:'var(--gold)' }}>{r.req_number || `SR-${idx+1}`}</td>
-                  <td>{r.date}</td>
-                  <td style={{ fontWeight:600 }}>{r.department}</td>
-                  <td>{r.requester_name}</td>
-                  <td><span className={`badge badge-${r.priority === 'critical' ? 'red' : r.priority === 'urgent' ? 'yellow' : 'blue'}`}>{r.priority}</span></td>
-                  <td style={{ fontFamily:'var(--mono)' }}>{items.length} item{items.length !== 1 ? 's' : ''}</td>
-                  <td><span className={`badge ${STATUS_COLORS[r.status] || 'badge-blue'}`}>{r.status}</span></td>
+                  <td style={{ fontFamily:'var(--mono)', color:'var(--gold)' }}>{r.req_number || `SR-${idx+1}`}<\/td>
+                  <td>{r.date}<\/td>
+                  <td style={{ fontWeight:600 }}>{r.department}<\/td>
+                  <td>{r.requester_name}<\/td>
+                  <td><span className={`badge badge-${r.priority === 'critical' ? 'red' : r.priority === 'urgent' ? 'yellow' : 'blue'}`}>{r.priority}<\/span><\/td>
+                  <td style={{ fontFamily:'var(--mono)' }}>{items.length} item{items.length !== 1 ? 's' : ''}<\/td>
+                  <td><span className={`badge ${STATUS_COLORS[r.status] || 'badge-blue'}`}>{r.status}<\/span><\/td>
                   <td onClick={e => e.stopPropagation()} style={{ display:'flex', gap:4 }}>
                     {r.status === 'draft' && <>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}><span className="material-icons" style={{ fontSize:14 }}>edit</span></button>
-                      <button className="btn btn-primary btn-sm" onClick={() => submitForApproval(r.id)}>Submit</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}><span className="material-icons">edit<\/span><\/button>
+                      <button className="btn btn-primary btn-sm" onClick={() => submitForApproval(r.id)}>Submit<\/button>
                     </>}
                     {r.status === 'submitted' && <>
-                      <button className="btn btn-primary btn-sm" onClick={() => handleApprove(r.id)}>✅ Approve</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleReject(r.id)}>❌ Reject</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => handleApprove(r.id)}><span className="material-icons">check_circle<\/span> Approve<\/button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleReject(r.id)}><span className="material-icons">cancel<\/span> Reject<\/button>
                     </>}
-                  </td>
-                </tr>
+                  <\/td>
+                <\/tr>
               )
             })}
-          </tbody>
-        </table>
-      </div>
+          <\/tbody>
+        <\/table>
+      <\/div>
 
       {/* Create / Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editing ? 'Edit' : 'New'} Store <span>Requisition</span></div>
+            <div className="modal-title">{editing ? 'Edit' : 'New'} Store <span>Requisition<\/span><\/div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>DATE</label><input type="date" className="form-control" value={form.date} onChange={e => setForm(f => ({...f, date:e.target.value}))} /></div>
-                <div className="form-group"><label>DEPARTMENT *</label><input className="form-control" required value={form.department} onChange={e => setForm(f => ({...f, department:e.target.value}))} /></div>
-                <div className="form-group"><label>PRIORITY</label>
+                <div className="form-group"><label>DATE<\/label><input type="date" className="form-control" value={form.date} onChange={e => setForm(f => ({...f, date:e.target.value}))} /><\/div>
+                <div className="form-group"><label>DEPARTMENT *<\/label><input className="form-control" required value={form.department} onChange={e => setForm(f => ({...f, department:e.target.value}))} /><\/div>
+                <div className="form-group"><label>PRIORITY<\/label>
                   <select className="form-control" value={form.priority} onChange={e => setForm(f => ({...f, priority:e.target.value}))}>
-                    <option value="normal">Normal</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="critical">Critical</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-group"><label>REQUESTED BY</label><input className="form-control" value={form.requester_name} onChange={e => setForm(f => ({...f, requester_name:e.target.value}))} /></div>
+                    <option value="normal">Normal<\/option>
+                    <option value="urgent">Urgent<\/option>
+                    <option value="critical">Critical<\/option>
+                  <\/select>
+                <\/div>
+              <\/div>
+              <div className="form-group"><label>REQUESTED BY<\/label><input className="form-control" value={form.requester_name} onChange={e => setForm(f => ({...f, requester_name:e.target.value}))} /><\/div>
 
-              <div style={{ margin:'16px 0 8px', fontWeight:700, fontSize:12, color:'var(--text-dim)', letterSpacing:1 }}>ITEMS REQUESTED</div>
-              <div style={{ display:'grid', gridTemplateColumns:'2fr 1.5fr 0.7fr 0.7fr 1.5fr auto', gap:6, marginBottom:6, fontSize:9, fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:1, padding:'0 4px' }}>
-                <span>ITEM NAME</span><span>CATEGORY</span><span>QTY</span><span>UNIT</span><span>NOTES</span><span></span>
-              </div>
+              <div style={{ margin:'16px 0 8px', fontWeight:700, fontSize:12, color:'var(--text-dim)' }}>ITEMS REQUESTED<\/div>
+              <div style={{ display:'grid', gridTemplateColumns:'2fr 1.5fr 0.7fr 0.7fr 1.5fr auto', gap:6, marginBottom:6, fontSize:9, fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
+                <span>ITEM NAME<\/span><span>CATEGORY<\/span><span>QTY<\/span><span>UNIT<\/span><span>NOTES<\/span><span><\/span>
+              <\/div>
               {form.items.map((it, i) => (
                 <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 1.5fr 0.7fr 0.7fr 1.5fr auto', gap:6, marginBottom:6 }}>
                   <input className="form-control" placeholder="Item name" value={it.name} onChange={e => setItem(i,'name',e.target.value)} />
@@ -164,49 +163,49 @@ export default function StoreRequisitions() {
                   <input type="number" className="form-control" min="1" value={it.qty} onChange={e => setItem(i,'qty',parseInt(e.target.value)||1)} />
                   <input className="form-control" placeholder="pcs" value={it.unit} onChange={e => setItem(i,'unit',e.target.value)} />
                   <input className="form-control" placeholder="Notes" value={it.notes} onChange={e => setItem(i,'notes',e.target.value)} />
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons" style={{ fontSize:14 }}>close</span></button>
-                </div>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons">close<\/span><\/button>
+                <\/div>
               ))}
               <button type="button" className="btn btn-secondary btn-sm" onClick={addItem} style={{ marginBottom:16 }}>
-                <span className="material-icons" style={{ fontSize:14 }}>add</span> Add Item
-              </button>
+                <span className="material-icons">add<\/span> Add Item
+              <\/button>
 
-              <div className="form-group"><label>NOTES / JUSTIFICATION</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} /></div>
+              <div className="form-group"><label>NOTES \/ JUSTIFICATION<\/label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} /><\/div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">💾 Save Draft</button>
-              </div>
-            </form>
-          </div>
-        </div>
+                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel<\/button>
+                <button type="submit" className="btn btn-primary">Save Draft<\/button>
+              <\/div>
+            <\/form>
+          <\/div>
+        <\/div>
       )}
 
       {/* View Modal */}
       {viewReq && (
         <div className="overlay" onClick={() => setViewReq(null)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">📝 {viewReq.req_number} — <span>{viewReq.department}</span></div>
+            <div className="modal-title">{viewReq.req_number} — <span>{viewReq.department}<\/span><\/div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16, fontSize:13 }}>
-              <div><span style={{ color:'var(--text-dim)' }}>Date:</span> {viewReq.date}</div>
-              <div><span style={{ color:'var(--text-dim)' }}>Status:</span> <span className={`badge ${STATUS_COLORS[viewReq.status]}`}>{viewReq.status}</span></div>
-              <div><span style={{ color:'var(--text-dim)' }}>Requested by:</span> {viewReq.requester_name}</div>
-              <div><span style={{ color:'var(--text-dim)' }}>Priority:</span> {viewReq.priority}</div>
-              {viewReq.approver_name && <div><span style={{ color:'var(--text-dim)' }}>Approved by:</span> {viewReq.approver_name}</div>}
-              {viewReq.rejection_reason && <div style={{ gridColumn:'span 2', color:'var(--red)' }}>Rejected: {viewReq.rejection_reason}</div>}
-            </div>
+              <div><span style={{ color:'var(--text-dim)' }}>Date:<\/span> {viewReq.date}<\/div>
+              <div><span style={{ color:'var(--text-dim)' }}>Status:<\/span> <span className={`badge ${STATUS_COLORS[viewReq.status]}`}>{viewReq.status}<\/span><\/div>
+              <div><span style={{ color:'var(--text-dim)' }}>Requested by:<\/span> {viewReq.requester_name}<\/div>
+              <div><span style={{ color:'var(--text-dim)' }}>Priority:<\/span> {viewReq.priority}<\/div>
+              {viewReq.approver_name && <div><span style={{ color:'var(--text-dim)' }}>Approved by:<\/span> {viewReq.approver_name}<\/div>}
+              {viewReq.rejection_reason && <div style={{ gridColumn:'span 2', color:'var(--red)' }}>Rejected: {viewReq.rejection_reason}<\/div>}
+            <\/div>
             <table>
-              <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th><th>Notes</th></tr></thead>
+              <thead><tr><th>Item<\/th><th>Category<\/th><th>Qty<\/th><th>Unit<\/th><th>Notes<\/th><\/tr><\/thead>
               <tbody>
                 {(typeof viewReq.items === 'string' ? JSON.parse(viewReq.items || '[]') : viewReq.items).map((it, i) => (
-                  <tr key={i}><td>{it.name}</td><td>{it.category}</td><td style={{ fontFamily:'var(--mono)' }}>{it.qty}</td><td>{it.unit}</td><td style={{ color:'var(--text-dim)' }}>{it.notes}</td></tr>
+                  <tr key={i}><td>{it.name}<\/td><td>{it.category}<\/td><td style={{ fontFamily:'var(--mono)' }}>{it.qty}<\/td><td>{it.unit}<\/td><td style={{ color:'var(--text-dim)' }}>{it.notes}<\/td><\/tr>
                 ))}
-              </tbody>
-            </table>
-            {viewReq.notes && <div style={{ marginTop:12, padding:10, background:'var(--surface2)', borderRadius:8, fontSize:12, color:'var(--text-dim)' }}>{viewReq.notes}</div>}
-            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setViewReq(null)}>Close</button></div>
-          </div>
-        </div>
+              <\/tbody>
+            <\/table>
+            {viewReq.notes && <div style={{ marginTop:12, padding:10, background:'var(--surface2)', borderRadius:8, fontSize:12, color:'var(--text-dim)' }}>{viewReq.notes}<\/div>}
+            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setViewReq(null)}>Close<\/button><\/div>
+          <\/div>
+        <\/div>
       )}
-    </div>
+    <\/div>
   )
 }
