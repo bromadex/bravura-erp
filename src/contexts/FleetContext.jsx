@@ -10,22 +10,46 @@ export function FleetProvider({ children }) {
   const [genRunLogs, setGenRunLogs] = useState([])
   const [earthMovers, setEarthMovers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fuelMap, setFuelMap] = useState({})   // vehicle reg -> total litres
+  const [genFuelMap, setGenFuelMap] = useState({}) // generator id -> total fuel from run logs
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
+  // Fetch all fleet data and fuel consumption
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [vRes, gRes, grRes, eRes] = await Promise.all([
+      const [vRes, gRes, grRes, eRes, fuelRes] = await Promise.all([
         supabase.from('fleet').select('*').order('reg'),
         supabase.from('generators').select('*').order('gen_code'),
         supabase.from('gen_run_log').select('*').order('date', { ascending: false }),
         supabase.from('earth_movers').select('*').order('reg'),
+        supabase.from('fuel_log').select('vehicle, amount'),
       ])
       if (vRes.data) setVehicles(vRes.data)
       if (gRes.data) setGenerators(gRes.data)
       if (grRes.data) setGenRunLogs(grRes.data)
       if (eRes.data) setEarthMovers(eRes.data)
+
+      // Build fuel map for vehicles (by registration)
+      const fMap = {}
+      if (fuelRes.data) {
+        fuelRes.data.forEach(f => {
+          if (f.vehicle) fMap[f.vehicle] = (fMap[f.vehicle] || 0) + (f.amount || 0)
+        })
+      }
+      setFuelMap(fMap)
+
+      // Build generator fuel map from run logs
+      const gMap = {}
+      if (grRes.data) {
+        grRes.data.forEach(log => {
+          const genId = log.gen_id
+          if (genId) gMap[genId] = (gMap[genId] || 0) + (log.fuel_used || 0)
+        })
+      }
+      setGenFuelMap(gMap)
+
     } catch (err) {
       console.error(err)
       toast.error('Failed to load fleet data')
@@ -110,20 +134,21 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // Helper: get total fuel consumed for a vehicle (from fuel_log)
-  const getVehicleFuel = (reg) => {
-    // This will be used in components by querying fuel_log directly or via context.
-    // We'll compute on demand inside components.
-    return 0 // placeholder – actual calculation done in component using Supabase query.
-  }
+  // Helper to get fuel for a vehicle by registration
+  const getVehicleFuel = (reg) => fuelMap[reg] || 0
+
+  // Helper to get total fuel for a generator by its id
+  const getGeneratorFuel = (genId) => genFuelMap[genId] || 0
 
   return (
     <FleetContext.Provider value={{
       vehicles, generators, genRunLogs, earthMovers, loading,
+      fuelMap: fuelMap,
       addVehicle, updateVehicle, deleteVehicle,
       addGenerator, updateGenerator, deleteGenerator,
       addGenRunLog, deleteGenRunLog,
       addEarthMover, updateEarthMover, deleteEarthMover,
+      getVehicleFuel, getGeneratorFuel,
       fetchAll,
     }}>
       {children}
