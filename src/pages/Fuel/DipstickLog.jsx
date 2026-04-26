@@ -92,57 +92,63 @@ export default function DipstickLog() {
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="11">Loading...<\/td><\/tr> : dipstickLog.length === 0 ? <tr><td colSpan="11">No records<\/td><\/tr> : dipstickLog.map(r => {
-              const tank = tanks.find(t => t.id === r.tank_id)
-              return (
-                <tr key={r.id}>
-                  <td>{r.date}<\/td>
-                  <td>{tank?.name || '-'}<\/td>
-                  <td>{r.dip_start_cm}<\/td><td>{r.dip_end_cm}<\/td>
-                  <td>{r.start_litres?.toFixed(0)}<\/td><td>{r.end_litres?.toFixed(0)}<\/td>
-                  <td style={{ color: 'var(--blue)' }}>{r.actual_issued?.toFixed(0)}<\/td>
-                  <td>{r.flowmeter_issued?.toFixed(0)}<\/td>
-                  <td style={{ color: Math.abs(r.error_liters) > 50 ? 'var(--red)' : 'var(--yellow)' }}>{r.error_liters?.toFixed(1)}<\/td>
-                  <td style={{ color: Math.abs(r.error_percent) > 5 ? 'var(--red)' : 'var(--yellow)' }}>{r.error_percent?.toFixed(1)}%<\/td>
-                  <td>{r.recorded_by || '-'}<\/td>
-                <\/tr>
-              )
-            })}
-          <\/tbody>
-        <\/table>
-      <\/div>
+            {loading ? (
+              <tr><td colSpan="11">Loading...</td></tr>
+            ) : dipstickLog.length === 0 ? (
+              <tr><td colSpan="11">No records</td></tr>
+            ) : (
+              dipstickLog.map(r => {
+                const tank = tanks.find(t => t.id === r.tank_id)
+                return (
+                  <tr key={r.id}>
+                    <td>{r.date}</td>
+                    <td>{tank?.name || '-'}</td>
+                    <td>{r.dip_start_cm}</td><td>{r.dip_end_cm}</td>
+                    <td>{r.start_litres?.toFixed(0)}</td><td>{r.end_litres?.toFixed(0)}</td>
+                    <td style={{ color: 'var(--blue)' }}>{r.actual_issued?.toFixed(0)}</td>
+                    <td>{r.flowmeter_issued?.toFixed(0)}</td>
+                    <td style={{ color: Math.abs(r.error_liters) > 50 ? 'var(--red)' : 'var(--yellow)' }}>{r.error_liters?.toFixed(1)}</td>
+                    <td style={{ color: Math.abs(r.error_percent) > 5 ? 'var(--red)' : 'var(--yellow)' }}>{r.error_percent?.toFixed(1)}%</td>
+                    <td>{r.recorded_by || '-'}</td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">New <span>Dipstick Record</span><\/div>
+            <div className="modal-title">New <span>Dipstick Record</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>TANK<\/label><select className="form-control" required value={form.tank_id} onChange={e => setForm({...form, tank_id: e.target.value})}><option value="">Select<\/option>{tanks.map(t => <option key={t.id} value={t.id}>{t.name}<\/option>)}<\/select><\/div>
-                <div className="form-group"><label>DATE<\/label><input type="date" className="form-control" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} /><\/div>
-              <\/div>
+                <div className="form-group"><label>TANK</label><select className="form-control" required value={form.tank_id} onChange={e => setForm({...form, tank_id: e.target.value})}><option value="">Select</option>{tanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                <div className="form-group"><label>DATE</label><input type="date" className="form-control" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>Dipstick Start (cm)<\/label><input type="number" step="0.01" className="form-control" value={form.dip_start_cm} onChange={e => setForm({...form, dip_start_cm: e.target.value})} onBlur={handleCalculate} /><\/div>
-                <div className="form-group"><label>Dipstick End (cm)<\/label><input type="number" step="0.01" className="form-control" value={form.dip_end_cm} onChange={e => setForm({...form, dip_end_cm: e.target.value})} onBlur={handleCalculate} /><\/div>
-              <\/div>
+                <div className="form-group"><label>Dipstick Start (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_start_cm} onChange={e => setForm({...form, dip_start_cm: e.target.value})} onBlur={handleCalculate} /></div>
+                <div className="form-group"><label>Dipstick End (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_end_cm} onChange={e => setForm({...form, dip_end_cm: e.target.value})} onBlur={handleCalculate} /></div>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>Flowmeter Start (L)<\/label><input type="number" step="0.1" className="form-control" value={form.flowmeter_start} onChange={e => setForm({...form, flowmeter_start: e.target.value})} onBlur={handleCalculate} /><\/div>
-                <div className="form-group"><label>Flowmeter End (L)<\/label><input type="number" step="0.1" className="form-control" value={form.flowmeter_end} onChange={e => setForm({...form, flowmeter_end: e.target.value})} onBlur={handleCalculate} /><\/div>
-              <\/div>
+                <div className="form-group"><label>Flowmeter Start (L)</label><input type="number" step="0.1" className="form-control" value={form.flowmeter_start} onChange={e => setForm({...form, flowmeter_start: e.target.value})} onBlur={handleCalculate} /></div>
+                <div className="form-group"><label>Flowmeter End (L)</label><input type="number" step="0.1" className="form-control" value={form.flowmeter_end} onChange={e => setForm({...form, flowmeter_end: e.target.value})} onBlur={handleCalculate} /></div>
+              </div>
               {calculated && (
                 <div style={{ background: 'var(--surface2)', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
-                  <div>Start: <strong>{calculated.startL.toFixed(0)} L<\/strong> | End: <strong>{calculated.endL.toFixed(0)} L<\/strong><\/div>
-                  <div>Actual Issued: <strong style={{ color: 'var(--blue)' }}>{calculated.actualIssued.toFixed(0)} L<\/strong><\/div>
-                  <div>Flowmeter Issued: <strong>{calculated.flowmeterIssued.toFixed(0)} L<\/strong><\/div>
-                  <div>Error: <strong style={{ color: Math.abs(calculated.errorLit) > 50 ? 'var(--red)' : 'var(--yellow)' }}>{calculated.errorLit.toFixed(1)} L ({calculated.errorPct.toFixed(1)}%)<\/strong><\/div>
-                <\/div>
+                  <div>Start: <strong>{calculated.startL.toFixed(0)} L</strong> | End: <strong>{calculated.endL.toFixed(0)} L</strong></div>
+                  <div>Actual Issued: <strong style={{ color: 'var(--blue)' }}>{calculated.actualIssued.toFixed(0)} L</strong></div>
+                  <div>Flowmeter Issued: <strong>{calculated.flowmeterIssued.toFixed(0)} L</strong></div>
+                  <div>Error: <strong style={{ color: Math.abs(calculated.errorLit) > 50 ? 'var(--red)' : 'var(--yellow)' }}>{calculated.errorLit.toFixed(1)} L ({calculated.errorPct.toFixed(1)}%)</strong></div>
+                </div>
               )}
-              <div className="form-group"><label>Notes<\/label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /><\/div>
-              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel<\/button><button type="submit" className="btn btn-primary">Save Record<\/button><\/div>
-            <\/form>
-          <\/div>
-        <\/div>
+              <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /></div>
+              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">Save Record</button></div>
+            </form>
+          </div>
+        </div>
       )}
-    <\/div>
+    </div>
   )
 }
