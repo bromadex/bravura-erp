@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 
 const FuelContext = createContext(null)
 
-// Tank constant (from original HTML – ZUFTA10)
+// Tank constant (ZUFTA10 – 10,103L)
 const TANK_MAX_LITRES = 10103
 const DIPSTICK_TABLE = [
   [0.00,0],[0.01,6],[0.02,17],[0.03,31],[0.04,48],[0.05,67],[0.06,88],[0.07,111],[0.08,136],[0.09,162],
@@ -58,7 +58,7 @@ export function FuelProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Helper: convert cm to litres using DIPSTICK_TABLE
+  // Convert cm to litres using DIPSTICK_TABLE
   const getLitresFromCm = (cm) => {
     if (cm === null || cm === undefined || isNaN(cm)) return 0
     if (cm <= 0) return 0
@@ -74,7 +74,6 @@ export function FuelProvider({ children }) {
     return 0
   }
 
-  // Add fuel issuance
   const addIssuance = async (issuance) => {
     const id = generateId()
     const { error } = await supabase.from('fuel_log').insert([{ id, ...issuance, created_at: new Date().toISOString() }])
@@ -82,7 +81,6 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
-  // Add fuel delivery
   const addDelivery = async (delivery) => {
     const id = generateId()
     const { error } = await supabase.from('fuel_deliveries').insert([{ id, ...delivery, created_at: new Date().toISOString() }])
@@ -90,7 +88,6 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
-  // Add dipstick record (with automatic calculation)
   const addDipstick = async (record) => {
     const id = generateId()
     const { error } = await supabase.from('dipstick_log').insert([{ id, ...record, created_at: new Date().toISOString() }])
@@ -98,17 +95,13 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
-  // Get current tank level from latest dipstick (end reading)
   const getCurrentTankLevel = () => {
     if (!dipstickLog.length) return 0
     const latest = [...dipstickLog].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
     return latest.fuel_end || latest.end_litres || 0
   }
 
-  // Get tank percentage
-  const getTankPercentage = () => {
-    return (getCurrentTankLevel() / TANK_MAX_LITRES) * 100
-  }
+  const getTankPercentage = () => (getCurrentTankLevel() / TANK_MAX_LITRES) * 100
 
   return (
     <FuelContext.Provider value={{
