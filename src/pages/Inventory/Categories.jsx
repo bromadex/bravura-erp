@@ -6,7 +6,7 @@ export default function Categories() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newCategory, setNewCategory] = useState({ name: '', icon: '' })
+  const [newCategory, setNewCategory] = useState({ name: '', icon: 'category' })
 
   const fetchCategories = async () => {
     setLoading(true)
@@ -25,12 +25,13 @@ export default function Categories() {
 
   const handleAdd = async () => {
     if (!newCategory.name.trim()) return toast.error('Category name required')
-    const { error } = await supabase.from('categories').insert([{ name: newCategory.name, icon: newCategory.icon || 'category' }])
+    const iconName = newCategory.icon.trim() || 'category'
+    const { error } = await supabase.from('categories').insert([{ name: newCategory.name, icon: iconName }])
     if (error) {
       toast.error(error.message)
     } else {
       toast.success('Category added')
-      setNewCategory({ name: '', icon: '' })
+      setNewCategory({ name: '', icon: 'category' })
       setShowAddModal(false)
       fetchCategories()
     }
@@ -58,9 +59,13 @@ export default function Categories() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="categories-table">
           <thead>
-            <tr><th>Icon</th><th>Category Name</th><th>Actions</th></tr>
+            <tr>
+              <th>Icon</th>
+              <th>Category Name</th>
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {loading ? (
@@ -70,7 +75,11 @@ export default function Categories() {
             ) : (
               categories.map((cat) => (
                 <tr key={cat.name}>
-                  <td><span className="material-icons" style={{ color: 'var(--gold)' }}>{cat.icon || 'category'}</span></td>
+                  <td>
+                    <span className="material-icons" style={{ fontSize: 24, color: 'var(--gold)' }}>
+                      {cat.icon || 'category'}
+                    </span>
+                  </td>
                   <td style={{ fontWeight: 600 }}>{cat.name}</td>
                   <td>
                     <button className="btn btn-danger btn-sm" onClick={() => handleDelete(cat.name)}>
@@ -92,13 +101,32 @@ export default function Categories() {
               Add <span>Category</span>
             </div>
             <div className="form-group">
-              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category</span> Category Name</label>
-              <input className="form-control" placeholder="e.g. Plumbing Supplies" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} />
+              <label>
+                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category</span>
+                Category Name
+              </label>
+              <input 
+                className="form-control" 
+                placeholder="e.g. Plumbing Supplies" 
+                value={newCategory.name} 
+                onChange={e => setNewCategory({...newCategory, name: e.target.value})} 
+              />
             </div>
             <div className="form-group">
-              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>style</span> Icon Name</label>
-              <input className="form-control" placeholder="e.g. plumbing, electrical_services, build" value={newCategory.icon} onChange={e => setNewCategory({...newCategory, icon: e.target.value})} />
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Material icon name (default: category)</div>
+              <label>
+                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>style</span>
+                Material Icon
+              </label>
+              <input 
+                className="form-control" 
+                placeholder="e.g. plumbing, electrical_services, build" 
+                value={newCategory.icon} 
+                onChange={e => setNewCategory({...newCategory, icon: e.target.value})} 
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span>Preview: <span className="material-icons" style={{ fontSize: 18, verticalAlign: 'middle' }}>{newCategory.icon || 'category'}</span></span>
+                <span>Common icons: <code>category</code>, <code>build</code>, <code>plumbing</code>, <code>electrical_services</code></span>
+              </div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
