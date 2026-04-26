@@ -66,7 +66,7 @@ export default function Suppliers() {
         <table>
           <thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Terms</th><th>Lead Time</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {loading ? (<tr><td colSpan="8">Loading...</td></tr>) : suppliers.length === 0 ? (<tr><td colSpan="8">No suppliers</td></tr>) : (
+            {loading ? <tr><td colSpan="8">Loading...</td></tr> : suppliers.length === 0 ? <tr><td colSpan="8">No suppliers</td></tr> : (
               suppliers.map(s => (
                 <tr key={s.id}>
                   <td><strong>{s.name}</strong></td>
