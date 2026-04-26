@@ -9,6 +9,9 @@ import Layout from './components/layout/Layout'
 import StockBalance from './pages/Inventory/StockBalance'
 import StockIn from './pages/Inventory/StockIn'
 import StockOut from './pages/Inventory/StockOut'
+import Transactions from './pages/Inventory/Transactions'
+import StockTaking from './pages/Inventory/StockTaking'
+import Categories from './pages/Inventory/Categories'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -60,9 +63,9 @@ function AppRoutes() {
         <Route path="stock-balance" element={<StockBalance />} />
         <Route path="stock-in" element={<StockIn />} />
         <Route path="stock-out" element={<StockOut />} />
-        <Route path="transactions" element={<ModulePlaceholder module="inventory" page="transactions" />} />
-        <Route path="stock-taking" element={<ModulePlaceholder module="inventory" page="stock-taking" />} />
-        <Route path="categories" element={<ModulePlaceholder module="inventory" page="categories" />} />
+        <Route path="transactions" element={<Transactions />} />
+        <Route path="stock-taking" element={<StockTaking />} />
+        <Route path="categories" element={<Categories />} />
       </Route>
 
       {/* Other modules - placeholder */}
