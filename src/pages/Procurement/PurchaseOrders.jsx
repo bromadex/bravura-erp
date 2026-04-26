@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function PurchaseOrders() {
-  const { purchaseOrders, suppliers, createPurchaseOrder, updatePurchaseOrderStatus, loading } = useProcurement()
+  const { purchaseOrders, suppliers, createPurchaseOrder, loading } = useProcurement()
   const { user } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({
@@ -61,7 +61,9 @@ export default function PurchaseOrders() {
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>PO #</th><th>Supplier</th><th>Order Date</th><th>Delivery Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <thead>
+            <tr><th>PO #</th><th>Supplier</th><th>Order Date</th><th>Delivery Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr>
+          </thead>
           <tbody>
             {loading ? <tr><td colSpan="8">Loading...</td></tr> : purchaseOrders.length === 0 ? <tr><td colSpan="8">No purchase orders</td></tr> : purchaseOrders.map(po => {
               const items = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : (po.items || [])
@@ -71,8 +73,8 @@ export default function PurchaseOrders() {
                   <td>{po.supplier_name}</td>
                   <td>{po.order_date}</td>
                   <td>{po.delivery_date || '-'}</td>
-                  <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
-                  <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${parseFloat(po.total_amount || 0).toFixed(2)}</td>
+                  <td>{items.length}</td>
+                  <td>${parseFloat(po.total_amount || 0).toFixed(2)}</td>
                   <td><span className={`badge ${po.status === 'completed' ? 'badge-green' : po.status === 'confirmed' ? 'badge-blue' : 'badge-yellow'}`}>{po.status}</span></td>
                   <td><button className="btn btn-secondary btn-sm" onClick={() => { alert('Receive goods – coming soon') }}><span className="material-icons">move_to_inbox</span> Receive</button></td>
                 </tr>
