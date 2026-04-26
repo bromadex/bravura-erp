@@ -71,14 +71,14 @@ export default function Vehicles() {
               <div style={{ fontSize: 12, marginTop: 4 }}>{v.description || ''}</div>
               {v.driver_name && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>person</span> {v.driver_name}</div>}
               {v.assigned_project && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>location_on</span> {v.assigned_project}</div>}
-              <div style={{ marginTop: 8, fontSize: 12 }}>📊 Odometer: <strong>{v.odometer_km?.toLocaleString()} km</strong></div>
+              <div style={{ marginTop: 8, fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>straighten</span> Odometer: <strong>{v.odometer_km?.toLocaleString()} km</strong></div>
               {efficiency && (
                 <div style={{ fontSize: 12 }}>
-                  ⛽ Fuel Efficiency: <strong>{efficiency.kmPerLiter?.toFixed(1)} km/L</strong> ({efficiency.litersPer100km?.toFixed(1)} L/100km)
+                  <span className="material-icons" style={{ fontSize: 12 }}>local_gas_station</span> Fuel Efficiency: <strong>{efficiency.kmPerLiter?.toFixed(1)} km/L</strong> ({efficiency.litersPer100km?.toFixed(1)} L/100km)
                 </div>
               )}
               <div style={{ fontSize: 12 }}>
-                🛠️ Last Service: {v.last_service_date || '—'} {nextService && nextService.type === 'date' && (
+                <span className="material-icons" style={{ fontSize: 12 }}>build</span> Last Service: {v.last_service_date || '—'} {nextService && nextService.type === 'date' && (
                   <span style={{ color: isServiceOverdue ? 'var(--red)' : 'var(--green)' }}>
                     · Next: {nextService} {isServiceOverdue && '(Overdue)'}
                   </span>
