@@ -94,72 +94,81 @@ export default function FuelIssuance() {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Date</th><th>Time</th><th>Tank</th><th>Type</th><th>Equipment</th><th>Qty (L)</th><th>Driver/Operator</th><th>Authorized By</th><th>Purpose</th><th>Odometer</th></tr>
+            <tr>
+              <th>Date</th><th>Time</th><th>Tank</th><th>Type</th><th>Equipment</th><th>Qty (L)</th>
+              <th>Driver/Operator</th><th>Authorized By</th><th>Purpose</th><th>Odometer</th>
+            </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="10">Loading...<\/td><\/tr> : issuances.length === 0 ? <tr><td colSpan="10">No issuances<\/td><\/tr> : issuances.map(i => {
-              const tank = tanks.find(t => t.id === i.tank_id)
-              return (
-                <tr key={i.id}>
-                  <td>{i.date}<\/td><td>{i.time}<\/td>
-                  <td>{tank?.name || '-'}<\/td>
-                  <td><span className="badge bg-blue">{i.fuel_type}<\/span><\/td>
-                  <td><strong>{i.equipment_name}<\/strong><\/td>
-                  <td style={{ color: 'var(--blue)' }}>{i.quantity.toLocaleString()}<\/td>
-                  <td>{i.driver_operator || '-'}<\/td>
-                  <td>{i.authorized_by || '-'}<\/td>
-                  <td>{i.purpose || '-'}<\/td>
-                  <td>{i.odometer_reading || '-'}<\/td>
-                <\/tr>
-              )
-            })}
-          <\/tbody>
-        <\/table>
-      <\/div>
+            {loading ? (
+              <tr><td colSpan="10">Loading...</td></tr>
+            ) : issuances.length === 0 ? (
+              <tr><td colSpan="10">No issuances</td></tr>
+            ) : (
+              issuances.map(i => {
+                const tank = tanks.find(t => t.id === i.tank_id)
+                return (
+                  <tr key={i.id}>
+                    <td>{i.date}</td><td>{i.time}</td>
+                    <td>{tank?.name || '-'}</td>
+                    <td><span className="badge bg-blue">{i.fuel_type}</span></td>
+                    <td><strong>{i.equipment_name}</strong></td>
+                    <td style={{ color: 'var(--blue)' }}>{i.quantity.toLocaleString()}</td>
+                    <td>{i.driver_operator || '-'}</td>
+                    <td>{i.authorized_by || '-'}</td>
+                    <td>{i.purpose || '-'}</td>
+                    <td>{i.odometer_reading || '-'}</td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Log <span>Fuel Issuance</span><\/div>
+            <div className="modal-title">Log <span>Fuel Issuance</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>TANK<\/label><select className="form-control" required value={form.tank_id} onChange={e => setForm({...form, tank_id: e.target.value})}><option value="">Select<\/option>{tanks.map(t => <option key={t.id} value={t.id}>{t.name} (current: {t.current_level?.toFixed(0)} L)<\/option>)}<\/select><\/div>
-                <div className="form-group"><label>DATE<\/label><input type="date" className="form-control" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} /><\/div>
-                <div className="form-group"><label>TIME<\/label><input type="time" className="form-control" value={form.time} onChange={e => setForm({...form, time: e.target.value})} /><\/div>
-              <\/div>
+                <div className="form-group"><label>TANK</label><select className="form-control" required value={form.tank_id} onChange={e => setForm({...form, tank_id: e.target.value})}><option value="">Select</option>{tanks.map(t => <option key={t.id} value={t.id}>{t.name} (current: {t.current_level?.toFixed(0)} L)</option>)}</select></div>
+                <div className="form-group"><label>DATE</label><input type="date" className="form-control" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
+                <div className="form-group"><label>TIME</label><input type="time" className="form-control" value={form.time} onChange={e => setForm({...form, time: e.target.value})} /></div>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>FUEL TYPE<\/label><select className="form-control" value={form.fuel_type} onChange={e => setForm({...form, fuel_type: e.target.value})}><option>DIESEL<\/option><option>PETROL<\/option><option>PARAFFIN<\/option><\/select><\/div>
-                <div className="form-group"><label>QUANTITY (Litres) *<\/label><input type="number" step="0.1" className="form-control" required value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} /><\/div>
-              <\/div>
-              <div className="form-group"><label>EQUIPMENT TYPE<\/label>
+                <div className="form-group"><label>FUEL TYPE</label><select className="form-control" value={form.fuel_type} onChange={e => setForm({...form, fuel_type: e.target.value})}><option>DIESEL</option><option>PETROL</option><option>PARAFFIN</option></select></div>
+                <div className="form-group"><label>QUANTITY (Litres) *</label><input type="number" step="0.1" className="form-control" required value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} /></div>
+              </div>
+              <div className="form-group"><label>EQUIPMENT TYPE</label>
                 <div style={{ display:'flex', gap:8, marginBottom:8 }}>
                   {['vehicle','generator','earthmover'].map(t => (
-                    <button key={t} type="button" className={`btn btn-sm ${form.equipment_type === t ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setForm({...form, equipment_type: t, equipment_id: '', equipment_name: ''})}>{t}<\/button>
+                    <button key={t} type="button" className={`btn btn-sm ${form.equipment_type === t ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setForm({...form, equipment_type: t, equipment_id: '', equipment_name: ''})}>{t}</button>
                   ))}
-                <\/div>
-              <\/div>
-              <div className="form-group"><label>EQUIPMENT<\/label>
+                </div>
+              </div>
+              <div className="form-group"><label>EQUIPMENT</label>
                 <select className="form-control" required value={form.equipment_id} onChange={e => handleEquipmentChange(form.equipment_type, e.target.value)}>
-                  <option value="">Select<\/option>
-                  {form.equipment_type === 'vehicle' && vehicles.map(v => <option key={v.id} value={v.id}>{v.reg} - {v.description}<\/option>)}
-                  {form.equipment_type === 'generator' && generators.map(g => <option key={g.id} value={g.id}>{g.gen_code} - {g.gen_name}<\/option>)}
-                  {form.equipment_type === 'earthmover' && earthmovers.map(e => <option key={e.id} value={e.id}>{e.reg} - {e.description}<\/option>)}
-                <\/select>
-              <\/div>
+                  <option value="">Select</option>
+                  {form.equipment_type === 'vehicle' && vehicles.map(v => <option key={v.id} value={v.id}>{v.reg} - {v.description}</option>)}
+                  {form.equipment_type === 'generator' && generators.map(g => <option key={g.id} value={g.id}>{g.gen_code} - {g.gen_name}</option>)}
+                  {form.equipment_type === 'earthmover' && earthmovers.map(e => <option key={e.id} value={e.id}>{e.reg} - {e.description}</option>)}
+                </select>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>Driver / Operator<\/label><input className="form-control" value={form.driver_operator} onChange={e => setForm({...form, driver_operator: e.target.value})} /><\/div>
-                <div className="form-group"><label>Odometer (km) or Engine Hours<\/label><input type="number" step="0.1" className="form-control" placeholder="Optional" value={form.odometer_reading} onChange={e => setForm({...form, odometer_reading: e.target.value})} /><\/div>
-              <\/div>
+                <div className="form-group"><label>Driver / Operator</label><input className="form-control" value={form.driver_operator} onChange={e => setForm({...form, driver_operator: e.target.value})} /></div>
+                <div className="form-group"><label>Odometer (km) or Engine Hours</label><input type="number" step="0.1" className="form-control" placeholder="Optional" value={form.odometer_reading} onChange={e => setForm({...form, odometer_reading: e.target.value})} /></div>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>Authorized By<\/label><input className="form-control" value={form.authorized_by} onChange={e => setForm({...form, authorized_by: e.target.value})} /><\/div>
-                <div className="form-group"><label>Purpose<\/label><input className="form-control" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} /><\/div>
-              <\/div>
-              <div className="form-group"><label>Notes<\/label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /><\/div>
-              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel<\/button><button type="submit" className="btn btn-primary">Log Issuance<\/button><\/div>
-            <\/form>
-          <\/div>
-        <\/div>
+                <div className="form-group"><label>Authorized By</label><input className="form-control" value={form.authorized_by} onChange={e => setForm({...form, authorized_by: e.target.value})} /></div>
+                <div className="form-group"><label>Purpose</label><input className="form-control" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} /></div>
+              </div>
+              <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /></div>
+              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">Log Issuance</button></div>
+            </form>
+          </div>
+        </div>
       )}
-    <\/div>
+    </div>
   )
 }
