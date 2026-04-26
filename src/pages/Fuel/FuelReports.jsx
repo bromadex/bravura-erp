@@ -13,10 +13,22 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js'
 import { Bar, Line } from 'react-chartjs-2'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend)
+// Register all required components once
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 export default function FuelReports() {
   const { issuances, getIssuanceByDay, getIssuanceByVehicle, getTankLevelTrend, predictDaysUntilEmpty, getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES } = useFuel()
@@ -68,9 +80,18 @@ export default function FuelReports() {
     }
   }
 
-  // Chart options
-  const barOptions = { responsive: true, plugins: { legend: { position: 'top' } } }
-  const lineOptions = { responsive: true, plugins: { legend: { position: 'top' } } }
+  const barOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { position: 'top', labels: { color: 'var(--text)' } } },
+    scales: { y: { ticks: { color: 'var(--text-dim)' } }, x: { ticks: { color: 'var(--text-dim)' } } }
+  }
+  const lineOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { position: 'top', labels: { color: 'var(--text)' } } },
+    scales: { y: { ticks: { color: 'var(--text-dim)' } }, x: { ticks: { color: 'var(--text-dim)' } } }
+  }
 
   return (
     <div>
@@ -81,7 +102,6 @@ export default function FuelReports() {
         </button>
       </div>
 
-      {/* Low fuel alert and requisition button */}
       {isLow && (
         <div className="card" style={{ background: 'rgba(248,113,113,.1)', borderColor: 'var(--red)', marginBottom: 20, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -97,7 +117,6 @@ export default function FuelReports() {
         </div>
       )}
 
-      {/* Prediction */}
       {prediction && (
         <div className="card" style={{ padding: 16, marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -113,43 +132,49 @@ export default function FuelReports() {
       {/* Chart: Issuance by day */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Fuel Issuance by Day</h3>
-        {issuanceByDay.labels.length > 0 ? (
-          <Line
-            data={{
-              labels: issuanceByDay.labels,
-              datasets: [{ label: 'Litres', data: issuanceByDay.data, borderColor: 'var(--blue)', backgroundColor: 'rgba(96,165,250,0.2)', fill: true }],
-            }}
-            options={lineOptions}
-          />
-        ) : <div className="empty-state">No data for chart</div>}
+        {issuanceByDay.labels && issuanceByDay.labels.length > 0 ? (
+          <div style={{ height: 300 }}>
+            <Line
+              data={{
+                labels: issuanceByDay.labels,
+                datasets: [{ label: 'Litres', data: issuanceByDay.data, borderColor: 'var(--blue)', backgroundColor: 'rgba(96,165,250,0.2)', fill: true, tension: 0.3 }],
+              }}
+              options={lineOptions}
+            />
+          </div>
+        ) : <div className="empty-state">No data for chart – add fuel issuances first</div>}
       </div>
 
       {/* Chart: Issuance by vehicle */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Fuel Issuance by Vehicle (Top 10)</h3>
-        {issuanceByVehicle.labels.length > 0 ? (
-          <Bar
-            data={{
-              labels: issuanceByVehicle.labels,
-              datasets: [{ label: 'Litres', data: issuanceByVehicle.data, backgroundColor: 'var(--gold)' }],
-            }}
-            options={barOptions}
-          />
-        ) : <div className="empty-state">No data for chart</div>}
+        {issuanceByVehicle.labels && issuanceByVehicle.labels.length > 0 ? (
+          <div style={{ height: 300 }}>
+            <Bar
+              data={{
+                labels: issuanceByVehicle.labels,
+                datasets: [{ label: 'Litres', data: issuanceByVehicle.data, backgroundColor: 'var(--gold)' }],
+              }}
+              options={barOptions}
+            />
+          </div>
+        ) : <div className="empty-state">No data for chart – add fuel issuances first</div>}
       </div>
 
-      {/* Chart: Tank level per day */}
+      {/* Chart: Tank level over time */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Main Tank Level Over Time</h3>
-        {tankTrend.labels.length > 0 ? (
-          <Line
-            data={{
-              labels: tankTrend.labels,
-              datasets: [{ label: 'Litres', data: tankTrend.data, borderColor: 'var(--teal)', backgroundColor: 'rgba(45,212,191,0.2)', fill: true }],
-            }}
-            options={lineOptions}
-          />
-        ) : <div className="empty-state">No dipstick data available</div>}
+        {tankTrend.labels && tankTrend.labels.length > 0 ? (
+          <div style={{ height: 300 }}>
+            <Line
+              data={{
+                labels: tankTrend.labels,
+                datasets: [{ label: 'Litres', data: tankTrend.data, borderColor: 'var(--teal)', backgroundColor: 'rgba(45,212,191,0.2)', fill: true, tension: 0.3 }],
+              }}
+              options={lineOptions}
+            />
+          </div>
+        ) : <div className="empty-state">No dipstick data available – add dipstick records first</div>}
       </div>
 
       {/* Requisition Modal */}
