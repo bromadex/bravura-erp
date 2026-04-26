@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -49,6 +50,15 @@ export default function Categories() {
     }
   }
 
+  // Function to get valid icon name (fallback to 'category')
+  const getIconName = (icon) => {
+    if (!icon) return 'category'
+    // List of valid Material Icon names (common ones)
+    const validIcons = ['construction', 'electrical_services', 'category', 'build', 'safety_vest', 'plumbing', 'inventory', 'warehouse', 'local_shipping', 'factory']
+    if (validIcons.includes(icon)) return icon
+    return 'category'
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -69,72 +79,72 @@ export default function Categories() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 40 }}>Loading...</td></tr>
+              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 40 }}>Loading...<\/td><\/tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 40 }}>No categories found</td></tr>
+              <tr><td colSpan="3" style={{ textAlign: 'center', padding: 40 }}>No categories found<\/td><\/tr>
             ) : (
               categories.map((cat) => (
                 <tr key={cat.name}>
-                  <td>
-                    <span className="material-icons" style={{ fontSize: 24, color: 'var(--gold)' }}>
-                      {cat.icon || 'category'}
+                  <td style={{ textAlign: 'center' }}>
+                    <span className="material-icons" style={{ fontSize: 28, color: 'var(--gold)' }}>
+                      {getIconName(cat.icon)}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 600 }}>{cat.name}</td>
+                  <td style={{ fontWeight: 600 }}>{cat.name}<\/td>
                   <td>
                     <button className="btn btn-danger btn-sm" onClick={() => handleDelete(cat.name)}>
-                      <span className="material-icons" style={{ fontSize: 16 }}>delete</span>
+                      <span className="material-icons" style={{ fontSize: 16 }}>delete<\/span>
                     </button>
-                  </td>
-                </tr>
+                  <\/td>
+                <\/tr>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          <\/tbody>
+        <\/table>
+      <\/div>
 
       {showAddModal && (
         <div className="overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">
-              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>add</span>
-              Add <span>Category</span>
-            </div>
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>add<\/span>
+              Add <span>Category<\/span>
+            <\/div>
             <div className="form-group">
               <label>
-                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category</span>
+                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category<\/span>
                 Category Name
-              </label>
+              <\/label>
               <input 
                 className="form-control" 
                 placeholder="e.g. Plumbing Supplies" 
                 value={newCategory.name} 
                 onChange={e => setNewCategory({...newCategory, name: e.target.value})} 
               />
-            </div>
+            <\/div>
             <div className="form-group">
               <label>
-                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>style</span>
+                <span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>style<\/span>
                 Material Icon
-              </label>
+              <\/label>
               <input 
                 className="form-control" 
                 placeholder="e.g. plumbing, electrical_services, build" 
                 value={newCategory.icon} 
                 onChange={e => setNewCategory({...newCategory, icon: e.target.value})} 
               />
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span>Preview: <span className="material-icons" style={{ fontSize: 18, verticalAlign: 'middle' }}>{newCategory.icon || 'category'}</span></span>
-                <span>Common icons: <code>category</code>, <code>build</code>, <code>plumbing</code>, <code>electrical_services</code></span>
-              </div>
-            </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span>Preview: <span className="material-icons" style={{ fontSize: 18, verticalAlign: 'middle' }}>{newCategory.icon || 'category'}<\/span><\/span>
+                <span>Common icons: <code>category<\/code>, <code>build<\/code>, <code>plumbing<\/code>, <code>electrical_services<\/code>, <code>construction<\/code>, <code>safety_vest<\/code><\/span>
+              <\/div>
+            <\/div>
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAdd}>Add Category</button>
-            </div>
-          </div>
-        </div>
+              <button className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel<\/button>
+              <button className="btn btn-primary" onClick={handleAdd}>Add Category<\/button>
+            <\/div>
+          <\/div>
+        <\/div>
       )}
-    </div>
+    <\/div>
   )
 }
