@@ -32,9 +32,11 @@ import DipstickLog from './pages/Fuel/DipstickLog'
 import FuelReports from './pages/Fuel/FuelReports'
 
 // Fleet Pages
+import FleetDashboard from './pages/Fleet/FleetDashboard'
 import Vehicles from './pages/Fleet/Vehicles'
 import Generators from './pages/Fleet/Generators'
 import HeavyEquipment from './pages/Fleet/HeavyEquipment'
+import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -127,10 +129,12 @@ function AppRoutes() {
           </FleetProvider>
         </ProtectedRoute>
       }>
-        <Route index element={<Vehicles />} />
+        <Route index element={<FleetDashboard />} />
+        <Route path="dashboard" element={<FleetDashboard />} />
         <Route path="vehicles" element={<Vehicles />} />
         <Route path="generators" element={<Generators />} />
         <Route path="heavy-equipment" element={<HeavyEquipment />} />
+        <Route path="maintenance-alerts" element={<MaintenanceAlerts />} />
       </Route>
 
       {/* OTHER MODULES – placeholders */}
