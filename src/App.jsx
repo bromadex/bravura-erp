@@ -25,9 +25,9 @@ import GoodsReceived from './pages/Procurement/GoodsReceived'
 
 // Fuel
 import FuelTanks from './pages/Fuel/FuelTanks'
-import DipstickLog from './pages/Fuel/DipstickLog'
 import FuelIssuance from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
+import DipstickLog from './pages/Fuel/DipstickLog'
 import FuelReports from './pages/Fuel/FuelReports'
 
 function ProtectedRoute({ children }) {
@@ -95,9 +95,9 @@ function AppRoutes() {
       <Route path="/module/fuel" element={<ProtectedRoute><FuelProvider><Layout module="fuel" /></FuelProvider></ProtectedRoute>}>
         <Route index element={<FuelTanks />} />
         <Route path="tanks" element={<FuelTanks />} />
-        <Route path="dipstick" element={<DipstickLog />} />
         <Route path="issuance" element={<FuelIssuance />} />
         <Route path="deliveries" element={<FuelDeliveries />} />
+        <Route path="dipstick" element={<DipstickLog />} />
         <Route path="reports" element={<FuelReports />} />
       </Route>
 
