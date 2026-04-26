@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -9,11 +9,12 @@ export default function HeavyEquipment() {
   const [editing, setEditing] = useState(null)
   const [fuelMap, setFuelMap] = useState({})
   const [form, setForm] = useState({
-    reg: '', type: '', description: '', operator_name: '', status: 'Active'
+    reg: '', type: '', description: '', operator_name: '', status: 'Active',
+    hour_meter: 0, last_service_date: '', service_interval_hours: 500, assigned_project: ''
   })
 
-  // Fetch fuel consumption for heavy equipment (from fuel_log by reg)
-  useState(() => {
+  // Fetch fuel consumption from fuel_log
+  useEffect(() => {
     const loadFuel = async () => {
       const { data } = await supabase.from('fuel_log').select('vehicle, amount')
       if (data) {
@@ -32,11 +33,14 @@ export default function HeavyEquipment() {
       setEditing(eq)
       setForm({
         reg: eq.reg, type: eq.type || '', description: eq.description || '',
-        operator_name: eq.operator_name || '', status: eq.status || 'Active'
+        operator_name: eq.operator_name || '', status: eq.status || 'Active',
+        hour_meter: eq.hour_meter || 0, last_service_date: eq.last_service_date || '',
+        service_interval_hours: eq.service_interval_hours || 500,
+        assigned_project: eq.assigned_project || ''
       })
     } else {
       setEditing(null)
-      setForm({ reg: '', type: '', description: '', operator_name: '', status: 'Active' })
+      setForm({ reg: '', type: '', description: '', operator_name: '', status: 'Active', hour_meter: 0, last_service_date: '', service_interval_hours: 500, assigned_project: '' })
     }
     setModalOpen(true)
   }
@@ -61,6 +65,7 @@ export default function HeavyEquipment() {
     if (window.confirm(`Delete equipment "${eq.reg}"?`)) {
       await deleteEarthMover(eq.id)
       toast.success('Deleted')
+      await fetchAll()
     }
   }
 
@@ -73,33 +78,38 @@ export default function HeavyEquipment() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        {loading ? (
-          <div>Loading...</div>
-        ) : earthMovers.length === 0 ? (
-          <div className="empty-state">No equipment added</div>
-        ) : (
-          earthMovers.map(e => {
-            const totalFuel = fuelMap[e.reg] || 0
-            return (
-              <div key={e.id} className="card" style={{ padding: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>construction</span>
-                  <span className={`badge ${e.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{e.status}</span>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{e.reg}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{e.type || '—'}</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>{e.description || ''}</div>
-                {e.operator_name && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>person</span> {e.operator_name}</div>}
-                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 500 }}>⛽ Total Fuel: <strong>{totalFuel.toLocaleString()} L</strong></div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => openModal(e)}><span className="material-icons">edit</span></button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e)}><span className="material-icons">delete</span></button>
-                </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        {loading ? <div>Loading...</div> : earthMovers.length === 0 ? <div className="empty-state">No equipment added</div> : earthMovers.map(e => {
+          const totalFuel = fuelMap[e.reg] || 0
+          const efficiency = e.hour_meter > 0 ? totalFuel / e.hour_meter : null
+          return (
+            <div key={e.id} className="card" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>construction</span>
+                <span className={`badge ${e.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{e.status}</span>
               </div>
-            )
-          })
-        )}
+              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{e.reg}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{e.type || '—'}</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>{e.description || ''}</div>
+              {e.operator_name && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>person</span> {e.operator_name}</div>}
+              {e.assigned_project && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>location_on</span> {e.assigned_project}</div>}
+              <div style={{ marginTop: 8, fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> Hour Meter: <strong>{e.hour_meter?.toLocaleString()} hrs</strong></div>
+              {efficiency && (
+                <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>local_gas_station</span> Fuel Efficiency: <strong>{efficiency.toFixed(1)} L/hour</strong></div>
+              )}
+              <div style={{ fontSize: 12 }}>
+                <span className="material-icons" style={{ fontSize: 12 }}>build</span> Last Service: {e.last_service_date || '—'}
+                {e.last_service_date && e.service_interval_hours && (
+                  <span> · Next: {e.hour_meter + e.service_interval_hours} hrs</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => openModal(e)}><span className="material-icons">edit</span></button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e)}><span className="material-icons">delete</span></button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {modalOpen && (
@@ -115,6 +125,14 @@ export default function HeavyEquipment() {
               <div className="form-row">
                 <div className="form-group"><label>Operator Name</label><input className="form-control" value={form.operator_name} onChange={e => setForm({...form, operator_name: e.target.value})} /></div>
                 <div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>Grounded</option><option>Maintenance</option></select></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Hour Meter (hours)</label><input type="number" className="form-control" value={form.hour_meter} onChange={e => setForm({...form, hour_meter: parseFloat(e.target.value) || 0})} /></div>
+                <div className="form-group"><label>Last Service Date</label><input type="date" className="form-control" value={form.last_service_date} onChange={e => setForm({...form, last_service_date: e.target.value})} /></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Service Interval (hours)</label><input type="number" className="form-control" value={form.service_interval_hours} onChange={e => setForm({...form, service_interval_hours: parseInt(e.target.value) || 500})} /></div>
+                <div className="form-group"><label>Assigned Project / Site</label><input className="form-control" value={form.assigned_project} onChange={e => setForm({...form, assigned_project: e.target.value})} /></div>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
