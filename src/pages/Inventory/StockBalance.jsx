@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import { useInventory } from '../../hooks/useInventory'
 import toast from 'react-hot-toast'
@@ -5,7 +6,7 @@ import toast from 'react-hot-toast'
 function getStatus(balance, threshold) {
   if (balance <= 0) return { label: 'OUT', color: 'var(--red)', bg: 'rgba(248,113,113,.15)' }
   if (balance <= threshold) return { label: 'LOW', color: 'var(--yellow)', bg: 'rgba(251,191,36,.15)' }
-  if (balance <= threshold * 0.2) return { label: 'CRITICAL', color: 'var(--orange)', bg: 'rgba(249,115,22,.15)' }
+  if (balance <= threshold * 0.2) return { label: 'CRITICAL', color: '#fb923c', bg: 'rgba(249,115,22,.15)' }
   return { label: 'GOOD', color: 'var(--green)', bg: 'rgba(52,211,153,.15)' }
 }
 
@@ -28,7 +29,7 @@ export default function StockBalance() {
   })
 
   const handleDelete = async (item) => {
-    if (confirm(`Delete "${item.name}"? This will also delete all its transactions.`)) {
+    if (window.confirm(`Delete "${item.name}"? This will also remove all its transactions.`)) {
       await deleteItem(item.id)
       toast.success(`${item.name} deleted`)
     }
@@ -44,7 +45,7 @@ export default function StockBalance() {
       <div className="page-header">
         <h1 className="page-title">Stock Balance</h1>
         <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowAddModal(true) }}>
-          <span className="material-icons">add</span> Add Item
+          <span className="material-icons" style={{ fontSize: 18 }}>add</span> Add Item
         </button>
       </div>
 
@@ -84,7 +85,7 @@ export default function StockBalance() {
 
       {/* Table */}
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
               <th>#</th><th>Item Name</th><th>Category</th><th>Unit</th>
@@ -181,21 +182,47 @@ function ItemModal({ item, categories, onClose, onSave }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">{item ? 'Edit' : 'Add'} <span>Item</span></div>
+        <div className="modal-title">
+          <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>{item ? 'edit' : 'add'}</span>
+          {item ? 'Edit' : 'Add'} <span>Item</span>
+        </div>
         <form onSubmit={handleSubmit}>
-          <div className="form-group"><label>Item Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-          <div className="form-row">
-            <div className="form-group"><label>Category</label><select className="form-control" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>{categories.map(c => <option key={c}>{c}</option>)}</select></div>
-            <div className="form-group"><label>Unit</label><input className="form-control" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} /></div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>inventory</span> Item Name *</label>
+            <input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
           </div>
           <div className="form-row">
-            <div className="form-group"><label>Unit Cost (USD)</label><input type="number" step="0.01" className="form-control" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} /></div>
-            <div className="form-group"><label>Low Stock Threshold</label><input type="number" className="form-control" value={form.threshold} onChange={e => setForm({...form, threshold: parseInt(e.target.value) || 5})} /></div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category</span> Category</label>
+              <select className="form-control" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
+                {categories.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>straighten</span> Unit</label>
+              <input className="form-control" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>attach_money</span> Unit Cost (USD)</label>
+              <input type="number" step="0.01" className="form-control" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} />
+            </div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>warning</span> Low Stock Threshold</label>
+              <input type="number" className="form-control" value={form.threshold} onChange={e => setForm({...form, threshold: parseInt(e.target.value) || 5})} />
+            </div>
           </div>
           {!item && (
-            <div className="form-group"><label>Opening Stock</label><input type="number" className="form-control" value={form.openingStock} onChange={e => setForm({...form, openingStock: parseInt(e.target.value) || 0})} /></div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>add_circle</span> Opening Stock</label>
+              <input type="number" className="form-control" value={form.openingStock} onChange={e => setForm({...form, openingStock: parseInt(e.target.value) || 0})} />
+            </div>
           )}
-          <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /></div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>description</span> Notes</label>
+            <textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+          </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : (item ? 'Save Changes' : 'Add Item')}</button>
