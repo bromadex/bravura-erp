@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
 import { useAuth } from '../../contexts/AuthContext'
+import supabase from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function AssetIssues() {
-  const { vehicles, generators, earthMovers, addAssetIssue, updateAssetIssue, fetchAll } = useFleet()
+  const { vehicles, generators, earthMovers, addAssetIssue, updateAssetIssue } = useFleet()
   const { user } = useAuth()
   const [issues, setIssues] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -18,12 +19,13 @@ export default function AssetIssues() {
   })
 
   useEffect(() => {
-    const loadIssues = async () => {
-      const { data } = await supabase.from('asset_issues').select('*').order('created_at', { ascending: false })
-      if (data) setIssues(data)
-    }
     loadIssues()
   }, [])
+
+  const loadIssues = async () => {
+    const { data } = await supabase.from('asset_issues').select('*').order('created_at', { ascending: false })
+    if (data) setIssues(data)
+  }
 
   const getAssetName = (type, id) => {
     if (type === 'vehicle') return vehicles.find(v => v.id === id)?.reg
@@ -39,16 +41,14 @@ export default function AssetIssues() {
       await addAssetIssue(form)
       toast.success('Issue reported')
       setModalOpen(false)
-      const { data } = await supabase.from('asset_issues').select('*').order('created_at', { ascending: false })
-      if (data) setIssues(data)
+      loadIssues()
     } catch (err) { toast.error(err.message) }
   }
 
   const handleStatusUpdate = async (id, status) => {
     await updateAssetIssue(id, { status, resolved_date: status === 'resolved' ? new Date().toISOString().split('T')[0] : null })
     toast.success(`Issue marked as ${status}`)
-    const { data } = await supabase.from('asset_issues').select('*').order('created_at', { ascending: false })
-    if (data) setIssues(data)
+    loadIssues()
   }
 
   return (
@@ -61,7 +61,7 @@ export default function AssetIssues() {
       </div>
 
       <div className="table-wrap">
-        <table className="stock-table">
+        <table>
           <thead>
             <tr><th>Date</th><th>Asset</th><th>Issue</th><th>Urgency</th><th>Status</th><th>Reported By</th><th>Actions</th></tr>
           </thead>
