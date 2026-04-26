@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProcurement } from '../../contexts/ProcurementContext'
@@ -17,6 +17,7 @@ import {
 } from 'chart.js'
 import { Bar, Line } from 'react-chartjs-2'
 
+// Register all required components
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement, PointElement,
   Title, Tooltip, Legend, Filler
@@ -78,16 +79,48 @@ export default function FuelReports() {
     }
   }
 
-  const chartOptions = {
+  // Improved chart options with better visibility
+  const lineChartOptions = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: 'var(--text)' } },
-      tooltip: { bodyColor: 'var(--text)' },
+      legend: {
+        labels: { color: '#f1f5f9', font: { size: 12, weight: 'bold' } },
+      },
+      tooltip: { backgroundColor: '#1a2235', titleColor: '#f4a261', bodyColor: '#f1f5f9' },
     },
     scales: {
-      y: { ticks: { color: 'var(--text-dim)' } },
-      x: { ticks: { color: 'var(--text-dim)' } },
+      y: {
+        ticks: { color: '#94a3b8', stepSize: 500 },
+        grid: { color: 'rgba(148,163,184,0.2)' },
+        title: { display: true, text: 'Litres', color: '#94a3b8', font: { weight: 'bold' } },
+      },
+      x: {
+        ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 },
+        grid: { color: 'rgba(148,163,184,0.1)' },
+      },
+    },
+  }
+
+  const barChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: { color: '#f1f5f9', font: { size: 12, weight: 'bold' } },
+      },
+      tooltip: { backgroundColor: '#1a2235', titleColor: '#f4a261', bodyColor: '#f1f5f9' },
+    },
+    scales: {
+      y: {
+        ticks: { color: '#94a3b8', stepSize: 500 },
+        grid: { color: 'rgba(148,163,184,0.2)' },
+        title: { display: true, text: 'Litres', color: '#94a3b8', font: { weight: 'bold' } },
+      },
+      x: {
+        ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 },
+        grid: { color: 'rgba(148,163,184,0.1)' },
+      },
     },
   }
 
@@ -102,7 +135,7 @@ export default function FuelReports() {
 
       {/* Low fuel alert */}
       {isLow && (
-        <div className="card" style={{ background: 'rgba(248,113,113,.1)', borderColor: 'var(--red)', marginBottom: 20, padding: 16 }}>
+        <div className="card" style={{ background: 'rgba(248,113,113,.15)', borderColor: 'var(--red)', marginBottom: 24, padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <span className="material-icons" style={{ color: 'var(--red)', fontSize: 28, verticalAlign: 'middle', marginRight: 8 }}>warning</span>
@@ -118,9 +151,9 @@ export default function FuelReports() {
 
       {/* Prediction */}
       {prediction && (
-        <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <div className="card" style={{ padding: 16, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="material-icons" style={{ fontSize: 28, color: 'var(--gold)' }}>analytics</span>
+            <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>analytics</span>
             <div>
               <div style={{ fontWeight: 700 }}>Predicted next order date</div>
               <div style={{ fontSize: 13 }}>Based on recent consumption, the tank will be empty around <strong>{prediction}</strong>. Plan a purchase order.</div>
@@ -130,21 +163,28 @@ export default function FuelReports() {
       )}
 
       {/* Chart: Issuance by Day */}
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Fuel Issuance by Day</h3>
+      <div className="card" style={{ padding: 16, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Fuel Issuance by Day</h3>
         {issuanceByDay.labels?.length > 0 ? (
-          <div style={{ height: 300 }}>
-            <Line data={{
-              labels: issuanceByDay.labels,
-              datasets: [{
-                label: 'Litres',
-                data: issuanceByDay.data,
-                borderColor: 'var(--blue)',
-                backgroundColor: 'rgba(96,165,250,0.2)',
-                fill: true,
-                tension: 0.3,
-              }],
-            }} options={chartOptions} />
+          <div style={{ height: 400, width: '100%' }}>
+            <Line
+              data={{
+                labels: issuanceByDay.labels,
+                datasets: [{
+                  label: 'Litres Issued',
+                  data: issuanceByDay.data,
+                  borderColor: '#60a5fa',
+                  backgroundColor: 'rgba(96,165,250,0.2)',
+                  borderWidth: 3,
+                  pointRadius: 5,
+                  pointBackgroundColor: '#60a5fa',
+                  pointBorderColor: '#fff',
+                  fill: true,
+                  tension: 0.3,
+                }],
+              }}
+              options={lineChartOptions}
+            />
           </div>
         ) : (
           <div className="empty-state">No data – add fuel issuances first</div>
@@ -152,18 +192,23 @@ export default function FuelReports() {
       </div>
 
       {/* Chart: Issuance by Vehicle */}
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Fuel Issuance by Vehicle (Top 10)</h3>
+      <div className="card" style={{ padding: 16, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Fuel Issuance by Vehicle (Top 10)</h3>
         {issuanceByVehicle.labels?.length > 0 ? (
-          <div style={{ height: 300 }}>
-            <Bar data={{
-              labels: issuanceByVehicle.labels,
-              datasets: [{
-                label: 'Litres',
-                data: issuanceByVehicle.data,
-                backgroundColor: 'var(--gold)',
-              }],
-            }} options={chartOptions} />
+          <div style={{ height: 400, width: '100%' }}>
+            <Bar
+              data={{
+                labels: issuanceByVehicle.labels,
+                datasets: [{
+                  label: 'Litres Issued',
+                  data: issuanceByVehicle.data,
+                  backgroundColor: '#f4a261',
+                  borderRadius: 6,
+                  barPercentage: 0.7,
+                }],
+              }}
+              options={barChartOptions}
+            />
           </div>
         ) : (
           <div className="empty-state">No data – add fuel issuances first</div>
@@ -171,21 +216,28 @@ export default function FuelReports() {
       </div>
 
       {/* Chart: Tank Level Over Time */}
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Main Tank Level Over Time</h3>
+      <div className="card" style={{ padding: 16, marginBottom: 24 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Main Tank Level Over Time</h3>
         {tankTrend.labels?.length > 0 ? (
-          <div style={{ height: 300 }}>
-            <Line data={{
-              labels: tankTrend.labels,
-              datasets: [{
-                label: 'Litres',
-                data: tankTrend.data,
-                borderColor: 'var(--teal)',
-                backgroundColor: 'rgba(45,212,191,0.2)',
-                fill: true,
-                tension: 0.3,
-              }],
-            }} options={chartOptions} />
+          <div style={{ height: 400, width: '100%' }}>
+            <Line
+              data={{
+                labels: tankTrend.labels,
+                datasets: [{
+                  label: 'Litres in Tank',
+                  data: tankTrend.data,
+                  borderColor: '#2dd4bf',
+                  backgroundColor: 'rgba(45,212,191,0.2)',
+                  borderWidth: 3,
+                  pointRadius: 5,
+                  pointBackgroundColor: '#2dd4bf',
+                  pointBorderColor: '#fff',
+                  fill: true,
+                  tension: 0.3,
+                }],
+              }}
+              options={lineChartOptions}
+            />
           </div>
         ) : (
           <div className="empty-state">No dipstick data – add dipstick records first</div>
