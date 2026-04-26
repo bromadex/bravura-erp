@@ -13,13 +13,17 @@ export default function StockOut() {
       <div className="page-header">
         <h1 className="page-title">Stock Out Log</h1>
         <button className="btn btn-danger" onClick={() => setShowModal(true)}>
-          <span className="material-icons">remove</span> Stock Out
+          <span className="material-icons" style={{ fontSize: 18 }}>remove</span> Stock Out
         </button>
       </div>
 
       <div className="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>Date</th><th>Item</th><th>Category</th><th>Qty</th><th>Issued To</th><th>Authorized By</th><th>Purpose</th></tr></thead>
+        <table className="stock-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Date</th><th>Item</th><th>Category</th><th>Qty</th><th>Issued To</th><th>Authorized By</th><th>Purpose</th>
+            </tr>
+          </thead>
           <tbody>
             {loading ? (
               <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>Loading...</td></tr>
@@ -33,9 +37,9 @@ export default function StockOut() {
                   <td style={{ fontWeight: 600 }}>{tx.item_name}</td>
                   <td>{tx.category}</td>
                   <td style={{ color: 'var(--red)' }}>-{tx.qty}</td>
-                  <td>{tx.issued_to || '—'}</td>
-                  <td>{tx.authorized_by || '—'}</td>
-                  <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{tx.notes || '—'}</td>
+                  <td>{tx.issued_to || '-'}</td>
+                  <td>{tx.authorized_by || '-'}</td>
+                  <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{tx.notes || '-'}</td>
                 </tr>
               ))
             )}
@@ -65,7 +69,7 @@ function StockOutModal({ items, onClose, onSave }) {
     e.preventDefault()
     if (!form.itemId) return toast.error('Select an item')
     if (!form.quantity || form.quantity <= 0) return toast.error('Enter a valid quantity')
-    if (!isValid) return toast.error(`Insufficient stock. Available: ${selectedItem.balance} ${selectedItem.unit || 'pcs'}`)
+    if (!isValid) return toast.error(`Insufficient stock. Available: ${selectedItem.balance} ${selectedItem?.unit || 'pcs'}`)
     setLoading(true)
     try {
       await onSave(form.itemId, form.quantity, form.date, form.issuedTo, form.authorizedBy || 'System', form.purpose)
@@ -81,28 +85,53 @@ function StockOutModal({ items, onClose, onSave }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">📤 Stock <span>Out</span></div>
+        <div className="modal-title">
+          <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>assignment_return</span>
+          Stock <span>Out</span>
+        </div>
         <form onSubmit={handleSubmit}>
-          <div className="form-group"><label>Item *</label>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>category</span> Item *</label>
             <select className="form-control" required value={form.itemId} onChange={e => setForm({...form, itemId: e.target.value})}>
               <option value="">Select item</option>
               {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit || 'pcs'}) — Balance: {i.balance}</option>)}
             </select>
           </div>
           {selectedItem && (
-            <div style={{ background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)', padding: 8, borderRadius: 8, marginBottom: 12, fontSize: 12, color: !isValid ? 'var(--red)' : 'var(--green)' }}>
-              Available: {selectedItem.balance} {selectedItem.unit || 'pcs'} | Threshold: {selectedItem.threshold}
+            <div style={{ 
+              background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)', 
+              padding: 8, borderRadius: 8, marginBottom: 12, fontSize: 12, 
+              display: 'flex', alignItems: 'center', gap: 16,
+              color: !isValid ? 'var(--red)' : 'var(--green)'
+            }}>
+              <span><span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle' }}>straighten</span> Available: <strong>{selectedItem.balance} {selectedItem.unit || 'pcs'}</strong></span>
+              <span><span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle' }}>warning</span> Threshold: <strong>{selectedItem.threshold}</strong></span>
             </div>
           )}
           <div className="form-row">
-            <div className="form-group"><label>Quantity *</label><input type="number" className="form-control" required min="1" max={selectedItem?.balance || 0} value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value) || 0})} /></div>
-            <div className="form-group"><label>Date</label><input type="date" className="form-control" value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>remove_circle</span> Quantity *</label>
+              <input type="number" className="form-control" required min="1" max={selectedItem?.balance || 0} value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value) || 0})} />
+            </div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>event</span> Date</label>
+              <input type="date" className="form-control" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
+            </div>
           </div>
           <div className="form-row">
-            <div className="form-group"><label>Issued To</label><input className="form-control" value={form.issuedTo} onChange={e => setForm({...form, issuedTo: e.target.value})} /></div>
-            <div className="form-group"><label>Authorized By</label><input className="form-control" value={form.authorizedBy} onChange={e => setForm({...form, authorizedBy: e.target.value})} /></div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>person</span> Issued To</label>
+              <input className="form-control" value={form.issuedTo} onChange={e => setForm({...form, issuedTo: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>verified_user</span> Authorized By</label>
+              <input className="form-control" value={form.authorizedBy} onChange={e => setForm({...form, authorizedBy: e.target.value})} />
+            </div>
           </div>
-          <div className="form-group"><label>Purpose / Notes</label><textarea className="form-control" rows="2" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} /></div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14, marginRight: 4 }}>assignment</span> Purpose / Notes</label>
+            <textarea className="form-control" rows="2" value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} />
+          </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-danger" disabled={loading || !isValid}>{loading ? 'Processing...' : 'Confirm Stock Out'}</button>
