@@ -92,7 +92,7 @@ export default function GoodsReceived() {
                   <td style={{ fontWeight:600 }}>{grn.supplier_name || '—'}</td>
                   <td style={{ fontSize:12, color:'var(--text-dim)' }}>{grn.driver || '—'} {grn.vehicle ? `/ ${grn.vehicle}` : ''}</td>
                   <td>{grn.received_by || '—'}</td>
-                  <td style={{ fontFamily:'var(--mono)' }}>{items.length}</td>
+                  <td>{items.length}</td>
                   <td style={{ fontFamily:'var(--mono)', color:'var(--teal)' }}>${total.toFixed(2)}</td>
                   <td style={{ fontSize:12, color:'var(--text-dim)' }}>{grn.notes || '—'}</td>
                 </tr>
@@ -127,7 +127,7 @@ export default function GoodsReceived() {
               </div>
               <div className="form-group"><label>RECEIVED BY</label><input className="form-control" value={form.received_by} onChange={e => setForm(f => ({...f, received_by:e.target.value}))} /></div>
 
-              <div style={{ margin:'16px 0 8px', fontWeight:700, fontSize:12, color:'var(--text-dim)', letterSpacing:1 }}>ITEMS RECEIVED</div>
+              <div style={{ margin:'16px 0 8px', fontWeight:700, fontSize:12, color:'var(--text-dim)' }}>ITEMS RECEIVED</div>
               <div style={{ overflowX:'auto' }}>
                 <div style={{ display:'grid', gridTemplateColumns:'2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap:6, minWidth:700, marginBottom:6, fontSize:9, fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
                   <span>ITEM NAME</span><span>CATEGORY</span><span>UNIT</span><span>ORDERED</span><span>RECEIVED</span><span>UNIT COST</span><span>LOT/BATCH</span><span></span>
@@ -141,13 +141,13 @@ export default function GoodsReceived() {
                     <input type="number" className="form-control" min="0" value={it.received} onChange={e => setItem(i,'received',parseInt(e.target.value)||0)} style={{ border: it.received > it.ordered && it.ordered > 0 ? '1px solid var(--yellow)' : '' }} />
                     <input type="number" className="form-control" min="0" step="0.01" placeholder="0.00" value={it.unit_cost} onChange={e => setItem(i,'unit_cost',parseFloat(e.target.value)||0)} />
                     <input className="form-control" placeholder="Lot/Batch#" value={it.lot_batch} onChange={e => setItem(i,'lot_batch',e.target.value)} />
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons" style={{ fontSize:14 }}>close</span></button>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons">close</span></button>
                   </div>
                 ))}
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center', marginTop:8, marginBottom:16 }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
-                  <span className="material-icons" style={{ fontSize:14 }}>add</span> Add Item
+                  <span className="material-icons">add</span> Add Item
                 </button>
                 <div style={{ marginLeft:'auto', fontFamily:'var(--mono)', fontSize:13, color:'var(--teal)' }}>
                   Total Value: <strong>${totalValue.toFixed(2)}</strong>
@@ -158,7 +158,7 @@ export default function GoodsReceived() {
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-icons" style={{ fontSize:16 }}>save</span> Save GRN & Update Stock
+                  <span className="material-icons">save</span> Save GRN & Update Stock
                 </button>
               </div>
             </form>
@@ -189,9 +189,9 @@ export default function GoodsReceived() {
                       <td style={{ fontWeight:600 }}>{it.name}</td>
                       <td>{it.category}</td>
                       <td>{it.unit || 'pcs'}</td>
-                      <td style={{ fontFamily:'var(--mono)' }}>{it.ordered || '—'}</td>
+                      <td>{it.ordered || '—'}</td>
                       <td style={{ fontFamily:'var(--mono)', color:'var(--green)', fontWeight:700 }}>{it.received}</td>
-                      <td style={{ fontFamily:'var(--mono)' }}>${(it.unit_cost || 0).toFixed(2)}</td>
+                      <td>${(it.unit_cost || 0).toFixed(2)}</td>
                       <td style={{ fontFamily:'var(--mono)', color:'var(--teal)' }}>${((it.received || 0) * (it.unit_cost || 0)).toFixed(2)}</td>
                       <td style={{ color:'var(--text-dim)', fontSize:12 }}>{it.lot_batch || '—'}</td>
                     </tr>
