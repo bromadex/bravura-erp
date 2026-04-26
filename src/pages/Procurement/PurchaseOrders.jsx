@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useProcurement } from '../../hooks/useProcurement'
+import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
