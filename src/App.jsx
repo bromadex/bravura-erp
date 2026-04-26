@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { InventoryProvider } from './contexts/InventoryContext'
+import { ProcurementProvider } from './contexts/ProcurementContext'
 import Login from './pages/Login'
 import HomeGrid from './pages/HomeGrid'
 import Layout from './components/layout/Layout'
 
-// Inventory Pages
 import StockBalance from './pages/Inventory/StockBalance'
 import StockIn from './pages/Inventory/StockIn'
 import StockOut from './pages/Inventory/StockOut'
@@ -13,7 +14,6 @@ import Transactions from './pages/Inventory/Transactions'
 import StockTaking from './pages/Inventory/StockTaking'
 import Categories from './pages/Inventory/Categories'
 
-// Procurement Pages
 import Suppliers from './pages/Procurement/Suppliers'
 import StoreRequisitions from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
@@ -22,30 +22,17 @@ import GoodsReceived from './pages/Procurement/GoodsReceived'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text-dim)', gap:12 }}>Loading...</div>
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text-dim)', gap:12, flexDirection:'column' }}>
+      <span className="material-icons" style={{ fontSize:48, opacity:.3 }}>settings</span>
+      <span>Loading...</span>
+    </div>
+  )
   if (!user) return <Navigate to="/login" replace />
   return children
 }
 
-function ModulePlaceholder({ module, page }) {
-  const navigate = useNavigate()
-  const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  const modLabel = module?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'60vh', textAlign:'center', gap:16 }}>
-      <span className="material-icons" style={{ fontSize:72, opacity:.3, color:'var(--gold)' }}>construction</span>
-      <div><div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:2, marginBottom:6 }}>{modLabel}</div>
-      <h2 style={{ fontSize:22, fontWeight:800 }}>{label}</h2>
-      <p style={{ color:'var(--text-dim)', marginTop:8, fontSize:13 }}>This page is under development</p></div>
-      <button className="btn btn-secondary" onClick={() => navigate('/')}><span className="material-icons" style={{ fontSize:16 }}>home</span> Back to Home</button>
-    </div>
-  )
-}
-
-const MODULES = [
-  { id:'dashboard',   pages:['overview'] },
-  { id:'procurement', pages:['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'] },
-  { id:'inventory',   pages:['stock-balance','stock-in','stock-out','transactions','stock-taking','categories'] },
+const OTHER_MODULES = [
   { id:'logistics',   pages:['goods-received','batch-plant','campsite'] },
   { id:'fuel',        pages:['tanks','dipstick','issuance','deliveries','reports'] },
   { id:'fleet',       pages:['vehicles','generators','heavy-equipment'] },
@@ -54,6 +41,25 @@ const MODULES = [
   { id:'reports',     pages:['overview','audit-log','drafts'] },
 ]
 
+function ModulePlaceholder({ module, page }) {
+  const navigate = useNavigate()
+  const label = page?.replace(/-/g,' ').replace(/\b\w/g, l => l.toUpperCase())
+  const modLabel = module?.replace(/-/g,' ').replace(/\b\w/g, l => l.toUpperCase())
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'60vh', textAlign:'center', gap:16 }}>
+      <span className="material-icons" style={{ fontSize:72, opacity:.3, color:'var(--gold)' }}>construction</span>
+      <div>
+        <div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:2, marginBottom:6 }}>{modLabel}</div>
+        <h2 style={{ fontSize:22, fontWeight:800 }}>{label}</h2>
+        <p style={{ color:'var(--text-dim)', marginTop:8, fontSize:13 }}>Under development</p>
+      </div>
+      <button className="btn btn-secondary" onClick={() => navigate('/')}>
+        <span className="material-icons" style={{ fontSize:16 }}>home</span> Back to Home
+      </button>
+    </div>
+  )
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
@@ -61,9 +67,14 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
-
-      <Route path="/module/inventory" element={<ProtectedRoute><Layout module="inventory" /></ProtectedRoute>}>
+      {/* INVENTORY — wrapped in InventoryProvider */}
+      <Route path="/module/inventory" element={
+        <ProtectedRoute>
+          <InventoryProvider>
+            <Layout module="inventory" />
+          </InventoryProvider>
+        </ProtectedRoute>
+      }>
         <Route index element={<StockBalance />} />
         <Route path="stock-balance" element={<StockBalance />} />
         <Route path="stock-in" element={<StockIn />} />
@@ -73,7 +84,14 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
       </Route>
 
-      <Route path="/module/procurement" element={<ProtectedRoute><Layout module="procurement" /></ProtectedRoute>}>
+      {/* PROCUREMENT — wrapped in ProcurementProvider */}
+      <Route path="/module/procurement" element={
+        <ProtectedRoute>
+          <ProcurementProvider>
+            <Layout module="procurement" />
+          </ProcurementProvider>
+        </ProtectedRoute>
+      }>
         <Route index element={<Suppliers />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="store-requisitions" element={<StoreRequisitions />} />
@@ -82,7 +100,11 @@ function AppRoutes() {
         <Route path="goods-received" element={<GoodsReceived />} />
       </Route>
 
-      {MODULES.filter(m => m.id !== 'inventory' && m.id !== 'procurement' && m.id !== 'dashboard').map(mod => (
+      {/* DASHBOARD */}
+      <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
+
+      {/* OTHER MODULES — placeholders */}
+      {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
           {mod.pages.map(page => <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />)}
@@ -99,7 +121,11 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
-        <Toaster position="top-right" toastOptions={{ style: { background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border2)' } }} />
+        <Toaster position="top-right" toastOptions={{
+          style: { background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border2)' },
+          success: { iconTheme: { primary:'var(--green)', secondary:'var(--surface)' } },
+          error: { iconTheme: { primary:'var(--red)', secondary:'var(--surface)' } },
+        }} />
       </BrowserRouter>
     </AuthProvider>
   )
