@@ -60,10 +60,12 @@ const MODULE_NAV = {
   fleet: {
     label: 'Fleet & Assets', icon: 'directions_car', color: '#34d399',
     sections: [
-      { label: 'Assets', pages: [
-        { id: 'vehicles',        label: 'Vehicles',        icon: 'directions_car' },
-        { id: 'generators',      label: 'Generators',      icon: 'bolt' },
-        { id: 'heavy-equipment', label: 'Heavy Equipment', icon: 'construction' },
+      { label: 'Operations', pages: [
+        { id: 'dashboard',          label: 'Fleet Dashboard',     icon: 'dashboard' },
+        { id: 'vehicles',           label: 'Vehicles',            icon: 'directions_car' },
+        { id: 'generators',         label: 'Generators',          icon: 'bolt' },
+        { id: 'heavy-equipment',    label: 'Heavy Equipment',     icon: 'construction' },
+        { id: 'maintenance-alerts', label: 'Maintenance Alerts',  icon: 'notifications_active' },
       ]}
     ]
   },
@@ -108,7 +110,6 @@ export default function Sidebar({ module }) {
   const location = useLocation()
   const config = MODULE_NAV[module]
 
-  // Track which sections are expanded, persisted per module
   const storageKey = `sidebar_exp_${module}`
   const [expanded, setExpanded] = useState(() => {
     try { return JSON.parse(localStorage.getItem(storageKey) || '{}') }
@@ -119,7 +120,6 @@ export default function Sidebar({ module }) {
     localStorage.setItem(storageKey, JSON.stringify(expanded))
   }, [expanded, storageKey])
 
-  // Mobile sidebar toggle
   const [mobileOpen, setMobileOpen] = useState(false)
 
   if (!config) return null
@@ -141,7 +141,6 @@ export default function Sidebar({ module }) {
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* Module header */}
       <div style={{
         padding: '16px 16px 12px',
         borderBottom: '1px solid var(--border)',
@@ -163,7 +162,6 @@ export default function Sidebar({ module }) {
         </div>
       </div>
 
-      {/* Home button */}
       <div style={{ padding: '10px 10px 6px' }}>
         <button
           onClick={() => navigate('/')}
@@ -182,13 +180,11 @@ export default function Sidebar({ module }) {
         </button>
       </div>
 
-      {/* Nav sections */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>
         {config.sections.map(section => {
-          const isExpanded = expanded[section.label] !== false // default open
+          const isExpanded = expanded[section.label] !== false
           return (
             <div key={section.label} style={{ marginBottom: 4 }}>
-              {/* Section header */}
               <button
                 onClick={() => toggleSection(section.label)}
                 style={{
@@ -206,11 +202,10 @@ export default function Sidebar({ module }) {
                 </span>
               </button>
 
-              {/* Pages */}
               {isExpanded && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 }}>
                   {section.pages.map(page => {
-                    const isActive = currentPage === page.id || 
+                    const isActive = currentPage === page.id ||
                       (page.id === config.sections[0]?.pages[0]?.id && location.pathname === `/module/${module}`)
                     return (
                       <button
@@ -249,17 +244,15 @@ export default function Sidebar({ module }) {
 
   return (
     <>
-      {/* Desktop sidebar */}
       <div style={{ display: 'flex' }} className="sidebar-desktop">
         {sidebarContent}
       </div>
 
-      {/* Mobile hamburger button — shown via CSS */}
       <button
         className="sidebar-hamburger"
         onClick={() => setMobileOpen(!mobileOpen)}
         style={{
-          display: 'none', // shown via CSS @media
+          display: 'none',
           position: 'fixed', top: 12, left: 12, zIndex: 300,
           background: 'var(--surface)', border: '1px solid var(--border2)',
           borderRadius: 8, padding: 8, cursor: 'pointer', color: 'var(--text)',
@@ -268,7 +261,6 @@ export default function Sidebar({ module }) {
         <span className="material-icons">{mobileOpen ? 'close' : 'menu'}</span>
       </button>
 
-      {/* Mobile overlay sidebar */}
       {mobileOpen && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }}
