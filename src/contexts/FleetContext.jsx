@@ -47,7 +47,7 @@ export function FleetProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ---- Helper functions for calculations ----
+  // Helper functions
   const getVehicleFuelEfficiency = (reg) => {
     const fuelEntries = fuelLogs.filter(f => f.vehicle === reg)
     if (fuelEntries.length === 0) return null
@@ -63,7 +63,7 @@ export function FleetProvider({ children }) {
     const totalFuel = logs.reduce((s, l) => s + (l.fuel_used || 0), 0)
     const totalHours = logs.reduce((s, l) => s + (l.hours || 0), 0)
     if (totalHours === 0) return null
-    return totalFuel / totalHours // L/hour
+    return totalFuel / totalHours
   }
 
   const getEquipmentEfficiency = (reg) => {
@@ -72,7 +72,7 @@ export function FleetProvider({ children }) {
     const totalFuel = fuelEntries.reduce((s, f) => s + (f.amount || 0), 0)
     const equip = earthMovers.find(e => e.reg === reg)
     if (!equip || !equip.hour_meter || totalFuel === 0) return null
-    return totalFuel / equip.hour_meter // L/hour
+    return totalFuel / equip.hour_meter
   }
 
   const getNextService = (asset) => {
@@ -96,13 +96,9 @@ export function FleetProvider({ children }) {
 
   const getHealthScore = (asset, type) => {
     let score = 100
-    // Maintenance overdue
     const next = getNextService(asset)
-    if (next) {
-      const isOverdue = next?.type === 'date' ? new Date(next) < new Date() : false
-      if (isOverdue) score -= 30
-    }
-    // Efficiency trend
+    const isOverdue = next?.type === 'date' ? new Date(next) < new Date() : false
+    if (isOverdue) score -= 30
     if (type === 'vehicle') {
       const eff = getVehicleFuelEfficiency(asset.reg)
       if (eff && eff.litersPer100km > 20) score -= 20
@@ -116,7 +112,6 @@ export function FleetProvider({ children }) {
       if (eff && eff > 30) score -= 20
       else if (eff && eff > 20) score -= 10
     }
-    // Downtime frequency
     const downtimeCount = downtimeLogs.filter(d => d.asset_id === asset.id).length
     if (downtimeCount > 2) score -= 20
     else if (downtimeCount > 0) score -= 10
@@ -152,13 +147,81 @@ export function FleetProvider({ children }) {
     return alerts
   }
 
-  // CRUD methods remain similar, but now include new fields
+  // CRUD for Vehicles
+  const addVehicle = async (vehicle) => {
+    const id = generateId()
+    const { error } = await supabase.from('fleet').insert([{ id, ...vehicle, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
   const updateVehicle = async (id, updates) => {
     const { error } = await supabase.from('fleet').update(updates).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
+  const deleteVehicle = async (id) => {
+    const { error } = await supabase.from('fleet').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // CRUD for Generators
+  const addGenerator = async (generator) => {
+    const id = generateId()
+    const { error } = await supabase.from('generators').insert([{ id, ...generator, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const updateGenerator = async (id, updates) => {
+    const { error } = await supabase.from('generators').update(updates).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteGenerator = async (id) => {
+    const { error } = await supabase.from('generators').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // CRUD for Heavy Equipment
+  const addEarthMover = async (eq) => {
+    const id = generateId()
+    const { error } = await supabase.from('earth_movers').insert([{ id, ...eq, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const updateEarthMover = async (id, updates) => {
+    const { error } = await supabase.from('earth_movers').update(updates).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteEarthMover = async (id) => {
+    const { error } = await supabase.from('earth_movers').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // Run logs for generators
+  const addGenRunLog = async (log) => {
+    const id = generateId()
+    const { error } = await supabase.from('gen_run_log').insert([{ id, ...log, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteGenRunLog = async (id) => {
+    const { error } = await supabase.from('gen_run_log').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // Service and downtime logs
   const addMaintenanceLog = async (log) => {
     const id = generateId()
     const { error } = await supabase.from('service_maintenance_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
@@ -176,13 +239,13 @@ export function FleetProvider({ children }) {
   return (
     <FleetContext.Provider value={{
       vehicles, generators, earthMovers, genRunLogs, downtimeLogs, maintenanceLogs, fuelLogs, loading,
-      getVehicleFuelEfficiency, getGeneratorEfficiency, getEquipmentEfficiency,
-      getNextService, getHealthScore, getHealthStatus, getOverdueAlerts,
-      updateVehicle, updateGenerator, updateEarthMover, addMaintenanceLog, addDowntimeLog,
-      addGenRunLog, deleteGenRunLog,  // keep existing
       addVehicle, updateVehicle, deleteVehicle,
       addGenerator, updateGenerator, deleteGenerator,
       addEarthMover, updateEarthMover, deleteEarthMover,
+      addGenRunLog, deleteGenRunLog,
+      addMaintenanceLog, addDowntimeLog,
+      getVehicleFuelEfficiency, getGeneratorEfficiency, getEquipmentEfficiency,
+      getNextService, getHealthScore, getHealthStatus, getOverdueAlerts,
       fetchAll,
     }}>
       {children}
