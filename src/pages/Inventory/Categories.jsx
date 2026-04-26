@@ -1,4 +1,4 @@
-      import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -58,52 +58,59 @@ export default function Categories() {
       </div>
 
       <div className="table-wrap">
-        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom:'1px solid var(--border)' }}>
-              <th style={{ width:40, padding:'4px 2px', textAlign:'left', fontSize:10 }}>Icon</th>
-              <th style={{ padding:'4px 2px', textAlign:'left', fontSize:10 }}>Category Name</th>
-              <th style={{ width:40, padding:'4px 2px', textAlign:'left', fontSize:10 }}>Action</th>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              <th style={{ width: 40, padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Icon</th>
+              <th style={{ padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Category Name</th>
+              <th style={{ width: 40, padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="3" style={{ padding:16, textAlign:'center' }}>Loading...<\/td><\/tr>
+              <tr><td colSpan="3" style={{ padding: 16, textAlign: 'center' }}>Loading...</td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="3" style={{ padding:16, textAlign:'center' }}>No categories<\/td><\/tr>
+              <tr><td colSpan="3" style={{ padding: 16, textAlign: 'center' }}>No categories</td></tr>
             ) : (
               categories.map(cat => (
-                <tr key={cat.name} style={{ borderBottom:'1px solid var(--border)' }}>
-                  <td style={{ padding:'4px 2px' }}>
-                    <span className="material-icons" style={{ fontSize:18, color:'var(--gold)' }}>
+                <tr key={cat.name} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '4px 2px' }}>
+                    <span className="material-icons" style={{ fontSize: 18, color: 'var(--gold)' }}>
                       {cat.icon || getMaterialIcon(cat.name)}
                     </span>
-                  <\/td>
-                  <td style={{ padding:'4px 2px', fontWeight:500 }}>{cat.name}<\/td>
-                  <td style={{ padding:'4px 2px' }}>
-                    <button onClick={() => handleDelete(cat.name)} style={{ background:'none', border:'none', cursor:'pointer', padding:2 }}>
-                      <span className="material-icons" style={{ fontSize:16, color:'var(--red)' }}>delete<\/span>
-                    <\/button>
-                  <\/td>
-                <\/tr>
+                  </td>
+                  <td style={{ padding: '4px 2px', fontWeight: 500 }}>{cat.name}</td>
+                  <td style={{ padding: '4px 2px' }}>
+                    <button onClick={() => handleDelete(cat.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                      <span className="material-icons" style={{ fontSize: 16, color: 'var(--red)' }}>delete</span>
+                    </button>
+                  </td>
+                </tr>
               ))
             )}
-          <\/tbody>
-        <\/table>
-      <\/div>
+          </tbody>
+        </table>
+      </div>
 
       {showModal && (
         <div className="overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" style={{ maxWidth:320, padding:16 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize:16, fontWeight:700, marginBottom:12 }}>Add Category<\/div>
-            <input className="form-control" placeholder="Category name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding:'6px 8px', fontSize:13, marginBottom:12 }} autoFocus />
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(false)}>Cancel<\/button>
-              <button className="btn btn-primary btn-sm" onClick={handleAdd}>Add<\/button>
-            <\/div>
-          <\/div>
-        <\/div>
+          <div className="modal" style={{ maxWidth: 320, padding: 16 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Add Category</div>
+            <input
+              className="form-control"
+              placeholder="Category name"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              style={{ padding: '6px 8px', fontSize: 13, marginBottom: 12 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={handleAdd}>Add</button>
+            </div>
+          </div>
+        </div>
       )}
-    <\/div>
+    </div>
   )
 }
