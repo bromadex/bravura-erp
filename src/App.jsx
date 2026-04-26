@@ -3,8 +3,20 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import HomeGrid from './pages/HomeGrid'
+import Layout from './components/layout/Layout'
 
-// Simple placeholder for all module pages (no sidebar yet)
+// Placeholder for inventory pages (will be replaced with real components later)
+function InventoryPlaceholder({ pageName }) {
+  return (
+    <div style={{ padding: '40px', textAlign: 'center' }}>
+      <span className="material-icons" style={{ fontSize: 64, opacity: 0.4, marginBottom: 16 }}>inventory</span>
+      <h2 style={{ fontSize: 20, marginBottom: 8 }}>Inventory / {pageName}</h2>
+      <p style={{ color: 'var(--text-dim)' }}>This page is under development</p>
+    </div>
+  )
+}
+
+// Simple placeholder for other modules (no sidebar)
 function ModulePlaceholder({ moduleName }) {
   return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -29,43 +41,44 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// Inventory pages list (must match Sidebar.jsx)
+const inventoryPages = [
+  'stock-balance', 'stock-in', 'stock-out', 'transactions', 'stock-taking'
+]
+
 function AppRoutes() {
   const { user } = useAuth()
-  
-  // Define all module routes
-  const modules = [
-    'dashboard', 'procurement', 'inventory', 'logistics', 
-    'fuel', 'fleet', 'hr', 'accounting', 'reports'
-  ]
+  const navigate = useNavigate()
+  const onNavigate = (path) => navigate(path)
 
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={user ? <HomeGrid /> : <Navigate to="/login" replace />} />
-      
-      {/* Create routes for all modules */}
-      {modules.map(module => (
-        <Route 
-          key={module}
-          path={`/module/${module}`} 
-          element={
-            <ProtectedRoute>
-              <ModulePlaceholder moduleName={module.charAt(0).toUpperCase() + module.slice(1)} />
-            </ProtectedRoute>
-          } 
-        />
-      ))}
-      
-      {/* Also handle sub-routes like /module/inventory/stock-balance */}
-      <Route 
-        path="/module/inventory/:page" 
-        element={
-          <ProtectedRoute>
-            <ModulePlaceholder moduleName="Inventory" />
-          </ProtectedRoute>
-        } 
-      />
-      
+
+      {/* INVENTORY - with sidebar */}
+      <Route path="/module/inventory" element={<ProtectedRoute><Layout module="inventory" onNavigate={onNavigate} /></ProtectedRoute>}>
+        {inventoryPages.map(page => (
+          <Route 
+            key={page} 
+            path={page} 
+            element={<InventoryPlaceholder pageName={page.replace('-', ' ')} />} 
+          />
+        ))}
+        {/* Default redirect to stock-balance if no page specified */}
+        <Route index element={<Navigate to="stock-balance" replace />} />
+      </Route>
+
+      {/* ALL OTHER MODULES - no sidebar yet */}
+      <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder moduleName="Dashboard" /></ProtectedRoute>} />
+      <Route path="/module/procurement" element={<ProtectedRoute><ModulePlaceholder moduleName="Procurement" /></ProtectedRoute>} />
+      <Route path="/module/logistics" element={<ProtectedRoute><ModulePlaceholder moduleName="Logistics" /></ProtectedRoute>} />
+      <Route path="/module/fuel" element={<ProtectedRoute><ModulePlaceholder moduleName="Fuel Management" /></ProtectedRoute>} />
+      <Route path="/module/fleet" element={<ProtectedRoute><ModulePlaceholder moduleName="Fleet" /></ProtectedRoute>} />
+      <Route path="/module/hr" element={<ProtectedRoute><ModulePlaceholder moduleName="Human Resources" /></ProtectedRoute>} />
+      <Route path="/module/accounting" element={<ProtectedRoute><ModulePlaceholder moduleName="Accounting" /></ProtectedRoute>} />
+      <Route path="/module/reports" element={<ProtectedRoute><ModulePlaceholder moduleName="Reports" /></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
