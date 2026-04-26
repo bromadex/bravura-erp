@@ -9,6 +9,11 @@ export function useInventory() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Generate UUID for new records
+  const generateId = () => {
+    return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+  }
+
   // Fetch all inventory data
   const fetchAll = async () => {
     setLoading(true)
@@ -33,9 +38,11 @@ export function useInventory() {
 
   // Items CRUD
   const addItem = async (item) => {
+    const newId = generateId()
     const { data, error } = await supabase
       .from('items')
       .insert([{
+        id: newId,
         name: item.name,
         category: item.category,
         unit: item.unit || 'pcs',
@@ -78,6 +85,7 @@ export function useInventory() {
     if (!item) throw new Error('Item not found')
 
     const newBalance = item.balance + quantity
+    const newId = generateId()
     
     // Update item
     const { error: itemError } = await supabase
@@ -90,10 +98,11 @@ export function useInventory() {
     
     if (itemError) throw itemError
 
-    // Create transaction
+    // Create transaction with explicit ID
     const { error: txError } = await supabase
       .from('transactions')
       .insert([{
+        id: newId,
         type: 'IN',
         item_id: itemId,
         item_name: item.name,
@@ -104,6 +113,7 @@ export function useInventory() {
         received_by: receivedBy,
         notes: notes,
         user_name: receivedBy,
+        created_at: new Date().toISOString(),
       }])
     
     if (txError) throw txError
@@ -118,6 +128,7 @@ export function useInventory() {
     if (quantity > item.balance) throw new Error('Insufficient stock')
 
     const newBalance = item.balance - quantity
+    const newId = generateId()
     
     const { error: itemError } = await supabase
       .from('items')
@@ -132,6 +143,7 @@ export function useInventory() {
     const { error: txError } = await supabase
       .from('transactions')
       .insert([{
+        id: newId,
         type: 'OUT',
         item_id: itemId,
         item_name: item.name,
@@ -142,6 +154,7 @@ export function useInventory() {
         authorized_by: authorizedBy,
         notes: purpose,
         user_name: authorizedBy,
+        created_at: new Date().toISOString(),
       }])
     
     if (txError) throw txError
@@ -155,12 +168,14 @@ export function useInventory() {
     if (!item) throw new Error('Item not found')
 
     const variance = countedQty - item.balance
-    const adjType = variance > 0 ? 'IN' : 'OUT'
+    const newId = generateId()
+    const adjId = generateId()
     
     // Create stock take record
     const { error: stError } = await supabase
       .from('stock_takes')
       .insert([{
+        id: newId,
         item_id: itemId,
         item_name: item.name,
         system_qty: item.balance,
@@ -169,6 +184,7 @@ export function useInventory() {
         date: date,
         done_by: countedBy,
         notes: notes,
+        created_at: new Date().toISOString(),
       }])
     
     if (stError) throw stError
@@ -181,9 +197,10 @@ export function useInventory() {
     
     if (itemError) throw itemError
 
-    // Create adjustment transaction
+    // Create adjustment transaction if variance exists
     if (variance !== 0) {
       await supabase.from('transactions').insert([{
+        id: adjId,
         type: 'ADJUSTMENT',
         item_id: itemId,
         item_name: item.name,
@@ -193,6 +210,7 @@ export function useInventory() {
         done_by: countedBy,
         notes: `Stock take adjustment (${variance > 0 ? '+' : ''}${variance})`,
         user_name: countedBy,
+        created_at: new Date().toISOString(),
       }])
     }
     
