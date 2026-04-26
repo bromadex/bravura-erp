@@ -18,7 +18,6 @@ export default function FuelReports() {
 
   const exportToExcel = () => {
     const wb = XLSX.utils.book_new()
-    // Issuances sheet
     const issuanceData = issuances.map(i => ({
       Date: i.date, Time: i.time, Tank: tanks.find(t => t.id === i.tank_id)?.name || '',
       FuelType: i.fuel_type, Quantity: i.quantity, Equipment: i.equipment_name,
@@ -27,7 +26,6 @@ export default function FuelReports() {
     }))
     const wsIssuance = XLSX.utils.json_to_sheet(issuanceData)
     XLSX.utils.book_append_sheet(wb, wsIssuance, 'Fuel Issuance')
-    // Deliveries sheet
     const deliveryData = deliveries.map(d => ({
       Date: d.date, Tank: tanks.find(t => t.id === d.tank_id)?.name || '',
       FuelType: d.fuel_type, Quantity: d.quantity, UnitCost: d.unit_cost,
@@ -35,7 +33,6 @@ export default function FuelReports() {
     }))
     const wsDelivery = XLSX.utils.json_to_sheet(deliveryData)
     XLSX.utils.book_append_sheet(wb, wsDelivery, 'Fuel Deliveries')
-    // Efficiency sheet
     const efficiencyData = efficiency.map(e => ({
       Equipment: e.name, TotalFuel: e.totalFuel, Distance: e.distance,
       Efficiency: e.efficiency.toFixed(2) + ' L/km'
@@ -68,7 +65,9 @@ export default function FuelReports() {
               <tbody>
                 {efficiency.map(e => (
                   <tr key={e.name}>
-                    <td>{e.name}</td><td>{e.totalFuel.toFixed(1)}</td><td>{e.distance.toFixed(0)}</td>
+                    <td>{e.name}</td>
+                    <td>{e.totalFuel.toFixed(1)}</td>
+                    <td>{e.distance.toFixed(0)}</td>
                     <td style={{ color: 'var(--blue)' }}>{e.efficiency.toFixed(2)}</td>
                   </tr>
                 ))}
@@ -88,8 +87,10 @@ export default function FuelReports() {
                 const percent = (t.current_level / t.capacity) * 100
                 return (
                   <tr key={t.id}>
-                    <td>{t.name}</td><td>{t.capacity.toLocaleString()}</td>
-                    <td>{t.current_level.toLocaleString()}</td><td>{percent.toFixed(0)}%</td>
+                    <td>{t.name}</td>
+                    <td>{t.capacity.toLocaleString()}</td>
+                    <td>{t.current_level.toLocaleString()}</td>
+                    <td>{percent.toFixed(0)}%</td>
                     <td><span className={`badge ${t.current_level < t.alert_threshold ? 'bg-red' : 'bg-green'}`}>{t.current_level < t.alert_threshold ? 'LOW' : 'OK'}</span></td>
                   </tr>
                 )
