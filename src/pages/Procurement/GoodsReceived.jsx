@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function GoodsReceived() {
-  const { goodsReceived, purchaseOrders, suppliers, createGoodsReceived, loading } = useProcurement()
+  const { goodsReceived, purchaseOrders, createGoodsReceived, loading } = useProcurement()
   const { user } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [viewGRN, setViewGRN] = useState(null)
@@ -102,11 +102,13 @@ export default function GoodsReceived() {
         </table>
       </div>
 
-      {/* GRN Create Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">📦 New Goods Received <span>Note (GRN)</span></div>
+            <div className="modal-title">
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>move_to_inbox</span>
+              New Goods Received <span>Note</span>
+            </div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group"><label>DATE *</label><input type="date" className="form-control" required value={form.date} onChange={e => setForm(f => ({...f, date:e.target.value}))} /></div>
@@ -125,10 +127,9 @@ export default function GoodsReceived() {
               </div>
               <div className="form-group"><label>RECEIVED BY</label><input className="form-control" value={form.received_by} onChange={e => setForm(f => ({...f, received_by:e.target.value}))} /></div>
 
-              {/* Items table */}
               <div style={{ margin:'16px 0 8px', fontWeight:700, fontSize:12, color:'var(--text-dim)', letterSpacing:1 }}>ITEMS RECEIVED</div>
               <div style={{ overflowX:'auto' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap:6, minWidth:700, marginBottom:6, fontSize:9, fontFamily:'var(--mono)', color:'var(--text-dim)', letterSpacing:1, padding:'0 4px' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap:6, minWidth:700, marginBottom:6, fontSize:9, fontFamily:'var(--mono)', color:'var(--text-dim)' }}>
                   <span>ITEM NAME</span><span>CATEGORY</span><span>UNIT</span><span>ORDERED</span><span>RECEIVED</span><span>UNIT COST</span><span>LOT/BATCH</span><span></span>
                 </div>
                 {form.items.map((it, i) => (
@@ -145,7 +146,9 @@ export default function GoodsReceived() {
                 ))}
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center', marginTop:8, marginBottom:16 }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}><span className="material-icons" style={{ fontSize:14 }}>add</span> Add Item</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
+                  <span className="material-icons" style={{ fontSize:14 }}>add</span> Add Item
+                </button>
                 <div style={{ marginLeft:'auto', fontFamily:'var(--mono)', fontSize:13, color:'var(--teal)' }}>
                   Total Value: <strong>${totalValue.toFixed(2)}</strong>
                 </div>
@@ -154,18 +157,22 @@ export default function GoodsReceived() {
               <div className="form-group"><label>NOTES</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} /></div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">✅ Save GRN &amp; Update Stock</button>
+                <button type="submit" className="btn btn-primary">
+                  <span className="material-icons" style={{ fontSize:16 }}>save</span> Save GRN & Update Stock
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* GRN Detail View Modal */}
       {viewGRN && (
         <div className="overlay" onClick={() => setViewGRN(null)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">📦 {viewGRN.grn_number}</div>
+            <div className="modal-title">
+              <span className="material-icons" style={{ fontSize:20, marginRight:8 }}>receipt</span>
+              {viewGRN.grn_number}
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16, fontSize:13 }}>
               <div><span style={{ color:'var(--text-dim)' }}>Date:</span> <strong>{viewGRN.date}</strong></div>
               <div><span style={{ color:'var(--text-dim)' }}>Supplier:</span> <strong>{viewGRN.supplier_name || '—'}</strong></div>
