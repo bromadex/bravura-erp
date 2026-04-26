@@ -131,3 +131,13 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
 /* Module card hover effect */
 .module-card-hover { transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .module-card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+
+/* ── Mobile sidebar ── */
+@media (max-width: 768px) {
+  .sidebar-desktop { display: none !important; }
+  .sidebar-hamburger { display: flex !important; }
+}
+@media (min-width: 769px) {
+  .sidebar-hamburger { display: none !important; }
+}
+
