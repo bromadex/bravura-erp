@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 
 const FuelContext = createContext(null)
 
-// Tank constant (ZUFTA10 – 10,103L)
 const TANK_MAX_LITRES = 10103
 const DIPSTICK_TABLE = [
   [0.00,0],[0.01,6],[0.02,17],[0.03,31],[0.04,48],[0.05,67],[0.06,88],[0.07,111],[0.08,136],[0.09,162],
@@ -45,9 +44,9 @@ export function FuelProvider({ children }) {
         supabase.from('fuel_deliveries').select('*').order('date', { ascending: false }),
         supabase.from('dipstick_log').select('*').order('date', { ascending: false }),
       ])
-      if (iRes.data) setIssuances(iRes.data)
-      if (dRes.data) setDeliveries(dRes.data)
-      if (dipRes.data) setDipstickLog(dipRes.data)
+      setIssuances(iRes.data || [])
+      setDeliveries(dRes.data || [])
+      setDipstickLog(dipRes.data || [])
     } catch (err) {
       console.error(err)
       toast.error('Failed to load fuel data')
@@ -58,7 +57,6 @@ export function FuelProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Convert cm to litres using DIPSTICK_TABLE
   const getLitresFromCm = (cm) => {
     if (cm === null || cm === undefined || isNaN(cm)) return 0
     if (cm <= 0) return 0
@@ -72,6 +70,83 @@ export function FuelProvider({ children }) {
       }
     }
     return 0
+  }
+
+  const getCurrentTankLevel = () => {
+    if (!dipstickLog.length) return 0
+    const latest = [...dipstickLog].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
+    return latest.fuel_end || latest.end_litres || 0
+  }
+
+  const getTankPercentage = () => (getCurrentTankLevel() / TANK_MAX_LITRES) * 100
+
+  // ---- Chart data ----
+  const getIssuanceByDay = () => {
+    const map = new Map()
+    issuances.forEach(i => {
+      const date = i.date
+      const litres = i.amount || 0
+      map.set(date, (map.get(date) || 0) + litres)
+    })
+    const sortedDates = Array.from(map.keys()).sort()
+    return {
+      labels: sortedDates,
+      data: sortedDates.map(d => map.get(d))
+    }
+  }
+
+  const getIssuanceByVehicle = () => {
+    const map = new Map()
+    issuances.forEach(i => {
+      const vehicle = i.vehicle || 'Unknown'
+      const litres = i.amount || 0
+      map.set(vehicle, (map.get(vehicle) || 0) + litres)
+    })
+    const sorted = Array.from(map.entries()).sort((a,b) => b[1] - a[1]).slice(0, 10)
+    return {
+      labels: sorted.map(v => v[0]),
+      data: sorted.map(v => v[1])
+    }
+  }
+
+  const getTankLevelTrend = () => {
+    const sorted = [...dipstickLog].sort((a,b) => new Date(a.date) - new Date(b.date))
+    const labels = sorted.map(d => d.date)
+    const levels = sorted.map(d => d.fuel_end || d.end_litres || 0)
+    return { labels, data: levels }
+  }
+
+  // ---- Prediction (linear regression) ----
+  const predictDaysUntilEmpty = () => {
+    const sorted = [...dipstickLog].sort((a,b) => new Date(a.date) - new Date(b.date))
+    if (sorted.length < 2) return null
+
+    // Use last 14 days of tank level data
+    const recent = sorted.slice(-14)
+    const x = recent.map((_, idx) => idx) // days index
+    const y = recent.map(d => d.fuel_end || d.end_litres || 0)
+
+    // Simple linear regression
+    const n = x.length
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+    for (let i = 0; i < n; i++) {
+      sumX += x[i]
+      sumY += y[i]
+      sumXY += x[i] * y[i]
+      sumX2 += x[i] * x[i]
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+    const intercept = (sumY - slope * sumX) / n
+
+    // Predict when y = 0
+    if (slope >= 0) return null // consumption is not decreasing
+    const daysToEmpty = -intercept / slope
+    if (daysToEmpty < 0) return null
+
+    const lastDate = new Date(recent[recent.length-1].date)
+    const emptyDate = new Date(lastDate)
+    emptyDate.setDate(lastDate.getDate() + Math.ceil(daysToEmpty))
+    return emptyDate.toISOString().split('T')[0]
   }
 
   const addIssuance = async (issuance) => {
@@ -95,19 +170,13 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
-  const getCurrentTankLevel = () => {
-    if (!dipstickLog.length) return 0
-    const latest = [...dipstickLog].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
-    return latest.fuel_end || latest.end_litres || 0
-  }
-
-  const getTankPercentage = () => (getCurrentTankLevel() / TANK_MAX_LITRES) * 100
-
   return (
     <FuelContext.Provider value={{
       issuances, deliveries, dipstickLog, loading,
       addIssuance, addDelivery, addDipstick,
       getLitresFromCm, getCurrentTankLevel, getTankPercentage,
+      getIssuanceByDay, getIssuanceByVehicle, getTankLevelTrend,
+      predictDaysUntilEmpty,
       TANK_MAX_LITRES,
       fetchAll,
     }}>
