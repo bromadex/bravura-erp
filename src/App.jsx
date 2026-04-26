@@ -37,7 +37,7 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// Placeholder for other modules that are not yet built
+// Placeholder for other modules
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -72,7 +72,6 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Dashboard placeholder */}
       <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
 
       {/* INVENTORY */}
@@ -96,8 +95,16 @@ function AppRoutes() {
         <Route path="goods-received" element={<GoodsReceived />} />
       </Route>
 
-      {/* FUEL MANAGEMENT */}
-      <Route path="/module/fuel" element={<ProtectedRoute><FuelProvider><Layout module="fuel" /></FuelProvider></ProtectedRoute>}>
+      {/* FUEL MANAGEMENT – double‑wrapped to allow useProcurement inside FuelReports */}
+      <Route path="/module/fuel" element={
+        <ProtectedRoute>
+          <ProcurementProvider>
+            <FuelProvider>
+              <Layout module="fuel" />
+            </FuelProvider>
+          </ProcurementProvider>
+        </ProtectedRoute>
+      }>
         <Route index element={<FuelTanks />} />
         <Route path="tanks" element={<FuelTanks />} />
         <Route path="issuance" element={<FuelIssuance />} />
@@ -106,7 +113,7 @@ function AppRoutes() {
         <Route path="reports" element={<FuelReports />} />
       </Route>
 
-      {/* OTHER MODULES – placeholders */}
+      {/* OTHER MODULES */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
