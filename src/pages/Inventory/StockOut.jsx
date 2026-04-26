@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-import { useInventory } from '../../hooks/useInventory'
+import { useInventory } from '../../contexts/InventoryContext'
 import toast from 'react-hot-toast'
 
 export default function StockOut() {
