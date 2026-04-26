@@ -11,7 +11,6 @@ export default function PurchaseRequisitions() {
   const handleApprove = async (pr) => {
     await approvePurchaseRequisition(pr.id, user?.full_name || user?.username, user?.id)
     toast.success('Purchase requisition approved')
-    // Auto-create a purchase order (optional – you can let user do manually)
     const items = typeof pr.items === 'string' ? JSON.parse(pr.items) : pr.items
     const poItems = items.map(it => ({ ...it, ordered_qty: it.requested_qty, unit_cost: 0, total: 0 }))
     await createPurchaseOrder({
@@ -58,9 +57,7 @@ export default function PurchaseRequisitions() {
                 <td>{pr.requester_name}</td>
                 <td>{(typeof pr.items === 'string' ? JSON.parse(pr.items) : pr.items).length}</td>
                 <td><span className={`badge bg-${pr.status === 'approved' ? 'green' : pr.status === 'rejected' ? 'red' : 'yellow'}`}>{pr.status}</span></td>
-                <td>
-                  {pr.status === 'submitted' && <><button className="btn btn-green btn-sm" onClick={() => handleApprove(pr)}>Approve</button> <button className="btn btn-red btn-sm" onClick={() => handleReject(pr.id)}>Reject</button></>}
-                </td>
+                <td>{pr.status === 'submitted' && <><button className="btn btn-primary btn-sm" onClick={() => handleApprove(pr)}><span className="material-icons">check_circle</span> Approve</button> <button className="btn btn-danger btn-sm" onClick={() => handleReject(pr.id)}><span className="material-icons">cancel</span> Reject</button></>}</td>
               </tr>
             ))}
           </tbody>
