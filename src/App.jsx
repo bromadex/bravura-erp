@@ -66,4 +66,25 @@ function AppRoutes() {
       </Route>
 
       {/* Other modules - placeholder */}
-      {MODULES.filter(m => m.id !== 'inventory
+      {MODULES.filter(m => m.id !== 'inventory' && m.id !== 'dashboard').map(mod => (
+        <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
+          <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
+          {mod.pages.map(page => <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />)}
+        </Route>
+      ))}
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+        <Toaster position="top-right" toastOptions={{ style: { background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border2)' } }} />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
