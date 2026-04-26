@@ -13,7 +13,6 @@ export default function HeavyEquipment() {
     hour_meter: 0, last_service_date: '', service_interval_hours: 500, assigned_project: ''
   })
 
-  // Fetch fuel consumption from fuel_log
   useEffect(() => {
     const loadFuel = async () => {
       const { data } = await supabase.from('fuel_log').select('vehicle, amount')
@@ -82,11 +81,14 @@ export default function HeavyEquipment() {
         {loading ? <div>Loading...</div> : earthMovers.length === 0 ? <div className="empty-state">No equipment added</div> : earthMovers.map(e => {
           const totalFuel = fuelMap[e.reg] || 0
           const efficiency = e.hour_meter > 0 ? totalFuel / e.hour_meter : null
+          const isActive = e.status === 'Active'
           return (
             <div key={e.id} className="card" style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>construction</span>
-                <span className={`badge ${e.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{e.status}</span>
+                <span className="material-icons" style={{ fontSize: 20, color: isActive ? 'var(--green)' : 'var(--red)' }}>
+                  {isActive ? 'check_circle' : 'error'}
+                </span>
               </div>
               <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{e.reg}</div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{e.type || '—'}</div>
@@ -103,6 +105,7 @@ export default function HeavyEquipment() {
                   <span> · Next: {e.hour_meter + e.service_interval_hours} hrs</span>
                 )}
               </div>
+              <div style={{ marginTop: 8, fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>local_gas_station</span> Total Fuel: <strong>{totalFuel.toLocaleString()} L</strong></div>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <button className="btn btn-secondary btn-sm" onClick={() => openModal(e)}><span className="material-icons">edit</span></button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e)}><span className="material-icons">delete</span></button>
@@ -124,7 +127,13 @@ export default function HeavyEquipment() {
               <div className="form-group"><label>Description / Model</label><input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
               <div className="form-row">
                 <div className="form-group"><label>Operator Name</label><input className="form-control" value={form.operator_name} onChange={e => setForm({...form, operator_name: e.target.value})} /></div>
-                <div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>Grounded</option><option>Maintenance</option></select></div>
+                <div className="form-group"><label>Status</label>
+                  <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                    <option value="Active">Active</option>
+                    <option value="Grounded">Grounded</option>
+                    <option value="Maintenance">Maintenance</option>
+                  </select>
+                </div>
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Hour Meter (hours)</label><input type="number" className="form-control" value={form.hour_meter} onChange={e => setForm({...form, hour_meter: parseFloat(e.target.value) || 0})} /></div>
