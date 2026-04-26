@@ -27,7 +27,6 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// Placeholder for other modules that are not yet built
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -62,10 +61,8 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Dashboard placeholder */}
       <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
 
-      {/* Inventory - full implementation */}
       <Route path="/module/inventory" element={<ProtectedRoute><Layout module="inventory" /></ProtectedRoute>}>
         <Route index element={<StockBalance />} />
         <Route path="stock-balance" element={<StockBalance />} />
@@ -76,7 +73,6 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
       </Route>
 
-      {/* Procurement - full implementation */}
       <Route path="/module/procurement" element={<ProtectedRoute><Layout module="procurement" /></ProtectedRoute>}>
         <Route index element={<Suppliers />} />
         <Route path="suppliers" element={<Suppliers />} />
@@ -86,7 +82,6 @@ function AppRoutes() {
         <Route path="goods-received" element={<GoodsReceived />} />
       </Route>
 
-      {/* Other modules - placeholders */}
       {MODULES.filter(m => m.id !== 'inventory' && m.id !== 'procurement' && m.id !== 'dashboard').map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
