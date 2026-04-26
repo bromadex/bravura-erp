@@ -1,43 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
-import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Vehicles() {
-  const { vehicles, addVehicle, updateVehicle, deleteVehicle, loading, fetchAll } = useFleet()
+  const { vehicles, addVehicle, updateVehicle, deleteVehicle, getVehicleFuel, loading, fetchAll } = useFleet()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [fuelMap, setFuelMap] = useState({})
   const [form, setForm] = useState({
-    reg: '', type: '', description: '', driver_id: '', driver_name: '', status: 'Active'
+    reg: '', type: '', description: '', driver_name: '', status: 'Active'
   })
-
-  // Fetch fuel consumption for each vehicle
-  useEffect(() => {
-    const fetchFuel = async () => {
-      const { data } = await supabase.from('fuel_log').select('vehicle, amount')
-      if (data) {
-        const map = {}
-        data.forEach(f => {
-          if (f.vehicle) map[f.vehicle] = (map[f.vehicle] || 0) + (f.amount || 0)
-        })
-        setFuelMap(map)
-      }
-    }
-    fetchFuel()
-  }, [vehicles])
 
   const openModal = (vehicle = null) => {
     if (vehicle) {
       setEditing(vehicle)
       setForm({
-        reg: vehicle.reg, type: vehicle.type, description: vehicle.description || '',
-        driver_id: vehicle.driver_id || '', driver_name: vehicle.driver_name || '',
-        status: vehicle.status || 'Active'
+        reg: vehicle.reg, type: vehicle.type || '', description: vehicle.description || '',
+        driver_name: vehicle.driver_name || '', status: vehicle.status || 'Active'
       })
     } else {
       setEditing(null)
-      setForm({ reg: '', type: '', description: '', driver_id: '', driver_name: '', status: 'Active' })
+      setForm({ reg: '', type: '', description: '', driver_name: '', status: 'Active' })
     }
     setModalOpen(true)
   }
@@ -74,29 +56,32 @@ export default function Vehicles() {
         </button>
       </div>
 
-      <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
         {loading ? (
           <div>Loading...</div>
         ) : vehicles.length === 0 ? (
           <div className="empty-state">No vehicles added</div>
         ) : (
-          vehicles.map(v => (
-            <div key={v.id} className="card" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>directions_car</span>
-                <span className={`badge ${v.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{v.status}</span>
+          vehicles.map(v => {
+            const totalFuel = getVehicleFuel(v.reg)
+            return (
+              <div key={v.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>directions_car</span>
+                  <span className={`badge ${v.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{v.status}</span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{v.reg}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{v.type || '—'}</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>{v.description || ''}</div>
+                {v.driver_name && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>person</span> {v.driver_name}</div>}
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 500 }}>⛽ Total Fuel: <strong>{totalFuel.toLocaleString()} L</strong></div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openModal(v)}><span className="material-icons">edit</span></button>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(v)}><span className="material-icons">delete</span></button>
+                </div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{v.reg}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{v.type}</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>{v.description || ''}</div>
-              {v.driver_name && <div style={{ fontSize: 12, marginTop: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>person</span> {v.driver_name}</div>}
-              <div style={{ marginTop: 8, fontSize: 12 }}>⛽ Total Fuel: <strong>{fuelMap[v.reg]?.toLocaleString() || 0} L</strong></div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => openModal(v)}><span className="material-icons">edit</span></button>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(v)}><span className="material-icons">delete</span></button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -106,7 +91,7 @@ export default function Vehicles() {
             <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Vehicle</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>Registration *</label><input className="form-control" required value={form.reg} onChange={e => setForm({...form, reg: e.target.value})} /></div>
+                <div className="form-group"><label>Registration *</label><input className="form-control" required value={form.reg} onChange={e => setForm({...form, reg: e.target.value.toUpperCase()})} /></div>
                 <div className="form-group"><label>Type</label><input className="form-control" value={form.type} onChange={e => setForm({...form, type: e.target.value})} /></div>
               </div>
               <div className="form-group"><label>Description / Model</label><input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
