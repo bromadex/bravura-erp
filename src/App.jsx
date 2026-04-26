@@ -37,6 +37,7 @@ import Vehicles from './pages/Fleet/Vehicles'
 import Generators from './pages/Fleet/Generators'
 import HeavyEquipment from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
+import AssetIssues from './pages/Fleet/AssetIssues'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -135,6 +136,7 @@ function AppRoutes() {
         <Route path="generators" element={<Generators />} />
         <Route path="heavy-equipment" element={<HeavyEquipment />} />
         <Route path="maintenance-alerts" element={<MaintenanceAlerts />} />
+        <Route path="asset-issues" element={<AssetIssues />} />
       </Route>
 
       {/* OTHER MODULES – placeholders */}
