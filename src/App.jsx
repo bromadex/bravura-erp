@@ -13,6 +13,13 @@ import Transactions from './pages/Inventory/Transactions'
 import StockTaking from './pages/Inventory/StockTaking'
 import Categories from './pages/Inventory/Categories'
 
+// Procurement Pages
+import Suppliers from './pages/Procurement/Suppliers'
+import StoreRequisitions from './pages/Procurement/StoreRequisitions'
+import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
+import PurchaseOrders from './pages/Procurement/PurchaseOrders'
+import GoodsReceived from './pages/Procurement/GoodsReceived'
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text-dim)', gap:12 }}>Loading...</div>
@@ -20,18 +27,7 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-const MODULES = [
-  { id:'dashboard',   pages:['overview'] },
-  { id:'procurement', pages:['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'] },
-  { id:'inventory',   pages:['stock-balance','stock-in','stock-out','transactions','stock-taking','categories'] },
-  { id:'logistics',   pages:['goods-received','batch-plant','campsite'] },
-  { id:'fuel',        pages:['tanks','dipstick','issuance','deliveries','reports'] },
-  { id:'fleet',       pages:['vehicles','generators','heavy-equipment'] },
-  { id:'hr',          pages:['employees','timesheets','leave','payroll','permissions'] },
-  { id:'accounting',  pages:['chart-of-accounts','journal-entries','reports'] },
-  { id:'reports',     pages:['overview','audit-log','drafts'] },
-]
-
+// Placeholder for other modules that are not yet built
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -47,6 +43,18 @@ function ModulePlaceholder({ module, page }) {
   )
 }
 
+const MODULES = [
+  { id:'dashboard',   pages:['overview'] },
+  { id:'procurement', pages:['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'] },
+  { id:'inventory',   pages:['stock-balance','stock-in','stock-out','transactions','stock-taking','categories'] },
+  { id:'logistics',   pages:['goods-received','batch-plant','campsite'] },
+  { id:'fuel',        pages:['tanks','dipstick','issuance','deliveries','reports'] },
+  { id:'fleet',       pages:['vehicles','generators','heavy-equipment'] },
+  { id:'hr',          pages:['employees','timesheets','leave','payroll','permissions'] },
+  { id:'accounting',  pages:['chart-of-accounts','journal-entries','reports'] },
+  { id:'reports',     pages:['overview','audit-log','drafts'] },
+]
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
@@ -54,7 +62,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Dashboard - simple */}
+      {/* Dashboard placeholder */}
       <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
 
       {/* Inventory - full implementation */}
@@ -68,8 +76,18 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
       </Route>
 
-      {/* Other modules - placeholder */}
-      {MODULES.filter(m => m.id !== 'inventory' && m.id !== 'dashboard').map(mod => (
+      {/* Procurement - full implementation */}
+      <Route path="/module/procurement" element={<ProtectedRoute><Layout module="procurement" /></ProtectedRoute>}>
+        <Route index element={<Suppliers />} />
+        <Route path="suppliers" element={<Suppliers />} />
+        <Route path="store-requisitions" element={<StoreRequisitions />} />
+        <Route path="purchase-requisitions" element={<PurchaseRequisitions />} />
+        <Route path="purchase-orders" element={<PurchaseOrders />} />
+        <Route path="goods-received" element={<GoodsReceived />} />
+      </Route>
+
+      {/* Other modules - placeholders */}
+      {MODULES.filter(m => m.id !== 'inventory' && m.id !== 'procurement' && m.id !== 'dashboard').map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
           {mod.pages.map(page => <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />)}
