@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 
 const MODULE_SECTIONS = {
   inventory: {
@@ -16,7 +16,6 @@ const MODULE_SECTIONS = {
 }
 
 export default function Sidebar({ module, onNavigate }) {
-  const navigate = useNavigate()
   const location = useLocation()
   const [expanded, setExpanded] = useState(() => {
     const saved = localStorage.getItem(`sidebar_expanded_${module}`)
