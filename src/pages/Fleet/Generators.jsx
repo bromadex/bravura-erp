@@ -1,33 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
-import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Generators() {
-  const { generators, genRunLogs, addGenerator, updateGenerator, deleteGenerator, addGenRunLog, deleteGenRunLog, loading, fetchAll } = useFleet()
+  const { generators, genRunLogs, addGenerator, updateGenerator, deleteGenerator, addGenRunLog, deleteGenRunLog, getGeneratorFuel, loading, fetchAll } = useFleet()
   const [modalOpen, setModalOpen] = useState(false)
   const [runModalOpen, setRunModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [fuelMap, setFuelMap] = useState({})
   const [form, setForm] = useState({
     gen_code: '', gen_name: '', location: '', capacity: '', status: 'Stopped', service_date: ''
   })
   const [runForm, setRunForm] = useState({
     gen_id: '', date: new Date().toISOString().split('T')[0], start_time: '', end_time: '', hours: '', fuel_used: '', notes: ''
   })
-
-  // Fetch fuel consumed by each generator from gen_run_log
-  useEffect(() => {
-    const map = {}
-    genRunLogs.forEach(log => {
-      const gen = generators.find(g => g.id === log.gen_id)
-      if (gen) {
-        const key = gen.gen_code
-        map[key] = (map[key] || 0) + (log.fuel_used || 0)
-      }
-    })
-    setFuelMap(map)
-  }, [genRunLogs, generators])
 
   const openModal = (gen = null) => {
     if (gen) {
@@ -91,7 +76,7 @@ export default function Generators() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const getGenFuel = (genCode) => fuelMap[genCode] || 0
+  const getGenTotalFuel = (genId) => getGeneratorFuel(genId)
 
   return (
     <div>
@@ -102,28 +87,33 @@ export default function Generators() {
         </button>
       </div>
 
-      <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        {loading ? <div>Loading...</div> : generators.length === 0 ? (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        {loading ? (
+          <div>Loading...</div>
+        ) : generators.length === 0 ? (
           <div className="empty-state">No generators added</div>
         ) : (
-          generators.map(g => (
-            <div key={g.id} className="card" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>bolt</span>
-                <span className={`badge ${g.status === 'Running' ? 'bg-green' : 'bg-red'}`}>{g.status}</span>
+          generators.map(g => {
+            const totalFuel = getGenTotalFuel(g.id)
+            return (
+              <div key={g.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>bolt</span>
+                  <span className={`badge ${g.status === 'Running' ? 'bg-green' : 'bg-red'}`}>{g.status}</span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{g.gen_code}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{g.gen_name}</div>
+                {g.location && <div style={{ fontSize: 12, marginTop: 4 }}>📍 {g.location}</div>}
+                {g.capacity && <div style={{ fontSize: 12 }}>⚡ {g.capacity} kVA</div>}
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 500 }}>⛽ Total Fuel Used: <strong>{totalFuel.toLocaleString()} L</strong></div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openRunModal(g.id)}><span className="material-icons">schedule</span> Log Run</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => openModal(g)}><span className="material-icons">edit</span></button>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(g)}><span className="material-icons">delete</span></button>
+                </div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{g.gen_code}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{g.gen_name}</div>
-              {g.location && <div style={{ fontSize: 12, marginTop: 4 }}>📍 {g.location}</div>}
-              {g.capacity && <div style={{ fontSize: 12 }}>⚡ {g.capacity} kVA</div>}
-              <div style={{ marginTop: 8, fontSize: 12 }}>⛽ Total Fuel Used: <strong>{getGenFuel(g.gen_code).toLocaleString()} L</strong></div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => openRunModal(g.id)}><span className="material-icons">schedule</span> Log Run</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => openModal(g)}><span className="material-icons">edit</span></button>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(g)}><span className="material-icons">delete</span></button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
