@@ -3,19 +3,25 @@ import { useHR } from '../../contexts/HRContext'
 import toast from 'react-hot-toast'
 
 export default function Departments() {
-  const { departments, employees, designations, addDepartment, updateDepartment, deleteDepartment, loading, fetchAll } = useHR()
+  const { departments, employees, addDepartment, updateDepartment, deleteDepartment, loading, fetchAll } = useHR()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewEmployeesDept, setViewEmployeesDept] = useState(null)
-  const [form, setForm] = useState({ name: '', description: '', location: '', hod: '' })
+  const [form, setForm] = useState({ name: '', description: '', location: '', hod_id: '', parent_id: '' })
 
   const openModal = (dept = null) => {
     if (dept) {
       setEditing(dept)
-      setForm({ name: dept.name, description: dept.description || '', location: dept.location || '', hod: dept.hod || '' })
+      setForm({
+        name: dept.name,
+        description: dept.description || '',
+        location: dept.location || '',
+        hod_id: dept.hod_id || '',
+        parent_id: dept.parent_id || ''
+      })
     } else {
       setEditing(null)
-      setForm({ name: '', description: '', location: '', hod: '' })
+      setForm({ name: '', description: '', location: '', hod_id: '', parent_id: '' })
     }
     setModalOpen(true)
   }
@@ -38,13 +44,17 @@ export default function Departments() {
 
   const handleDelete = async (id, name) => {
     if (window.confirm(`Delete department "${name}"? Employees will lose assignment.`)) {
-      await deleteDepartment(id)
-      toast.success('Deleted')
-      await fetchAll()
+      try {
+        await deleteDepartment(id)
+        toast.success('Deleted')
+        await fetchAll()
+      } catch (err) { toast.error(err.message) }
     }
   }
 
   const getEmployeesInDept = (deptId) => employees.filter(e => e.department_id === deptId)
+  const getDepartmentName = (id) => departments.find(d => d.id === id)?.name || '—'
+  const getEmployeeName = (id) => employees.find(e => e.id === id)?.name || '—'
 
   return (
     <div>
@@ -59,7 +69,7 @@ export default function Departments() {
         <table className="stock-table">
           <thead>
             <tr>
-              <th>Name</th><th>Description</th><th>Location</th><th>HOD</th><th>Employees</th><th>Actions</th>
+              <th>Name</th><th>Description</th><th>Location</th><th>Head of Department</th><th>Parent Department</th><th>Employees</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -70,7 +80,8 @@ export default function Departments() {
                   <td style={{ fontWeight: 600 }}>{dept.name}</td>
                   <td>{dept.description || '—'}</td>
                   <td>{dept.location || '—'}</td>
-                  <td>{dept.hod || '—'}</td>
+                  <td>{getEmployeeName(dept.hod_id) || '—'}</td>
+                  <td>{getDepartmentName(dept.parent_id) || '—'}</td>
                   <td style={{ textAlign: 'center' }}>{empList.length} <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle' }}>people</span></td>
                   <td>
                     <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openModal(dept) }}><span className="material-icons">edit</span></button>
@@ -79,7 +90,7 @@ export default function Departments() {
                 </tr>
               )
             })}
-            {departments.length === 0 && <tr><td colSpan="6" className="empty-state">No departments</td></tr>}
+            {departments.length === 0 && <tr><td colSpan="7" className="empty-state">No departments</td></tr>}
           </tbody>
         </table>
       </div>
@@ -96,8 +107,8 @@ export default function Departments() {
                   {getEmployeesInDept(viewEmployeesDept.id).map(emp => (
                     <tr key={emp.id}>
                       <td style={{ fontWeight: 600 }}>{emp.name}</td>
-                      <td>{emp.emp_id || '—'}</td>
-                      <td>{designations.find(d => d.id === emp.designation_id)?.title || '—'}</td>
+                      <td>{emp.employee_number || '—'}</td>
+                      <td>{emp.designation_id ? '-' : '—'} {/* Add designation lookup if needed */}</td>
                       <td><span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status || 'Active'}</span></td>
                     </tr>
                   ))}
@@ -112,6 +123,7 @@ export default function Departments() {
         </div>
       )}
 
+      {/* Add/Edit Department Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -121,7 +133,18 @@ export default function Departments() {
               <div className="form-group"><label>Description</label><textarea className="form-control" rows="2" value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
               <div className="form-row">
                 <div className="form-group"><label>Location</label><input className="form-control" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
-                <div className="form-group"><label>Head of Department</label><input className="form-control" value={form.hod} onChange={e => setForm({...form, hod: e.target.value})} /></div>
+                <div className="form-group"><label>Head of Department</label>
+                  <select className="form-control" value={form.hod_id} onChange={e => setForm({...form, hod_id: e.target.value})}>
+                    <option value="">Select HOD</option>
+                    {employees.filter(e => e.status === 'Active').map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-group"><label>Parent Department</label>
+                <select className="form-control" value={form.parent_id} onChange={e => setForm({...form, parent_id: e.target.value})}>
+                  <option value="">None (Top Level)</option>
+                  {departments.filter(d => d.id !== editing?.id).map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
+                </select>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
