@@ -478,51 +478,52 @@ export default function Employees() {
       </div>
     )
   }
-const AttendanceTab = ({ employee }) => {
-  const empAttendance = getEmployeeAttendance(employee.id)
-  const weeklyStats = getWeeklyHours(employee.id)
-  const totalHours = empAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0)
-  const totalOvertime = empAttendance.reduce((sum, a) => sum + (a.overtime_hours || 0), 0)
-  return (
-    <div>
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <div className="kpi-card"><div className="kpi-label">Total Hours</div><div className="kpi-val">{totalHours.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
-        <div className="kpi-card"><div className="kpi-label">Overtime</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totalOvertime.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
-        <div className="kpi-card"><div className="kpi-label">This Week</div><div className="kpi-val">{weeklyStats.totalHours.toFixed(1)}</div><div className="kpi-sub">hours ({weeklyStats.totalOvertime.toFixed(1)} OT)</div></div>
-        <div className="kpi-card"><div className="kpi-label">Records</div><div className="kpi-val">{empAttendance.length}</div><div className="kpi-sub">entries</div></div>
-      </div>
-      <div className="table-wrap">
-        <table className="stock-table">
-          <thead>
-            <tr>
-              <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {empAttendance.map(att => (
-              <tr key={att.id}>
-                <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
-                <td>{att.clock_in}</td>
-                <td>{att.clock_out || '—'}</td>
-                <td><span className="badge bg-blue">{att.shift_type}</span></td>
-                <td>{att.total_hours?.toFixed(1) || '—'}</td>
-                <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
-                <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
-              </tr>
-            ))}
-            {empAttendance.length === 0 && (
+
+  const AttendanceTab = ({ employee }) => {
+    const empAttendance = getEmployeeAttendance(employee.id)
+    const weeklyStats = getWeeklyHours(employee.id)
+    const totalHours = empAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0)
+    const totalOvertime = empAttendance.reduce((sum, a) => sum + (a.overtime_hours || 0), 0)
+    return (
+      <div>
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
+          <div className="kpi-card"><div className="kpi-label">Total Hours</div><div className="kpi-val">{totalHours.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
+          <div className="kpi-card"><div className="kpi-label">Overtime</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totalOvertime.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
+          <div className="kpi-card"><div className="kpi-label">This Week</div><div className="kpi-val">{weeklyStats.totalHours.toFixed(1)}</div><div className="kpi-sub">hours ({weeklyStats.totalOvertime.toFixed(1)} OT)</div></div>
+          <div className="kpi-card"><div className="kpi-label">Records</div><div className="kpi-val">{empAttendance.length}</div><div className="kpi-sub">entries</div></div>
+        </div>
+        <div className="table-wrap">
+          <table className="stock-table">
+            <thead>
               <tr>
-                <td colSpan="7" className="empty-state">No attendance records</td>
+                <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {empAttendance.map(att => (
+                <tr key={att.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
+                  <td>{att.clock_in}</td>
+                  <td>{att.clock_out || '—'}</td>
+                  <td><span className="badge bg-blue">{att.shift_type}</span></td>
+                  <td>{att.total_hours?.toFixed(1) || '—'}</td>
+                  <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
+                </tr>
+              ))}
+              {empAttendance.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-state">No attendance records</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  )
-}
-  
-   const consterformanceTab = ({ employee }) => {
+    )
+  }
+
+  const PerformanceTab = ({ employee }) => {
     const empSkills = getEmployeeSkills(employee.id)
     const empCerts = getEmployeeCertifications(employee.id)
     const isExpiring = (expiryDate) => {
@@ -583,12 +584,12 @@ const AttendanceTab = ({ employee }) => {
                       <td>{cert.expiry_date || '—'}</td>
                       <td>
                         {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
-                      </table>
+                      </td>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
                       </td>
-                    <table>
+                    </tr>
                   )
                 })}
                 {empCerts.length === 0 && (
