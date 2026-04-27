@@ -3,7 +3,7 @@ import { useHR } from '../../contexts/HRContext'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
-  const { employees, departments, designations, attendance, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, loading, fetchAll } = useHR()
+  const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, loading, fetchAll } = useHR()
   
   // UI state
   const [modalOpen, setModalOpen] = useState(false)
@@ -11,6 +11,7 @@ export default function Employees() {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [editing, setEditing] = useState(null)
   const [accountInfo, setAccountInfo] = useState(null)
+  const [activeTab, setActiveTab] = useState('profile')
   
   // Search, filter, sort
   const [searchTerm, setSearchTerm] = useState('')
@@ -40,6 +41,26 @@ export default function Employees() {
       a.clock_out
     )
     return weekAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0).toFixed(1)
+  }
+
+  // Get employee's attendance records
+  const getEmployeeAttendance = (employeeId) => {
+    return attendance.filter(a => a.employee_id === employeeId).sort((a,b) => new Date(b.date) - new Date(a.date))
+  }
+
+  // Get employee's skills
+  const getEmployeeSkills = (employeeId) => {
+    return skills.filter(s => s.employee_id === employeeId)
+  }
+
+  // Get employee's certifications
+  const getEmployeeCertifications = (employeeId) => {
+    return certifications.filter(c => c.employee_id === employeeId)
+  }
+
+  // Get employee's audit history
+  const getEmployeeHistory = (employeeId) => {
+    return auditLogs.filter(log => log.entity_id === employeeId).slice(0, 20)
   }
 
   const openModal = (employee = null) => {
@@ -77,6 +98,7 @@ export default function Employees() {
 
   const openViewModal = (employee) => {
     setSelectedEmployee(employee)
+    setActiveTab('profile')
     setViewModalOpen(true)
   }
 
@@ -106,7 +128,6 @@ export default function Employees() {
     e.preventDefault()
     if (!form.name) return toast.error('Name required')
     
-    // Validation
     if (form.phone && !/^[0-9+\-\s()]{9,15}$/.test(form.phone)) {
       return toast.error('Invalid phone number format')
     }
@@ -114,7 +135,6 @@ export default function Employees() {
       return toast.error('Invalid email format')
     }
     
-    // Duplicate check
     const duplicate = employees.find(emp => 
       emp.id !== editing?.id && 
       (emp.name.toLowerCase() === form.name.toLowerCase() ||
@@ -178,6 +198,145 @@ export default function Employees() {
     Terminated: 'bg-red'
   }
 
+  // Tab content components
+  const ProfileTab = ({ employee }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div><span className="text-dim">Employee ID:</span> {employee.employee_number || '—'}</div>
+      <div><span className="text-dim">Status:</span> <span className={`badge ${statusColors[employee.status] || 'bg-green'}`}>{employee.status || 'Active'}</span></div>
+      <div><span className="text-dim">Employment Type:</span> {employee.employment_type || '—'}</div>
+      <div><span className="text-dim">Designation:</span> {getDesignationTitle(employee.designation_id)}</div>
+      <div><span className="text-dim">Department:</span> {getDepartmentName(employee.department_id)}</div>
+      <div><span className="text-dim">Phone:</span> {employee.phone || '—'}</div>
+      <div><span className="text-dim">Email:</span> {employee.email || '—'}</div>
+      <div><span className="text-dim">Hire Date:</span> {employee.hire_date || '—'}</div>
+      <div><span className="text-dim">Date of Birth:</span> {employee.date_of_birth || '—'}</div>
+      <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Residential Address:</span> {employee.residential_address || '—'}</div>
+      <div><span className="text-dim">Emergency Contact Name:</span> {employee.emergency_name || '—'}</div>
+      <div><span className="text-dim">Emergency Contact Phone:</span> {employee.emergency_phone || '—'}</div>
+      {employee.system_username && (
+        <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {employee.system_username}</div>
+      )}
+    </div>
+  )
+
+  const AttendanceTab = ({ employee }) => {
+    const empAttendance = getEmployeeAttendance(employee.id)
+    const totalHours = empAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0)
+    const totalOvertime = empAttendance.reduce((sum, a) => sum + (a.overtime_hours || 0), 0)
+    return (
+      <div>
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
+          <div className="kpi-card"><div className="kpi-label">Total Hours</div><div className="kpi-val">{totalHours.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
+          <div className="kpi-card"><div className="kpi-label">Overtime</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totalOvertime.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
+          <div className="kpi-card"><div className="kpi-label">This Week</div><div className="kpi-val">{getHoursThisWeek(employee.id)}</div><div className="kpi-sub">hours</div></div>
+          <div className="kpi-card"><div className="kpi-label">Records</div><div className="kpi-val">{empAttendance.length}</div><div className="kpi-sub">entries</div></div>
+        </div>
+        <div className="table-wrap">
+          <table className="stock-table">
+            <thead>
+              <tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              {empAttendance.map(att => (
+                <tr key={att.id}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
+                  <td>{att.clock_in}</td>
+                  <td>{att.clock_out || '—'}</td>
+                  <td><span className="badge bg-blue">{att.shift_type}</span></td>
+                  <td>{att.total_hours?.toFixed(1) || '—'}</td>
+                  <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
+                </tr>
+              ))}
+              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</td><\/tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  const PerformanceTab = ({ employee }) => {
+    const empSkills = getEmployeeSkills(employee.id)
+    const empCerts = getEmployeeCertifications(employee.id)
+    const isExpiring = (expiryDate) => {
+      if (!expiryDate) return false
+      const expiry = new Date(expiryDate)
+      const thirtyDays = new Date()
+      thirtyDays.setDate(thirtyDays.getDate() + 30)
+      return expiry <= thirtyDays && expiry >= new Date()
+    }
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Skills</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {empSkills.map(skill => (
+              <span key={skill.id} className="badge bg-purple">{skill.skill_name} ({skill.proficiency})</span>
+            ))}
+            {empSkills.length === 0 && <span className="text-dim">No skills added</span>}
+          </div>
+        </div>
+        <div>
+          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Certifications</h4>
+          <div className="table-wrap">
+            <table className="stock-table">
+              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th></tr></thead>
+              <tbody>
+                {empCerts.map(cert => {
+                  const expiring = isExpiring(cert.expiry_date)
+                  const expired = cert.expiry_date && new Date(cert.expiry_date) < new Date()
+                  return (
+                    <tr key={cert.id}>
+                      <td style={{ fontWeight: 600 }}>{cert.certification_name}</td>
+                      <td>{cert.issuing_body || '—'}</td>
+                      <td>{cert.issue_date || '—'}</td>
+                      <td>{cert.expiry_date || '—'}</td>
+                      <td>
+                        {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {empCerts.length === 0 && <tr><td colSpan="5" className="empty-state">No certifications</td><\/tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const HistoryTab = ({ employee }) => {
+    const history = getEmployeeHistory(employee.id)
+    const getActionColor = (action) => {
+      if (action.includes('CREATE')) return 'var(--green)'
+      if (action.includes('UPDATE')) return 'var(--blue)'
+      if (action.includes('DELETE')) return 'var(--red)'
+      return 'var(--text-dim)'
+    }
+    return (
+      <div className="table-wrap">
+        <table className="stock-table">
+          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
+          <tbody>
+            {history.map(log => (
+              <tr key={log.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
+                <td style={{ color: getActionColor(log.action) }}>{log.action}</td>
+                <td>{log.user_name || 'System'}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                  {log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}
+                </td>
+              </tr>
+            ))}
+            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</td><\/tr>}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -192,13 +351,7 @@ export default function Employees() {
         <div className="form-row">
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="Name, phone, ID, or designation..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+            <input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label>
@@ -271,15 +424,9 @@ export default function Employees() {
                 </div>
                 <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{hoursThisWeek}h</strong></span>
-                  <div>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}
-                      style={{ marginRight: 4 }}
-                    >
-                      <span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span>
-                    </button>
-                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span>
+                  </button>
                 </div>
               </div>
             )
@@ -287,38 +434,60 @@ export default function Employees() {
         )}
       </div>
 
-      {/* Detail View Modal (same as before, will be enhanced in 8.5.3) */}
+      {/* Tabbed Detail View Modal */}
       {viewModalOpen && selectedEmployee && (
         <div className="overlay" onClick={() => setViewModalOpen(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Employee Details: <span>{selectedEmployee.name}</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div><span className="text-dim">Employee ID:</span> {selectedEmployee.employee_number || '—'}</div>
-              <div><span className="text-dim">Status:</span> <span className={`badge ${statusColors[selectedEmployee.status] || 'bg-green'}`}>{selectedEmployee.status || 'Active'}</span></div>
-              <div><span className="text-dim">Employment Type:</span> {selectedEmployee.employment_type || '—'}</div>
-              <div><span className="text-dim">Designation:</span> {getDesignationTitle(selectedEmployee.designation_id)}</div>
-              <div><span className="text-dim">Department:</span> {getDepartmentName(selectedEmployee.department_id)}</div>
-              <div><span className="text-dim">Phone:</span> {selectedEmployee.phone || '—'}</div>
-              <div><span className="text-dim">Email:</span> {selectedEmployee.email || '—'}</div>
-              <div><span className="text-dim">Hire Date:</span> {selectedEmployee.hire_date || '—'}</div>
-              <div><span className="text-dim">Date of Birth:</span> {selectedEmployee.date_of_birth || '—'}</div>
-              <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Residential Address:</span> {selectedEmployee.residential_address || '—'}</div>
-              <div><span className="text-dim">Emergency Contact Name:</span> {selectedEmployee.emergency_name || '—'}</div>
-              <div><span className="text-dim">Emergency Contact Phone:</span> {selectedEmployee.emergency_phone || '—'}</div>
-              {selectedEmployee.system_username && (
-                <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {selectedEmployee.system_username}</div>
-              )}
+          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Employee Details: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
+              <div>
+                <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>
+                <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>
+              </div>
             </div>
-            <div className="modal-actions">
+            
+            {/* Tab Headers */}
+            <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+              {['profile', 'attendance', 'performance', 'history'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent',
+                    color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
+                    {tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}
+                  </span>
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 8 }}>
+              {activeTab === 'profile' && <ProfileTab employee={selectedEmployee} />}
+              {activeTab === 'attendance' && <AttendanceTab employee={selectedEmployee} />}
+              {activeTab === 'performance' && <PerformanceTab employee={selectedEmployee} />}
+              {activeTab === 'history' && <HistoryTab employee={selectedEmployee} />}
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
               <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
-              <button className="btn btn-primary" onClick={editFromView}><span className="material-icons">edit</span> Edit</button>
-              <button className="btn btn-danger" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal (unchanged from 8.5.2) */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
