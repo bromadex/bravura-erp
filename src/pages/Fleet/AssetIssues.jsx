@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
 import { useAuth } from '../../contexts/AuthContext'
-import supabase from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function AssetIssues() {
@@ -85,7 +85,7 @@ export default function AssetIssues() {
                       </>
                     )}
                   </td>
-                </tr>
+                <tr>
               )
             })}
             {issues.length === 0 && <tr><td colSpan="7" className="empty-state">No issues reported</td></tr>}
