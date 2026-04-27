@@ -42,6 +42,7 @@ import AssetIssues from './pages/Fleet/AssetIssues'
 
 // HR Pages
 import Employees from './pages/HR/Employees'
+import Departments from './pages/HR/Departments'
 import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
 
@@ -154,6 +155,7 @@ function AppRoutes() {
       }>
         <Route index element={<Employees />} />
         <Route path="employees" element={<Employees />} />
+        <Route path="departments" element={<Departments />} />
         <Route path="designations" element={<Designations />} />
         <Route path="permissions" element={<UserPermissions />} />
         <Route path="leave" element={<ModulePlaceholder module="hr" page="leave" />} />
