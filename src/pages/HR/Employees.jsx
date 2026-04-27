@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 export default function Employees() {
   const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, loading, fetchAll } = useHR()
   
-  // UI state
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
@@ -13,20 +12,17 @@ export default function Employees() {
   const [accountInfo, setAccountInfo] = useState(null)
   const [activeTab, setActiveTab] = useState('profile')
   
-  // Search, filter, sort
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('ALL')
   const [filterDesignation, setFilterDesignation] = useState('ALL')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [sortBy, setSortBy] = useState('name-asc')
   
-  // Skills & Certifications form states
   const [newSkill, setNewSkill] = useState({ name: '', proficiency: 'Intermediate' })
   const [certForm, setCertForm] = useState({ id: null, certification_name: '', issuing_body: '', issue_date: '', expiry_date: '', document_url: '', notes: '' })
   const [showCertModal, setShowCertModal] = useState(false)
   const [editingCert, setEditingCert] = useState(null)
   
-  // Form state
   const [form, setForm] = useState({
     name: '', employee_number: '', designation_id: '', department_id: '',
     phone: '', email: '', hire_date: '', date_of_birth: '',
@@ -36,7 +32,6 @@ export default function Employees() {
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRole, setAccountRole] = useState('viewer')
 
-  // Helper: calculate hours worked this week for an employee
   const getHoursThisWeek = (employeeId) => {
     const today = new Date()
     const startOfWeek = new Date(today)
@@ -49,27 +44,22 @@ export default function Employees() {
     return weekAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0).toFixed(1)
   }
 
-  // Get employee's attendance records
   const getEmployeeAttendance = (employeeId) => {
     return attendance.filter(a => a.employee_id === employeeId).sort((a,b) => new Date(b.date) - new Date(a.date))
   }
 
-  // Get employee's skills
   const getEmployeeSkills = (employeeId) => {
     return skills.filter(s => s.employee_id === employeeId)
   }
 
-  // Get employee's certifications
   const getEmployeeCertifications = (employeeId) => {
     return certifications.filter(c => c.employee_id === employeeId)
   }
 
-  // Get employee's audit history
   const getEmployeeHistory = (employeeId) => {
     return auditLogs.filter(log => log.entity_id === employeeId).slice(0, 20)
   }
 
-  // Skills handlers
   const handleAddSkill = async () => {
     if (!newSkill.name.trim()) return toast.error('Skill name required')
     try {
@@ -88,7 +78,6 @@ export default function Employees() {
     }
   }
 
-  // Certifications handlers
   const openCertModal = (cert = null) => {
     if (cert) {
       setEditingCert(cert)
@@ -239,7 +228,6 @@ export default function Employees() {
   const getDesignationTitle = (id) => designations.find(d => d.id === id)?.title || '—'
   const getDepartmentName = (id) => departments.find(d => d.id === id)?.name || '—'
 
-  // Filtered and sorted employees
   const filteredEmployees = employees.filter(emp => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
@@ -268,7 +256,6 @@ export default function Employees() {
     Terminated: 'bg-red'
   }
 
-  // Tab content components
   const ProfileTab = ({ employee }) => (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       <div><span className="text-dim">Employee ID:</span> {employee.employee_number || '—'}</div>
@@ -303,26 +290,18 @@ export default function Employees() {
         </div>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead>
-              <tr>
-                <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr></thead>
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
-                  <td>{att.clock_in}</td>
-                  <td>{att.clock_out || '—'}</td>
+                  <td>{att.date}</td><td>{att.clock_in}</td><td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
                   <td>{att.total_hours?.toFixed(1) || '—'}</td>
                   <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
-                  <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
+                  <td>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && (
-                <tr><td colSpan="7" className="empty-state">No attendance records</tr>
-              )}
+              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</td></tr>}
             </tbody>
           </table>
         </div>
@@ -342,7 +321,6 @@ export default function Employees() {
     }
     return (
       <div>
-        {/* Skills Section */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h4 style={{ fontSize: 14, fontWeight: 700 }}>Skills</h4>
@@ -359,27 +337,13 @@ export default function Employees() {
             {empSkills.length === 0 && <span className="text-dim">No skills added</span>}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="New skill"
-              value={newSkill.name}
-              onChange={e => setNewSkill({ ...newSkill, name: e.target.value })}
-              style={{ flex: 2 }}
-            />
-            <select
-              className="form-control"
-              value={newSkill.proficiency}
-              onChange={e => setNewSkill({ ...newSkill, proficiency: e.target.value })}
-              style={{ width: 130 }}
-            >
+            <input type="text" className="form-control" placeholder="New skill" value={newSkill.name} onChange={e => setNewSkill({ ...newSkill, name: e.target.value })} style={{ flex: 2 }} />
+            <select className="form-control" value={newSkill.proficiency} onChange={e => setNewSkill({ ...newSkill, proficiency: e.target.value })} style={{ width: 130 }}>
               <option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option>
             </select>
             <button className="btn btn-primary btn-sm" onClick={handleAddSkill}>Add</button>
           </div>
         </div>
-
-        {/* Certifications Section */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h4 style={{ fontSize: 14, fontWeight: 700 }}>Certifications</h4>
@@ -389,9 +353,7 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead>
-                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr>
-              </thead>
+              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -402,9 +364,7 @@ export default function Employees() {
                       <td>{cert.issuing_body || '—'}</td>
                       <td>{cert.issue_date || '—'}</td>
                       <td>{cert.expiry_date || '—'}</td>
-                      <td>
-                        {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
-                      </td>
+                      <td>{expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}</td>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
@@ -412,9 +372,7 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && (
-                  <tr><td colSpan="6" className="empty-state">No certifications</tr>
-                )}
+                {empCerts.length === 0 && <tr><td colSpan="6" className="empty-state">No certifications</td></tr>}
               </tbody>
             </table>
           </div>
@@ -434,11 +392,7 @@ export default function Employees() {
     return (
       <div className="table-wrap">
         <table className="stock-table">
-          <thead>
-            <tr>
-              <th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
           <tbody>
             {history.map(log => (
               <tr key={log.id}>
@@ -448,11 +402,9 @@ export default function Employees() {
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
               </tr>
             ))}
-            {history.length === 0 && (
-              <tr><td colSpan="4" className="empty-state">No history records</tr>
-            )}
+            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</td></tr>}
           </tbody>
-        <table>
+        </table>
       </div>
     )
   }
@@ -466,168 +418,81 @@ export default function Employees() {
         </button>
       </div>
 
-      {/* Search, Filter, Sort Bar */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <div className="form-row">
-          <div className="form-group">
-            <label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label>
-            <input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label>
-            <select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
-              <option value="ALL">All Departments</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label>
-            <select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}>
-              <option value="ALL">All Designations</option>
-              {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label>
-            <select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="ALL">All Status</option>
-              <option value="Active">Active</option>
-              <option value="On Leave">On Leave</option>
-              <option value="Suspended">Suspended</option>
-              <option value="Terminated">Terminated</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label>
-            <select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
-              <option value="name-asc">Name (A-Z)</option>
-              <option value="name-desc">Name (Z-A)</option>
-              <option value="hire-date-asc">Hire Date (Oldest)</option>
-              <option value="hire-date-desc">Hire Date (Newest)</option>
-            </select>
-          </div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label><input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label><select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}><option value="ALL">All Departments</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label><select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}><option value="ALL">All Designations</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label><select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="ALL">All Status</option><option value="Active">Active</option><option value="On Leave">On Leave</option><option value="Suspended">Suspended</option><option value="Terminated">Terminated</option></select></div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label><select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option><option value="hire-date-asc">Hire Date (Oldest)</option><option value="hire-date-desc">Hire Date (Newest)</option></select></div>
         </div>
       </div>
 
-      {/* Employee Cards Grid */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-        {loading ? (
-          <div>Loading...</div>
-        ) : filteredEmployees.length === 0 ? (
-          <div className="empty-state">No employees match your filters</div>
-        ) : (
-          filteredEmployees.map(emp => {
-            const hoursThisWeek = getHoursThisWeek(emp.id)
-            return (
-              <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>
-                      {emp.name?.charAt(0).toUpperCase() || '?'}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div>
-                      <div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span>
-                    <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div>
-                  </div>
+        {loading ? <div>Loading...</div> : filteredEmployees.length === 0 ? <div className="empty-state">No employees match your filters</div> : filteredEmployees.map(emp => {
+          const hoursThisWeek = getHoursThisWeek(emp.id)
+          return (
+            <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>{emp.name?.charAt(0).toUpperCase() || '?'}</div>
+                  <div><div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div><div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div></div>
                 </div>
-                <div style={{ marginTop: 12 }}>
-                  {emp.department_id && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
-                  {emp.phone && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
-                  {emp.email && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
-                  {emp.system_username && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
-                </div>
-                <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{hoursThisWeek}h</strong></span>
-                  <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}>
-                    <span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span>
-                  </button>
-                </div>
+                <div><span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span><div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div></div>
               </div>
-            )
-          })
-        )}
+              <div style={{ marginTop: 12 }}>
+                {emp.department_id && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
+                {emp.phone && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
+                {emp.email && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
+                {emp.system_username && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{hoursThisWeek}h</strong></span>
+                <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}><span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span></button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
-      {/* Tabbed Detail View Modal */}
       {viewModalOpen && selectedEmployee && (
         <div className="overlay" onClick={() => setViewModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Employee Details: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div>
-                <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>
-                <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>
-              </div>
+              <div><button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button><button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button></div>
             </div>
-            
-            {/* Tab Headers */}
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
               {['profile', 'attendance', 'performance', 'history'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent',
-                    color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textTransform: 'capitalize'
-                  }}
-                >
-                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
-                    {tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}
-                  </span>
-                  {tab}
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
+                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>{tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}</span>{tab}
                 </button>
               ))}
             </div>
-
-            {/* Tab Content */}
             <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 8 }}>
               {activeTab === 'profile' && <ProfileTab employee={selectedEmployee} />}
               {activeTab === 'attendance' && <AttendanceTab employee={selectedEmployee} />}
               {activeTab === 'performance' && <PerformanceTab employee={selectedEmployee} />}
               {activeTab === 'history' && <HistoryTab employee={selectedEmployee} />}
             </div>
-
-            <div className="modal-actions" style={{ marginTop: 20 }}>
-              <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
-            </div>
+            <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button></div>
           </div>
         </div>
       )}
 
-      {/* Certification Modal */}
       {showCertModal && (
         <div className="overlay" onClick={() => setShowCertModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editingCert ? 'Edit' : 'Add'} <span>Certification</span></div>
             <div className="form-group"><label>Certification Name *</label><input className="form-control" required value={certForm.certification_name} onChange={e => setCertForm({...certForm, certification_name: e.target.value})} /></div>
             <div className="form-group"><label>Issuing Body</label><input className="form-control" value={certForm.issuing_body} onChange={e => setCertForm({...certForm, issuing_body: e.target.value})} /></div>
-            <div className="form-row">
-              <div className="form-group"><label>Issue Date</label><input type="date" className="form-control" value={certForm.issue_date} onChange={e => setCertForm({...certForm, issue_date: e.target.value})} /></div>
-              <div className="form-group"><label>Expiry Date</label><input type="date" className="form-control" value={certForm.expiry_date} onChange={e => setCertForm({...certForm, expiry_date: e.target.value})} /></div>
-            </div>
+            <div className="form-row"><div className="form-group"><label>Issue Date</label><input type="date" className="form-control" value={certForm.issue_date} onChange={e => setCertForm({...certForm, issue_date: e.target.value})} /></div><div className="form-group"><label>Expiry Date</label><input type="date" className="form-control" value={certForm.expiry_date} onChange={e => setCertForm({...certForm, expiry_date: e.target.value})} /></div></div>
             <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={certForm.notes} onChange={e => setCertForm({...certForm, notes: e.target.value})} /></div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowCertModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSaveCertification}>Save</button>
-            </div>
+            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setShowCertModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleSaveCertification}>Save</button></div>
           </div>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -641,80 +506,10 @@ export default function Employees() {
               </div>
             )}
             <form onSubmit={handleSubmit}>
-              {/* ... existing form fields (same as before) ... */}
-              <div className="form-row">
-                <div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Designation</label>
-                  <select className="form-control" value={form.designation_id} onChange={e => setForm({...form, designation_id: e.target.value})}>
-                    <option value="">Select</option>
-                    {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-                  </select>
-                </div>
-                <div className="form-group"><label>Department</label>
-                  <select className="form-control" value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}>
-                    <option value="">Select</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Employment Type</label>
-                  <select className="form-control" value={form.employment_type} onChange={e => setForm({...form, employment_type: e.target.value})}>
-                    <option>Full-time</option><option>Contract</option><option>Casual</option>
-                  </select>
-                </div>
-                <div className="form-group"><label>Status</label>
-                  <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
-                    <option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-                <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div>
-                <div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div>
-              </div>
+              <div className="form-row"><div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div><div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div></div>
+              <div className="form-row"><div className="form-group"><label>Designation</label><select className="form-control" value={form.designation_id} onChange={e => setForm({...form, designation_id: e.target.value})}><option value="">Select</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div><div className="form-group"><label>Department</label><select className="form-control" value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}><option value="">Select</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div></div>
+              <div className="form-row"><div className="form-group"><label>Employment Type</label><select className="form-control" value={form.employment_type} onChange={e => setForm({...form, employment_type: e.target.value})}><option>Full-time</option><option>Contract</option><option>Casual</option></select></div><div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div></div>
+              <div className="form-row"><div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div><div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div></div>
+              <div className="form-row"><div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div><div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div></div>
               <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({...form, residential_address: e.target.value})} /></div>
-              <div className="form-row">
-                <div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div>
-                <div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div>
-              </div>
-              {!editing && (
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} />
-                    <span>Create system account (username + password)</span>
-                  </label>
-                  {createAccount && (
-                    <div style={{ marginTop: 8 }}>
-                      <label>System Role</label>
-                      <select className="form-control" value={accountRole} onChange={e => setAccountRole(e.target.value)}>
-                        <option value="viewer">Viewer</option>
-                        <option value="storekeeper">Storekeeper</option>
-                        <option value="fuel_attendant">Fuel Attendant</option>
-                        <option value="hr_officer">HR Officer</option>
-                        <option value="requisition_officer">Requisition Officer</option>
-                        <option value="manager">Manager</option>
-                        <option value="super_admin">Super Admin</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => set
