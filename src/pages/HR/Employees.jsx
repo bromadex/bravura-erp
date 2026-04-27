@@ -45,10 +45,13 @@ export default function Employees() {
 
   const fetchDocuments = async (employeeId) => {
     try {
-      const { data, error } = await supabase
-        .storage
+      const { data, error } = await supabase.storage
         .from('hr-documents')
-        .list(`employee-docs/${employeeId}/`)
+        .list('', {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' }
+        })
       
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
@@ -56,20 +59,25 @@ export default function Employees() {
       }
       
       if (data && data.length) {
-        const docsWithUrls = await Promise.all(data.map(async (file) => {
-          const category = file.name.split('/')[0]
+        const employeeDocs = data.filter(file => file.name.startsWith(`${employeeId}_`))
+        const docsWithUrls = employeeDocs.map(file => {
+          let category = 'general'
+          const parts = file.name.split('_')
+          if (parts.length >= 2) {
+            category = parts[1]
+          }
           const { data: { publicUrl } } = supabase.storage
             .from('hr-documents')
-            .getPublicUrl(`employee-docs/${employeeId}/${file.name}`)
+            .getPublicUrl(file.name)
           return {
             name: file.name,
-            path: `employee-docs/${employeeId}/${file.name}`,
+            path: file.name,
             category: category,
             url: publicUrl,
             size: file.metadata?.size,
             created_at: file.created_at
           }
-        }))
+        })
         setDocuments(docsWithUrls)
       } else {
         setDocuments([])
@@ -81,23 +89,56 @@ export default function Employees() {
   }
 
   const handleUpload = async (file, category) => {
-    if (!selectedEmployee) return
+    if (!selectedEmployee) {
+      toast.error('No employee selected')
+      return
+    }
+    
+    if (!file) {
+      toast.error('No file selected')
+      return
+    }
+    
     setUploading(true)
+    
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${category}/${Date.now()}.${fileExt}`
-      const filePath = `employee-docs/${selectedEmployee.id}/${fileName}`
+      const fileName = `${selectedEmployee.id}_${category}_${Date.now()}.${fileExt}`
+      const filePath = fileName
       
-      const { error: uploadError } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('hr-documents')
-        .upload(filePath, file)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
       
-      if (uploadError) throw uploadError
+      if (error) {
+        console.error('Upload error:', error)
+        toast.error(`Upload failed: ${error.message}`)
+        setUploading(false)
+        return
+      }
       
+      const { data: { publicUrl } } = supabase.storage
+        .from('hr-documents')
+        .getPublicUrl(filePath)
+      
+      const newDoc = {
+        name: fileName,
+        path: filePath,
+        category: category,
+        url: publicUrl,
+        size: file.size,
+        created_at: new Date().toISOString()
+      }
+      
+      setDocuments(prev => [...prev, newDoc])
       toast.success('Document uploaded')
-      await fetchDocuments(selectedEmployee.id)
+      
     } catch (err) {
-      toast.error(err.message)
+      console.error('Upload error:', err)
+      toast.error(err.message || 'Upload failed')
     } finally {
       setUploading(false)
     }
@@ -112,7 +153,7 @@ export default function Employees() {
         toast.error(error.message)
       } else {
         toast.success('Document deleted')
-        await fetchDocuments(selectedEmployee.id)
+        setDocuments(prev => prev.filter(doc => doc.path !== path))
       }
     }
   }
@@ -436,7 +477,7 @@ export default function Employees() {
                     {isImage ? 'image' : 'description'}
                   </span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name.split('/').pop()}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name.split('_').slice(2).join('_') || doc.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                       {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}
                     </div>
@@ -480,7 +521,7 @@ export default function Employees() {
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</table>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
