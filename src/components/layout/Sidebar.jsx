@@ -73,8 +73,9 @@ const MODULE_NAV = {
   hr: {
     label: 'Human Resources', icon: 'badge', color: '#f87171',
     sections: [
-      { label: 'People', pages: [
+      { label: 'Organization', pages: [
         { id: 'employees',     label: 'Employees',     icon: 'people' },
+        { id: 'departments',   label: 'Departments',   icon: 'business' },
         { id: 'designations',  label: 'Designations',  icon: 'work' },
         { id: 'permissions',   label: 'Permissions',   icon: 'admin_panel_settings' },
       ]},
