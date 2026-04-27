@@ -521,7 +521,7 @@ export default function Employees() {
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</table>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
