@@ -63,7 +63,15 @@ export default function AssetIssues() {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Date</th><th>Asset</th><th>Issue</th><th>Urgency</th><th>Status</th><th>Reported By</th><th>Actions</th></tr>
+            <tr>
+              <th>Date</th>
+              <th>Asset</th>
+              <th>Issue</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Reported By</th>
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {issues.map(issue => {
@@ -85,10 +93,14 @@ export default function AssetIssues() {
                       </>
                     )}
                   </td>
-                <tr>
+                </tr>
               )
             })}
-            {issues.length === 0 && <tr><td colSpan="7" className="empty-state">No issues reported</td></tr>}
+            {issues.length === 0 && (
+              <tr>
+                <td colSpan="7" className="empty-state">No issues reported</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -99,14 +111,16 @@ export default function AssetIssues() {
             <div className="modal-title">Report <span>Issue</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>Asset Type</label>
+                <div className="form-group">
+                  <label>Asset Type</label>
                   <select className="form-control" value={form.asset_type} onChange={e => setForm({...form, asset_type: e.target.value, asset_id: ''})}>
                     <option value="vehicle">Vehicle</option>
                     <option value="generator">Generator</option>
                     <option value="earthmover">Heavy Equipment</option>
                   </select>
                 </div>
-                <div className="form-group"><label>Asset</label>
+                <div className="form-group">
+                  <label>Asset</label>
                   <select className="form-control" required value={form.asset_id} onChange={e => setForm({...form, asset_id: e.target.value})}>
                     <option value="">Select</option>
                     {form.asset_type === 'vehicle' && vehicles.map(v => <option key={v.id} value={v.id}>{v.reg}</option>)}
@@ -116,11 +130,18 @@ export default function AssetIssues() {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label>Reported Date</label><input type="date" className="form-control" required value={form.reported_date} onChange={e => setForm({...form, reported_date: e.target.value})} /></div>
-                <div className="form-group"><label>Reported By</label><input className="form-control" value={form.reported_by} onChange={e => setForm({...form, reported_by: e.target.value})} /></div>
+                <div className="form-group">
+                  <label>Reported Date</label>
+                  <input type="date" className="form-control" required value={form.reported_date} onChange={e => setForm({...form, reported_date: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Reported By</label>
+                  <input className="form-control" value={form.reported_by} onChange={e => setForm({...form, reported_by: e.target.value})} />
+                </div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label>Urgency</label>
+                <div className="form-group">
+                  <label>Urgency</label>
                   <select className="form-control" value={form.urgency} onChange={e => setForm({...form, urgency: e.target.value})}>
                     <option value="low">Low</option>
                     <option value="normal">Normal</option>
@@ -129,7 +150,10 @@ export default function AssetIssues() {
                   </select>
                 </div>
               </div>
-              <div className="form-group"><label>Issue Description *</label><textarea className="form-control" rows="3" required value={form.issue_description} onChange={e => setForm({...form, issue_description: e.target.value})} /></div>
+              <div className="form-group">
+                <label>Issue Description *</label>
+                <textarea className="form-control" rows="3" required value={form.issue_description} onChange={e => setForm({...form, issue_description: e.target.value})} />
+              </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Report Issue</button>
