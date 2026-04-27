@@ -156,7 +156,6 @@ export default function Employees() {
           accountResult = await addEmployee(form, true, accountRole)
           setAccountInfo(accountResult)
           toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
-          // Don't close modal – show credentials
         } else {
           await addEmployee(form, false)
           toast.success('Employee added')
@@ -334,7 +333,9 @@ export default function Employees() {
       <div className="table-wrap">
         <table className="stock-table">
           <thead>
-            <tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr>
+            <tr>
+              <th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th>
+            </tr>
           </thead>
           <tbody>
             {history.map(log => (
@@ -345,7 +346,7 @@ export default function Employees() {
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                   {log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}
                 </td>
-              </td>
+              </tr>
             ))}
             {history.length === 0 && (
               <tr>
