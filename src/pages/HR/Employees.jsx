@@ -149,6 +149,7 @@ export default function Employees() {
       if (editing) {
         await updateEmployee(editing.id, form)
         toast.success('Employee updated')
+        setModalOpen(false)
       } else {
         let accountResult = null
         if (createAccount) {
@@ -158,10 +159,10 @@ export default function Employees() {
         } else {
           await addEmployee(form, false)
           toast.success('Employee added')
+          setModalOpen(false)
         }
         if (!accountResult) setModalOpen(false)
       }
-      if (!editing && !accountInfo) setModalOpen(false)
       await fetchAll()
     } catch (err) { toast.error(err.message) }
   }
@@ -234,7 +235,9 @@ export default function Employees() {
         <div className="table-wrap">
           <table className="stock-table">
             <thead>
-              <tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr>
+              <tr>
+                <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
+              </tr>
             </thead>
             <tbody>
               {empAttendance.map(att => (
@@ -248,7 +251,11 @@ export default function Employees() {
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</td><\/tr>}
+              {empAttendance.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-state">No attendance records</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -281,7 +288,9 @@ export default function Employees() {
           <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Certifications</h4>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th></tr></thead>
+              <thead>
+                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th></tr>
+              </thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -298,7 +307,11 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && <tr><td colSpan="5" className="empty-state">No certifications</td><\/tr>}
+                {empCerts.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="empty-state">No certifications</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -318,7 +331,9 @@ export default function Employees() {
     return (
       <div className="table-wrap">
         <table className="stock-table">
-          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
+          <thead>
+            <tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr>
+          </thead>
           <tbody>
             {history.map(log => (
               <tr key={log.id}>
@@ -330,7 +345,11 @@ export default function Employees() {
                 </td>
               </tr>
             ))}
-            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</td><\/tr>}
+            {history.length === 0 && (
+              <tr>
+                <td colSpan="4" className="empty-state">No history records</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -487,7 +506,7 @@ export default function Employees() {
         </div>
       )}
 
-      {/* Add/Edit Modal (unchanged from 8.5.2) */}
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
