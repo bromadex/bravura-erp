@@ -45,6 +45,7 @@ import Employees from './pages/HR/Employees'
 import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
 import Attendance from './pages/HR/Attendance'
+import HRDashboard from './pages/HR/HRDashboard'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -153,7 +154,8 @@ function AppRoutes() {
           </HRProvider>
         </ProtectedRoute>
       }>
-        <Route index element={<Employees />} />
+        <Route index element={<HRDashboard />} />
+        <Route path="dashboard" element={<HRDashboard />} />
         <Route path="employees" element={<Employees />} />
         <Route path="designations" element={<Designations />} />
         <Route path="permissions" element={<UserPermissions />} />
