@@ -156,15 +156,17 @@ export default function Employees() {
           accountResult = await addEmployee(form, true, accountRole)
           setAccountInfo(accountResult)
           toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
+          // Don't close modal – show credentials
         } else {
           await addEmployee(form, false)
           toast.success('Employee added')
           setModalOpen(false)
         }
-        if (!accountResult) setModalOpen(false)
       }
       await fetchAll()
-    } catch (err) { toast.error(err.message) }
+    } catch (err) { 
+      toast.error(err.message) 
+    }
   }
 
   const getDesignationTitle = (id) => designations.find(d => d.id === id)?.title || '—'
@@ -343,7 +345,7 @@ export default function Employees() {
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                   {log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}
                 </td>
-              </tr>
+              </td>
             ))}
             {history.length === 0 && (
               <tr>
