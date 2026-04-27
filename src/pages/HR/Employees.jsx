@@ -36,7 +36,6 @@ export default function Employees() {
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRole, setAccountRole] = useState('viewer')
 
-  // Document categories
   const docCategories = [
     { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
     { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/*,application/pdf' },
@@ -44,7 +43,6 @@ export default function Employees() {
     { id: 'general', label: 'General', icon: 'description', accept: '*' }
   ]
 
-  // Fetch documents for selected employee
   const fetchDocuments = async (employeeId) => {
     try {
       const { data, error } = await supabase
@@ -82,7 +80,6 @@ export default function Employees() {
     }
   }
 
-  // Upload document
   const handleUpload = async (file, category) => {
     if (!selectedEmployee) return
     setUploading(true)
@@ -106,7 +103,6 @@ export default function Employees() {
     }
   }
 
-  // Delete document
   const handleDeleteDocument = async (path) => {
     if (window.confirm('Delete this document?')) {
       const { error } = await supabase.storage
@@ -370,7 +366,6 @@ export default function Employees() {
           )}
         </div>
 
-        {/* Documents Section */}
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
             <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }}>folder</span>
@@ -477,11 +472,15 @@ export default function Employees() {
         </div>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
+              </tr>
+            </thead>
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td>{att.date}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
@@ -490,7 +489,11 @@ export default function Employees() {
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</tr>}
+              {empAttendance.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-state">No attendance records</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -542,7 +545,11 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th>
+                </tr>
+              </thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -553,7 +560,9 @@ export default function Employees() {
                       <td>{cert.issuing_body || '—'}</td>
                       <td>{cert.issue_date || '—'}</td>
                       <td>{cert.expiry_date || '—'}</td>
-                      <td>{expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}</td>
+                      <td>
+                        {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
+                      </td>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
@@ -561,7 +570,11 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && <tr><td colSpan="6" className="empty-state">No certifications</tr>}
+                {empCerts.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="empty-state">No certifications</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -581,7 +594,11 @@ export default function Employees() {
     return (
       <div className="table-wrap">
         <table className="stock-table">
-          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th>
+            </tr>
+          </thead>
           <tbody>
             {history.map(log => (
               <tr key={log.id}>
@@ -591,7 +608,11 @@ export default function Employees() {
                 <td style={{ fontSize: 12 }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
               </tr>
             ))}
-            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</tr>}
+            {history.length === 0 && (
+              <tr>
+                <td colSpan="4" className="empty-state">No history records</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
