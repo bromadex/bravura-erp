@@ -512,4 +512,18 @@ export default function Employees() {
               <div className="form-row"><div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div><div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div></div>
               <div className="form-row"><div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div><div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div></div>
               <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({...form, residential_address: e.target.value})} /></div>
-              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => set
+              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div><div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div></div>
+              {!editing && (
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} /><span>Create system account (username + password)</span></label>
+                  {createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRole} onChange={e => setAccountRole(e.target.value)}><option value="viewer">Viewer</option><option value="storekeeper">Storekeeper</option><option value="fuel_attendant">Fuel Attendant</option><option value="hr_officer">HR Officer</option><option value="requisition_officer">Requisition Officer</option><option value="manager">Manager</option><option value="super_admin">Super Admin</option></select></div>)}
+                </div>
+              )}
+              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
