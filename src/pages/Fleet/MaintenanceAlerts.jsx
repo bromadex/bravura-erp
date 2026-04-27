@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 export default function MaintenanceAlerts() {
   const navigate = useNavigate()
-  const { vehicles, generators, earthMovers, getNextService, getHealthScore, getHealthStatus } = useFleet()
+  const { vehicles, generators, earthMovers, assetIssues, getNextService, getHealthScore, getHealthStatus } = useFleet()
 
   const allAssets = [
     ...vehicles.map(v => ({ ...v, type: 'vehicle', assetType: 'Vehicle', reg: v.reg, id: v.id })),
@@ -11,13 +11,24 @@ export default function MaintenanceAlerts() {
     ...earthMovers.map(e => ({ ...e, type: 'earthmover', assetType: 'Heavy Equipment', reg: e.reg, id: e.id })),
   ]
 
-  const alerts = allAssets.map(asset => {
+  const assetAlerts = allAssets.map(asset => {
     const nextService = getNextService(asset)
     const isOverdue = nextService?.type === 'date' && new Date(nextService) < new Date()
     const healthScore = getHealthScore(asset, asset.type)
     const health = getHealthStatus(healthScore)
     return { asset, nextService, isOverdue, health, healthScore }
   }).filter(a => a.isOverdue || a.healthScore < 50)
+
+  // Critical open issues (urgency 'critical' and status != 'resolved')
+  const criticalIssues = assetIssues.filter(i => i.urgency === 'critical' && i.status !== 'resolved')
+
+  const alerts = [...assetAlerts, ...criticalIssues.map(i => ({
+    asset: { reg: i.asset_id, assetType: i.asset_type, ...i },
+    isOverdue: false,
+    health: { label: 'Critical Issue', color: 'var(--red)', icon: 'error' },
+    criticalIssue: true,
+    issue: i
+  }))]
 
   return (
     <div>
@@ -31,17 +42,28 @@ export default function MaintenanceAlerts() {
           <div style={{ marginTop: 12 }}>All assets are in good health. No urgent alerts.</div>
         </div>
       ) : (
-        alerts.map(({ asset, nextService, isOverdue, health, healthScore }) => (
-          <div key={asset.id} className="card" style={{ padding: 16, marginBottom: 16, borderLeft: `4px solid ${isOverdue ? 'var(--red)' : health.color}` }}>
+        alerts.map((alert, idx) => (
+          <div key={idx} className="card" style={{ padding: 16, marginBottom: 16, borderLeft: `4px solid ${alert.isOverdue ? 'var(--red)' : alert.health?.color || 'var(--red)'}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{asset.reg} <span className="badge" style={{ background: health.color + '22', color: health.color }}>{health.label}</span></div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{asset.assetType} · Status: {asset.status}</div>
-                {isOverdue && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>🔴 Service overdue since {nextService}</div>}
-                {asset.last_service_date && !isOverdue && <div style={{ fontSize: 12 }}>🟢 Next service: {nextService?.type === 'date' ? nextService : `${nextService?.value} km/hours`}</div>}
-                <div style={{ marginTop: 4, fontSize: 12 }}>Health Score: <strong>{healthScore}%</strong></div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>
+                  {alert.asset.reg || alert.asset.asset_id}
+                  {alert.criticalIssue && <span className="badge" style={{ background: 'var(--red)22', color: 'var(--red)', marginLeft: 8 }}>Critical Issue</span>}
+                </div>
+                {alert.criticalIssue ? (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{alert.issue.issue_description}</div>
+                    <div style={{ fontSize: 12 }}>Reported: {alert.issue.reported_date} · Urgency: {alert.issue.urgency}</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{alert.asset.assetType} · Status: {alert.asset.status}</div>
+                    {alert.isOverdue && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4 }}>Service overdue since {alert.nextService}</div>}
+                    {!alert.isOverdue && <div style={{ fontSize: 12 }}>Health Score: {alert.healthScore}% · {alert.health.label}</div>}
+                  </>
+                )}
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/module/fleet/${asset.type}s`)}>View Details</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/module/fleet/${alert.asset.type || alert.asset.asset_type}s`)}>View</button>
             </div>
           </div>
         ))
