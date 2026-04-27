@@ -6,6 +6,7 @@ const HRContext = createContext(null)
 
 export function HRProvider({ children }) {
   const [employees, setEmployees] = useState([])
+  const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
   const [permissions, setPermissions] = useState([])
   const [leaveTypes, setLeaveTypes] = useState([])
@@ -20,10 +21,9 @@ export function HRProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [
-        empRes, desRes, permRes, ltRes, lrRes, certRes, empCertRes, travelRes
-      ] = await Promise.all([
+      const [empRes, deptRes, desRes, permRes, ltRes, lrRes, certRes, empCertRes, travelRes] = await Promise.all([
         supabase.from('employees').select('*').order('name'),
+        supabase.from('departments').select('*').order('name'),
         supabase.from('designations').select('*').order('title'),
         supabase.from('user_permissions').select('*'),
         supabase.from('leave_types').select('*'),
@@ -33,6 +33,7 @@ export function HRProvider({ children }) {
         supabase.from('travel_requests').select('*').order('created_at', { ascending: false }),
       ])
       if (empRes.data) setEmployees(empRes.data)
+      if (deptRes.data) setDepartments(deptRes.data)
       if (desRes.data) setDesignations(desRes.data)
       if (permRes.data) setPermissions(permRes.data)
       if (ltRes.data) setLeaveTypes(ltRes.data)
@@ -105,12 +106,31 @@ export function HRProvider({ children }) {
   }
 
   const deleteEmployee = async (id) => {
-    // Optionally delete associated app_user
     const emp = employees.find(e => e.id === id)
     if (emp?.system_user_id) {
       await supabase.from('app_users').delete().eq('id', emp.system_user_id)
     }
     const { error } = await supabase.from('employees').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ---- Departments CRUD ----
+  const addDepartment = async (dept) => {
+    const id = generateId()
+    const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const updateDepartment = async (id, updates) => {
+    const { error } = await supabase.from('departments').update(updates).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteDepartment = async (id) => {
+    const { error } = await supabase.from('departments').delete().eq('id', id)
     if (error) throw error
     await fetchAll()
   }
@@ -122,11 +142,13 @@ export function HRProvider({ children }) {
     if (error) throw error
     await fetchAll()
   }
+
   const updateDesignation = async (id, updates) => {
     const { error } = await supabase.from('designations').update(updates).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
+
   const deleteDesignation = async (id) => {
     const { error } = await supabase.from('designations').delete().eq('id', id)
     if (error) throw error
@@ -135,7 +157,6 @@ export function HRProvider({ children }) {
 
   // ---- Permissions ----
   const setUserPermissions = async (userId, permissionsList) => {
-    // Delete existing for that user (module/page combo)
     for (const perm of permissionsList) {
       const { error } = await supabase.from('user_permissions').upsert({
         user_id: userId,
@@ -163,6 +184,7 @@ export function HRProvider({ children }) {
     if (error) throw error
     await fetchAll()
   }
+
   const updateLeaveRequest = async (id, updates) => {
     const { error } = await supabase.from('leave_requests').update(updates).eq('id', id)
     if (error) throw error
@@ -176,6 +198,7 @@ export function HRProvider({ children }) {
     if (error) throw error
     await fetchAll()
   }
+
   const updateTravelRequest = async (id, updates) => {
     const { error } = await supabase.from('travel_requests').update(updates).eq('id', id)
     if (error) throw error
@@ -184,9 +207,10 @@ export function HRProvider({ children }) {
 
   return (
     <HRContext.Provider value={{
-      employees, designations, permissions, leaveTypes, leaveRequests,
+      employees, departments, designations, permissions, leaveTypes, leaveRequests,
       certifications, empCertifications, travelRequests, loading,
       addEmployee, updateEmployee, deleteEmployee,
+      addDepartment, updateDepartment, deleteDepartment,
       addDesignation, updateDesignation, deleteDesignation,
       setUserPermissions, getUserPermissions,
       addLeaveRequest, updateLeaveRequest,
