@@ -73,18 +73,21 @@ const MODULE_NAV = {
   hr: {
     label: 'Human Resources', icon: 'badge', color: '#f87171',
     sections: [
+      { label: 'Overview', pages: [
+        { id: 'dashboard',     label: 'HR Dashboard',     icon: 'dashboard' },
+      ]},
       { label: 'Organization', pages: [
-        { id: 'employees',     label: 'Employees',     icon: 'people' },
-        { id: 'departments',   label: 'Departments',   icon: 'business' },
-        { id: 'designations',  label: 'Designations',  icon: 'work' },
-        { id: 'permissions',   label: 'Permissions',   icon: 'admin_panel_settings' },
+        { id: 'employees',     label: 'Employees',        icon: 'people' },
+        { id: 'departments',   label: 'Departments',      icon: 'business' },
+        { id: 'designations',  label: 'Designations',     icon: 'work' },
+        { id: 'permissions',   label: 'Permissions',      icon: 'admin_panel_settings' },
       ]},
       { label: 'Time & Attendance', pages: [
-        { id: 'attendance',     label: 'Attendance',     icon: 'schedule' },
-        { id: 'leave',          label: 'Leave',          icon: 'event_busy' },
+        { id: 'attendance',    label: 'Attendance',       icon: 'schedule' },
+        { id: 'leave',         label: 'Leave',            icon: 'event_busy' },
       ]},
       { label: 'Travel', pages: [
-        { id: 'travel',         label: 'Travel',         icon: 'flight' },
+        { id: 'travel',        label: 'Travel',           icon: 'flight' },
       ]}
     ]
   },
