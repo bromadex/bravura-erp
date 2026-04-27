@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { useHR } from '../../contexts/HRContext'
-import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
   const { employees, departments, designations, addEmployee, updateEmployee, deleteEmployee, loading, fetchAll } = useHR()
-  const { user } = useAuth()
-  const [modalOpen, setModalOpen] = useState(false)         // Add/Edit modal
-  const [viewModalOpen, setViewModalOpen] = useState(false) // Detail view modal
+  const [modalOpen, setModalOpen] = useState(false)
+  const [viewModalOpen, setViewModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [editing, setEditing] = useState(null)
   const [accountInfo, setAccountInfo] = useState(null)
@@ -20,13 +18,12 @@ export default function Employees() {
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRole, setAccountRole] = useState('viewer')
 
-  // Open Add/Edit modal
   const openModal = (employee = null) => {
     setAccountInfo(null)
     if (employee) {
       setEditing(employee)
       setForm({
-        name: employee.name,
+        name: employee.name || '',
         emp_id: employee.emp_id || '',
         designation_id: employee.designation_id || '',
         department_id: employee.department_id || '',
@@ -53,21 +50,18 @@ export default function Employees() {
     setModalOpen(true)
   }
 
-  // View details (click on card)
   const openViewModal = (employee) => {
     setSelectedEmployee(employee)
     setViewModalOpen(true)
   }
 
-  // Edit from view modal
   const editFromView = () => {
     setViewModalOpen(false)
     openModal(selectedEmployee)
   }
 
-  // Delete from view modal
   const deleteFromView = async () => {
-    if (window.confirm(`Delete employee "${selectedEmployee.name}"? System account will also be removed.`)) {
+    if (window.confirm(`Delete employee "${selectedEmployee.name}"?`)) {
       await deleteEmployee(selectedEmployee.id)
       toast.success('Deleted')
       setViewModalOpen(false)
@@ -79,40 +73,24 @@ export default function Employees() {
     e.preventDefault()
     if (!form.name) return toast.error('Name required')
     try {
-      let accountResult = null
-      if (!editing && createAccount) {
-        accountResult = await addEmployee(form, true, accountRole)
-        setAccountInfo(accountResult)
-        toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
-      } else if (editing) {
+      if (editing) {
         await updateEmployee(editing.id, form)
         toast.success('Employee updated')
       } else {
-        await addEmployee(form, false)
-        toast.success('Employee added (no system account)')
-      }
-      if (!editing) {
-        setForm({
-          name: '', emp_id: '', designation_id: '', department_id: '',
-          phone: '', email: '', hire_date: '', date_of_birth: '',
-          residential_address: '', emergency_name: '', emergency_phone: '',
-          status: 'Active'
-        })
-        setCreateAccount(false)
+        let accountResult = null
+        if (createAccount) {
+          accountResult = await addEmployee(form, true, accountRole)
+          setAccountInfo(accountResult)
+          toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
+        } else {
+          await addEmployee(form, false)
+          toast.success('Employee added')
+        }
         if (!accountResult) setModalOpen(false)
-      } else {
-        setModalOpen(false)
       }
+      if (!editing && !accountInfo) setModalOpen(false)
       await fetchAll()
     } catch (err) { toast.error(err.message) }
-  }
-
-  const handleDelete = async (employee) => {
-    if (window.confirm(`Delete employee "${employee.name}"? System account will also be removed.`)) {
-      await deleteEmployee(employee.id)
-      toast.success('Deleted')
-      await fetchAll()
-    }
   }
 
   const getDesignationTitle = (id) => designations.find(d => d.id === id)?.title || '—'
@@ -127,14 +105,13 @@ export default function Employees() {
         </button>
       </div>
 
-      {/* Employee Cards Grid */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
         {loading ? <div>Loading...</div> : employees.length === 0 ? <div className="empty-state">No employees</div> : employees.map(emp => (
           <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', gap: 12 }}>
                 <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>
-                  {emp.name.charAt(0).toUpperCase()}
+                  {emp.name?.charAt(0).toUpperCase() || '?'}
                 </div>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div>
@@ -142,7 +119,7 @@ export default function Employees() {
                   <div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div>
                 </div>
               </div>
-              <span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status}</span>
+              <span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status || 'Active'}</span>
             </div>
             <div style={{ marginTop: 12 }}>
               {emp.department_id && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
@@ -154,14 +131,14 @@ export default function Employees() {
         ))}
       </div>
 
-      {/* Detail View Modal (click on card) */}
+      {/* Detail View Modal */}
       {viewModalOpen && selectedEmployee && (
         <div className="overlay" onClick={() => setViewModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-title">Employee Details: <span>{selectedEmployee.name}</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div><span className="text-dim">Employee ID:</span> {selectedEmployee.emp_id || '—'}</div>
-              <div><span className="text-dim">Status:</span> <span className={`badge ${selectedEmployee.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{selectedEmployee.status}</span></div>
+              <div><span className="text-dim">Status:</span> <span className={`badge ${selectedEmployee.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{selectedEmployee.status || 'Active'}</span></div>
               <div><span className="text-dim">Designation:</span> {getDesignationTitle(selectedEmployee.designation_id)}</div>
               <div><span className="text-dim">Department:</span> {getDepartmentName(selectedEmployee.department_id)}</div>
               <div><span className="text-dim">Phone:</span> {selectedEmployee.phone || '—'}</div>
