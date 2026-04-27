@@ -5,6 +5,7 @@ import { InventoryProvider } from './contexts/InventoryContext'
 import { ProcurementProvider } from './contexts/ProcurementContext'
 import { FuelProvider } from './contexts/FuelContext'
 import { FleetProvider } from './contexts/FleetContext'
+import { HRProvider } from './contexts/HRContext'
 import Login from './pages/Login'
 import HomeGrid from './pages/HomeGrid'
 import Layout from './components/layout/Layout'
@@ -39,6 +40,11 @@ import HeavyEquipment from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues from './pages/Fleet/AssetIssues'
 
+// HR Pages
+import Employees from './pages/HR/Employees'
+import Designations from './pages/HR/Designations'
+import UserPermissions from './pages/HR/UserPermissions'
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text-dim)' }}>Loading...</div>
@@ -68,7 +74,6 @@ function ModulePlaceholder({ module, page }) {
 
 const OTHER_MODULES = [
   { id:'logistics',   pages:['goods-received','batch-plant','campsite'] },
-  { id:'hr',          pages:['employees','timesheets','leave','payroll','permissions'] },
   { id:'accounting',  pages:['chart-of-accounts','journal-entries','reports'] },
   { id:'reports',     pages:['overview','audit-log','drafts'] },
 ]
@@ -137,6 +142,22 @@ function AppRoutes() {
         <Route path="heavy-equipment" element={<HeavyEquipment />} />
         <Route path="maintenance-alerts" element={<MaintenanceAlerts />} />
         <Route path="asset-issues" element={<AssetIssues />} />
+      </Route>
+
+      {/* HUMAN RESOURCES */}
+      <Route path="/module/hr" element={
+        <ProtectedRoute>
+          <HRProvider>
+            <Layout module="hr" />
+          </HRProvider>
+        </ProtectedRoute>
+      }>
+        <Route index element={<Employees />} />
+        <Route path="employees" element={<Employees />} />
+        <Route path="designations" element={<Designations />} />
+        <Route path="permissions" element={<UserPermissions />} />
+        <Route path="leave" element={<ModulePlaceholder module="hr" page="leave" />} />
+        <Route path="travel" element={<ModulePlaceholder module="hr" page="travel" />} />
       </Route>
 
       {/* OTHER MODULES – placeholders */}
