@@ -21,7 +21,9 @@ export function HRProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [empRes, deptRes, desRes, permRes, ltRes, lrRes, certRes, empCertRes, travelRes] = await Promise.all([
+      const [
+        empRes, deptRes, desRes, permRes, ltRes, lrRes, certRes, empCertRes, travelRes
+      ] = await Promise.all([
         supabase.from('employees').select('*').order('name'),
         supabase.from('departments').select('*').order('name'),
         supabase.from('designations').select('*').order('title'),
@@ -207,8 +209,9 @@ export function HRProvider({ children }) {
 
   return (
     <HRContext.Provider value={{
-      employees, departments, designations, permissions, leaveTypes, leaveRequests,
-      certifications, empCertifications, travelRequests, loading,
+      employees, departments, designations, permissions,
+      leaveTypes, leaveRequests, certifications, empCertifications, travelRequests,
+      loading,
       addEmployee, updateEmployee, deleteEmployee,
       addDepartment, updateDepartment, deleteDepartment,
       addDesignation, updateDesignation, deleteDesignation,
