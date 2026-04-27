@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
-  const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, loading, fetchAll } = useHR()
+  const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, getWeeklyHours, loading, fetchAll } = useHR()
   
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
@@ -47,11 +47,7 @@ export default function Employees() {
     try {
       const { data, error } = await supabase.storage
         .from('hr-documents')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        })
+        .list(`employees/${employeeId}/`, { recursive: true })
       
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
@@ -59,18 +55,14 @@ export default function Employees() {
       }
       
       if (data && data.length) {
-        const employeeDocs = data.filter(file => file.name.startsWith(`${employeeId}_`))
-        const docsWithUrls = employeeDocs.map(file => {
-          let category = 'general'
-          const parts = file.name.split('_')
-          if (parts.length >= 2) {
-            category = parts[1]
-          }
+        const docsWithUrls = data.map(file => {
+          const pathParts = file.name.split('/')
+          const category = pathParts[pathParts.length - 2] || 'general'
           const { data: { publicUrl } } = supabase.storage
             .from('hr-documents')
             .getPublicUrl(file.name)
           return {
-            name: file.name,
+            name: file.name.split('/').pop(),
             path: file.name,
             category: category,
             url: publicUrl,
@@ -103,14 +95,14 @@ export default function Employees() {
     
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${selectedEmployee.id}_${category}_${Date.now()}.${fileExt}`
-      const filePath = fileName
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      const filePath = `employees/${selectedEmployee.id}/${category}/${Date.now()}_${safeFileName}`
       
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true
+          upsert: false
         })
       
       if (error) {
@@ -125,7 +117,7 @@ export default function Employees() {
         .getPublicUrl(filePath)
       
       const newDoc = {
-        name: fileName,
+        name: safeFileName,
         path: filePath,
         category: category,
         url: publicUrl,
@@ -134,7 +126,7 @@ export default function Employees() {
       }
       
       setDocuments(prev => [...prev, newDoc])
-      toast.success('Document uploaded')
+      toast.success('Document uploaded successfully!')
       
     } catch (err) {
       console.error('Upload error:', err)
@@ -156,18 +148,6 @@ export default function Employees() {
         setDocuments(prev => prev.filter(doc => doc.path !== path))
       }
     }
-  }
-
-  const getHoursThisWeek = (employeeId) => {
-    const today = new Date()
-    const startOfWeek = new Date(today)
-    startOfWeek.setDate(today.getDate() - today.getDay())
-    const weekAttendance = attendance.filter(a => 
-      a.employee_id === employeeId && 
-      new Date(a.date) >= startOfWeek &&
-      a.clock_out
-    )
-    return weekAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0).toFixed(1)
   }
 
   const getEmployeeAttendance = (employeeId) => {
@@ -477,7 +457,7 @@ export default function Employees() {
                     {isImage ? 'image' : 'description'}
                   </span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name.split('_').slice(2).join('_') || doc.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                       {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}
                     </div>
@@ -501,6 +481,7 @@ export default function Employees() {
 
   const AttendanceTab = ({ employee }) => {
     const empAttendance = getEmployeeAttendance(employee.id)
+    const weeklyStats = getWeeklyHours(employee.id)
     const totalHours = empAttendance.reduce((sum, a) => sum + (a.total_hours || 0), 0)
     const totalOvertime = empAttendance.reduce((sum, a) => sum + (a.overtime_hours || 0), 0)
     return (
@@ -508,7 +489,7 @@ export default function Employees() {
         <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <div className="kpi-card"><div className="kpi-label">Total Hours</div><div className="kpi-val">{totalHours.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
           <div className="kpi-card"><div className="kpi-label">Overtime</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totalOvertime.toFixed(1)}</div><div className="kpi-sub">All time</div></div>
-          <div className="kpi-card"><div className="kpi-label">This Week</div><div className="kpi-val">{getHoursThisWeek(employee.id)}</div><div className="kpi-sub">hours</div></div>
+          <div className="kpi-card"><div className="kpi-label">This Week</div><div className="kpi-val">{weeklyStats.totalHours.toFixed(1)}</div><div className="kpi-sub">hours ({weeklyStats.totalOvertime.toFixed(1)} OT)</div></div>
           <div className="kpi-card"><div className="kpi-label">Records</div><div className="kpi-val">{empAttendance.length}</div><div className="kpi-sub">entries</div></div>
         </div>
         <div className="table-wrap">
@@ -603,12 +584,12 @@ export default function Employees() {
                       <td>{cert.expiry_date || '—'}</td>
                       <td>
                         {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
-                      </td>
+                      </table>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
                       </td>
-                    </tr>
+                    <table>
                   )
                 })}
                 {empCerts.length === 0 && (
@@ -681,7 +662,7 @@ export default function Employees() {
 
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
         {loading ? <div>Loading...</div> : filteredEmployees.length === 0 ? <div className="empty-state">No employees match your filters</div> : filteredEmployees.map(emp => {
-          const hoursThisWeek = getHoursThisWeek(emp.id)
+          const weeklyStats = getWeeklyHours(emp.id)
           return (
             <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -698,7 +679,7 @@ export default function Employees() {
                 {emp.system_username && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
               </div>
               <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{hoursThisWeek}h</strong></span>
+                <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{weeklyStats.totalHours.toFixed(1)}h</strong> (OT: {weeklyStats.totalOvertime.toFixed(1)}h)</span>
                 <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}><span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span></button>
               </div>
             </div>
