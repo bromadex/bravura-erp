@@ -79,9 +79,12 @@ const MODULE_NAV = {
         { id: 'designations',  label: 'Designations',  icon: 'work' },
         { id: 'permissions',   label: 'Permissions',   icon: 'admin_panel_settings' },
       ]},
-      { label: 'Time & Leave', pages: [
-        { id: 'leave',         label: 'Leave',         icon: 'event_busy' },
-        { id: 'travel',        label: 'Travel',        icon: 'flight' },
+      { label: 'Time & Attendance', pages: [
+        { id: 'attendance',     label: 'Attendance',     icon: 'schedule' },
+        { id: 'leave',          label: 'Leave',          icon: 'event_busy' },
+      ]},
+      { label: 'Travel', pages: [
+        { id: 'travel',         label: 'Travel',         icon: 'flight' },
       ]}
     ]
   },
