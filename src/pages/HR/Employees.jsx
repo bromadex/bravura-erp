@@ -10,7 +10,7 @@ export default function Employees() {
   const [editing, setEditing] = useState(null)
   const [accountInfo, setAccountInfo] = useState(null)
   const [form, setForm] = useState({
-    name: '', emp_id: '', designation_id: '', department: '', phone: '', email: '',
+    name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '',
     hire_date: '', emergency_contact: '', status: 'Active'
   })
   const [createAccount, setCreateAccount] = useState(false)
@@ -21,15 +21,20 @@ export default function Employees() {
     if (employee) {
       setEditing(employee)
       setForm({
-        name: employee.name, emp_id: employee.emp_id || '', designation_id: employee.designation_id || '',
-        department: employee.department || '', phone: employee.phone || '', email: employee.email || '',
-        hire_date: employee.hire_date || '', emergency_contact: employee.emergency_contact || '',
+        name: employee.name,
+        emp_id: employee.emp_id || '',
+        designation_id: employee.designation_id || '',
+        dept: employee.dept || '',
+        phone: employee.phone || '',
+        email: employee.email || '',
+        hire_date: employee.hire_date || '',
+        emergency_contact: employee.emergency_contact || '',
         status: employee.status || 'Active'
       })
       setCreateAccount(false)
     } else {
       setEditing(null)
-      setForm({ name: '', emp_id: '', designation_id: '', department: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
+      setForm({ name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
       setCreateAccount(false)
     }
     setModalOpen(true)
@@ -52,7 +57,7 @@ export default function Employees() {
         toast.success('Employee added (no system account)')
       }
       if (!editing) {
-        setForm({ name: '', emp_id: '', designation_id: '', department: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
+        setForm({ name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
         setCreateAccount(false)
         if (!accountResult) setModalOpen(false)
       } else {
@@ -98,7 +103,7 @@ export default function Employees() {
               <span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status}</span>
             </div>
             <div style={{ marginTop: 12 }}>
-              {emp.department && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {emp.department}</div>}
+              {emp.dept && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {emp.dept}</div>}
               {emp.phone && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
               {emp.email && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
               {emp.system_username && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
@@ -135,7 +140,7 @@ export default function Employees() {
                     {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Department</label><input className="form-control" value={form.department} onChange={e => setForm({...form, department: e.target.value})} /></div>
+                <div className="form-group"><label>Department (dept)</label><input className="form-control" value={form.dept} onChange={e => setForm({...form, dept: e.target.value})} placeholder="e.g. Electrical" /></div>
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
