@@ -16,6 +16,26 @@ export function HRProvider({ children }) {
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
+  // Helper: generate employee number with BRA prefix
+  const generateEmployeeNumber = async () => {
+    const { data } = await supabase
+      .from('employees')
+      .select('employee_number')
+      .ilike('employee_number', 'BRA%')
+      .order('employee_number', { ascending: false })
+      .limit(1)
+    
+    let nextNum = 1
+    if (data && data.length > 0) {
+      const lastNumber = data[0].employee_number
+      const match = lastNumber.match(/BRA(\d+)/)
+      if (match) {
+        nextNum = parseInt(match[1]) + 1
+      }
+    }
+    return `BRA${String(nextNum).padStart(3, '0')}`
+  }
+
   // Helper: log HR actions
   const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
     try {
@@ -34,22 +54,24 @@ export function HRProvider({ children }) {
     } catch (err) { console.warn('Audit log failed:', err) }
   }
 
-  // Helper: generate employee number
-  const generateEmployeeNumber = async () => {
-    const year = new Date().getFullYear()
-    const { data } = await supabase
-      .from('employees')
-      .select('employee_number')
-      .ilike('employee_number', `EMP-${year}-%`)
-      .order('employee_number', { ascending: false })
-      .limit(1)
-    
-    let nextNum = 1
-    if (data && data.length > 0) {
-      const lastNum = parseInt(data[0].employee_number.split('-')[2])
-      nextNum = lastNum + 1
-    }
-    return `EMP-${year}-${String(nextNum).padStart(4, '0')}`
+  // Helper: create system account
+  const createSystemAccount = async (employeeId, fullName, role = 'viewer') => {
+    const username = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
+    const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
+    const { data, error } = await supabase.from('app_users').insert([{
+      id: generateId(),
+      username,
+      full_name: fullName,
+      role,
+      is_active: true,
+      password_plain: rawPassword,
+      password_hash: btoa(rawPassword),
+      employee_id: employeeId,
+      created_at: new Date().toISOString()
+    }]).select().single()
+    if (error) throw error
+    await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { role })
+    return { username, password: rawPassword, userId: data.id }
   }
 
   const fetchAll = useCallback(async () => {
@@ -82,26 +104,6 @@ export function HRProvider({ children }) {
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
-
-  // Helper: create system account
-  const createSystemAccount = async (employeeId, fullName, role = 'viewer') => {
-    const username = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
-    const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
-    const { data, error } = await supabase.from('app_users').insert([{
-      id: generateId(),
-      username,
-      full_name: fullName,
-      role,
-      is_active: true,
-      password_plain: rawPassword,
-      password_hash: btoa(rawPassword),
-      employee_id: employeeId,
-      created_at: new Date().toISOString()
-    }]).select().single()
-    if (error) throw error
-    await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { role })
-    return { username, password: rawPassword, userId: data.id }
-  }
 
   // ---- Employees CRUD ----
   const addEmployee = async (employee, createAccount = false, accountRole = 'viewer') => {
@@ -158,7 +160,7 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ---- Departments CRUD ----
+  // ---- Departments CRUD (with HOD and Parent Department) ----
   const addDepartment = async (dept) => {
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
@@ -231,7 +233,6 @@ export function HRProvider({ children }) {
     const now = new Date()
     const clockOutTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
     
-    // Calculate hours worked (simplified – assumes same day)
     const [inH, inM] = clockInTime.split(':').map(Number)
     const [outH, outM] = clockOutTime.split(':').map(Number)
     let totalMins = (outH * 60 + outM) - (inH * 60 + inM)
@@ -289,6 +290,34 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
+  // ---- Document Upload Methods ----
+  const uploadEmployeeDocument = async (employeeId, file, category) => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${employeeId}/${category}/${Date.now()}.${fileExt}`
+    const filePath = `employee-docs/${fileName}`
+    
+    const { error: uploadError } = await supabase.storage
+      .from('hr-documents')
+      .upload(filePath, file)
+    
+    if (uploadError) throw uploadError
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('hr-documents')
+      .getPublicUrl(filePath)
+    
+    // Save reference in a new table (optional – you can create employee_documents table)
+    // For now, we'll store the URL in the employee record (or a separate table)
+    return { url: publicUrl, path: filePath }
+  }
+
+  const deleteEmployeeDocument = async (filePath) => {
+    const { error } = await supabase.storage
+      .from('hr-documents')
+      .remove([filePath])
+    if (error) throw error
+  }
+
   // Helper: get employees with expiring certifications (within 30 days)
   const getExpiringCertifications = () => {
     const thirtyDaysFromNow = new Date()
@@ -310,6 +339,7 @@ export function HRProvider({ children }) {
       addSkill, deleteSkill,
       addCertification, updateCertification, deleteCertification,
       getExpiringCertifications,
+      uploadEmployeeDocument, deleteEmployeeDocument,
       logHRAction,
       fetchAll,
     }}>
