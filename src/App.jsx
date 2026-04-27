@@ -42,9 +42,9 @@ import AssetIssues from './pages/Fleet/AssetIssues'
 
 // HR Pages
 import Employees from './pages/HR/Employees'
-import Departments from './pages/HR/Departments'
 import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
+import Attendance from './pages/HR/Attendance'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -155,9 +155,9 @@ function AppRoutes() {
       }>
         <Route index element={<Employees />} />
         <Route path="employees" element={<Employees />} />
-        <Route path="departments" element={<Departments />} />
         <Route path="designations" element={<Designations />} />
         <Route path="permissions" element={<UserPermissions />} />
+        <Route path="attendance" element={<Attendance />} />
         <Route path="leave" element={<ModulePlaceholder module="hr" page="leave" />} />
         <Route path="travel" element={<ModulePlaceholder module="hr" page="travel" />} />
       </Route>
