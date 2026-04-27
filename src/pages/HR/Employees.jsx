@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
@@ -11,6 +12,9 @@ export default function Employees() {
   const [editing, setEditing] = useState(null)
   const [accountInfo, setAccountInfo] = useState(null)
   const [activeTab, setActiveTab] = useState('profile')
+  const [documents, setDocuments] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [activeDocCategory, setActiveDocCategory] = useState('general')
   
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('ALL')
@@ -31,6 +35,91 @@ export default function Employees() {
   })
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRole, setAccountRole] = useState('viewer')
+
+  // Document categories
+  const docCategories = [
+    { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
+    { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/*,application/pdf' },
+    { id: 'certifications', label: 'Certifications', icon: 'verified', accept: 'image/*,application/pdf' },
+    { id: 'general', label: 'General', icon: 'description', accept: '*' }
+  ]
+
+  // Fetch documents for selected employee
+  const fetchDocuments = async (employeeId) => {
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('hr-documents')
+        .list(`employee-docs/${employeeId}/`)
+      
+      if (error && error.message !== 'The resource was not found') {
+        console.error('Error fetching documents:', error)
+        return
+      }
+      
+      if (data && data.length) {
+        const docsWithUrls = await Promise.all(data.map(async (file) => {
+          const category = file.name.split('/')[0]
+          const { data: { publicUrl } } = supabase.storage
+            .from('hr-documents')
+            .getPublicUrl(`employee-docs/${employeeId}/${file.name}`)
+          return {
+            name: file.name,
+            path: `employee-docs/${employeeId}/${file.name}`,
+            category: category,
+            url: publicUrl,
+            size: file.metadata?.size,
+            created_at: file.created_at
+          }
+        }))
+        setDocuments(docsWithUrls)
+      } else {
+        setDocuments([])
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      setDocuments([])
+    }
+  }
+
+  // Upload document
+  const handleUpload = async (file, category) => {
+    if (!selectedEmployee) return
+    setUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${category}/${Date.now()}.${fileExt}`
+      const filePath = `employee-docs/${selectedEmployee.id}/${fileName}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('hr-documents')
+        .upload(filePath, file)
+      
+      if (uploadError) throw uploadError
+      
+      toast.success('Document uploaded')
+      await fetchDocuments(selectedEmployee.id)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Delete document
+  const handleDeleteDocument = async (path) => {
+    if (window.confirm('Delete this document?')) {
+      const { error } = await supabase.storage
+        .from('hr-documents')
+        .remove([path])
+      if (error) {
+        toast.error(error.message)
+      } else {
+        toast.success('Document deleted')
+        await fetchDocuments(selectedEmployee.id)
+      }
+    }
+  }
 
   const getHoursThisWeek = (employeeId) => {
     const today = new Date()
@@ -156,7 +245,10 @@ export default function Employees() {
   const openViewModal = (employee) => {
     setSelectedEmployee(employee)
     setActiveTab('profile')
+    setActiveDocCategory('general')
+    setDocuments([])
     setViewModalOpen(true)
+    fetchDocuments(employee.id)
   }
 
   const editFromView = () => {
@@ -256,25 +348,120 @@ export default function Employees() {
     Terminated: 'bg-red'
   }
 
-  const ProfileTab = ({ employee }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <div><span className="text-dim">Employee ID:</span> {employee.employee_number || '—'}</div>
-      <div><span className="text-dim">Status:</span> <span className={`badge ${statusColors[employee.status] || 'bg-green'}`}>{employee.status || 'Active'}</span></div>
-      <div><span className="text-dim">Employment Type:</span> {employee.employment_type || '—'}</div>
-      <div><span className="text-dim">Designation:</span> {getDesignationTitle(employee.designation_id)}</div>
-      <div><span className="text-dim">Department:</span> {getDepartmentName(employee.department_id)}</div>
-      <div><span className="text-dim">Phone:</span> {employee.phone || '—'}</div>
-      <div><span className="text-dim">Email:</span> {employee.email || '—'}</div>
-      <div><span className="text-dim">Hire Date:</span> {employee.hire_date || '—'}</div>
-      <div><span className="text-dim">Date of Birth:</span> {employee.date_of_birth || '—'}</div>
-      <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Residential Address:</span> {employee.residential_address || '—'}</div>
-      <div><span className="text-dim">Emergency Contact Name:</span> {employee.emergency_name || '—'}</div>
-      <div><span className="text-dim">Emergency Contact Phone:</span> {employee.emergency_phone || '—'}</div>
-      {employee.system_username && (
-        <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {employee.system_username}</div>
-      )}
-    </div>
-  )
+  const ProfileTab = ({ employee }) => {
+    const filteredDocs = documents.filter(doc => doc.category === activeDocCategory)
+    return (
+      <div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+          <div><span className="text-dim">Employee ID:</span> {employee.employee_number || '—'}</div>
+          <div><span className="text-dim">Status:</span> <span className={`badge ${statusColors[employee.status] || 'bg-green'}`}>{employee.status || 'Active'}</span></div>
+          <div><span className="text-dim">Employment Type:</span> {employee.employment_type || '—'}</div>
+          <div><span className="text-dim">Designation:</span> {getDesignationTitle(employee.designation_id)}</div>
+          <div><span className="text-dim">Department:</span> {getDepartmentName(employee.department_id)}</div>
+          <div><span className="text-dim">Phone:</span> {employee.phone || '—'}</div>
+          <div><span className="text-dim">Email:</span> {employee.email || '—'}</div>
+          <div><span className="text-dim">Hire Date:</span> {employee.hire_date || '—'}</div>
+          <div><span className="text-dim">Date of Birth:</span> {employee.date_of_birth || '—'}</div>
+          <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Residential Address:</span> {employee.residential_address || '—'}</div>
+          <div><span className="text-dim">Emergency Contact Name:</span> {employee.emergency_name || '—'}</div>
+          <div><span className="text-dim">Emergency Contact Phone:</span> {employee.emergency_phone || '—'}</div>
+          {employee.system_username && (
+            <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {employee.system_username}</div>
+          )}
+        </div>
+
+        {/* Documents Section */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+            <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }}>folder</span>
+            Documents
+          </h4>
+          
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            {docCategories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveDocCategory(cat.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 20,
+                  border: '1px solid var(--border)',
+                  background: activeDocCategory === cat.id ? 'var(--gold)' : 'transparent',
+                  color: activeDocCategory === cat.id ? '#0b0f1a' : 'var(--text-mid)',
+                  cursor: 'pointer',
+                  fontSize: 12
+                }}
+              >
+                <span className="material-icons" style={{ fontSize: 14 }}>{cat.icon}</span>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+              <span className="material-icons" style={{ fontSize: 14 }}>upload</span>
+              Upload {docCategories.find(c => c.id === activeDocCategory)?.label}
+              <input
+                type="file"
+                hidden
+                accept={docCategories.find(c => c.id === activeDocCategory)?.accept}
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleUpload(e.target.files[0], activeDocCategory)
+                  }
+                  e.target.value = ''
+                }}
+                disabled={uploading}
+              />
+            </label>
+            {uploading && <span style={{ marginLeft: 12, fontSize: 12 }}>Uploading...</span>}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filteredDocs.length === 0 && (
+              <div className="empty-state" style={{ padding: 24 }}>No documents in this category</div>
+            )}
+            {filteredDocs.map(doc => {
+              const isImage = doc.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+              return (
+                <div key={doc.path} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: 8,
+                  background: 'var(--surface2)',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)'
+                }}>
+                  <span className="material-icons" style={{ fontSize: 24, color: isImage ? 'var(--teal)' : 'var(--blue)' }}>
+                    {isImage ? 'image' : 'description'}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name.split('/').pop()}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                      {doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+                      <span className="material-icons" style={{ fontSize: 14 }}>open_in_new</span>
+                    </a>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDocument(doc.path)}>
+                      <span className="material-icons" style={{ fontSize: 14 }}>delete</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const AttendanceTab = ({ employee }) => {
     const empAttendance = getEmployeeAttendance(employee.id)
@@ -294,14 +481,16 @@ export default function Employees() {
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td>{att.date}</td><td>{att.clock_in}</td><td>{att.clock_out || '—'}</td>
+                  <td>{att.date}</td>
+                  <td>{att.clock_in}</td>
+                  <td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
                   <td>{att.total_hours?.toFixed(1) || '—'}</td>
                   <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
-                  <td>{att.notes || '—'}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</td></tr>}
+              {empAttendance.length === 0 && <tr><td colSpan="7" className="empty-state">No attendance records</tr>}
             </tbody>
           </table>
         </div>
@@ -372,7 +561,7 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && <tr><td colSpan="6" className="empty-state">No certifications</td></tr>}
+                {empCerts.length === 0 && <tr><td colSpan="6" className="empty-state">No certifications</tr>}
               </tbody>
             </table>
           </div>
@@ -399,10 +588,10 @@ export default function Employees() {
                 <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
                 <td style={{ color: getActionColor(log.action) }}>{log.action}</td>
                 <td>{log.user_name || 'System'}</td>
-                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
+                <td style={{ fontSize: 12 }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
               </tr>
             ))}
-            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</td></tr>}
+            {history.length === 0 && <tr><td colSpan="4" className="empty-state">No history records</tr>}
           </tbody>
         </table>
       </div>
@@ -423,7 +612,7 @@ export default function Employees() {
           <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label><input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
           <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label><select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}><option value="ALL">All Departments</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
           <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label><select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}><option value="ALL">All Designations</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div>
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label><select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="ALL">All Status</option><option value="Active">Active</option><option value="On Leave">On Leave</option><option value="Suspended">Suspended</option><option value="Terminated">Terminated</option></select></div>
+          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label><select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="ALL">All Status</option><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div>
           <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label><select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option><option value="hire-date-asc">Hire Date (Oldest)</option><option value="hire-date-desc">Hire Date (Newest)</option></select></div>
         </div>
       </div>
