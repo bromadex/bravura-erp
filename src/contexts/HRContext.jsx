@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { calculateDailyOvertime, getWeekStartEnd, hasWeeklyOvertimeAlert } from '../utils/attendanceUtils'
 
 const HRContext = createContext(null)
 
@@ -72,6 +73,16 @@ export function HRProvider({ children }) {
     if (error) throw error
     await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { role })
     return { username, password: rawPassword, userId: data.id }
+  }
+
+  // ---- Status Validation for Attendance ----
+  const canPerformAttendance = (employeeId) => {
+    const employee = employees.find(e => e.id === employeeId)
+    if (!employee) return { allowed: false, reason: 'Employee not found' }
+    if (employee.status === 'Terminated') return { allowed: false, reason: 'Terminated employees cannot clock in' }
+    if (employee.status === 'On Leave') return { allowed: false, reason: 'Employee is on leave' }
+    if (employee.status !== 'Active') return { allowed: false, reason: 'Employee status does not allow attendance' }
+    return { allowed: true, reason: null }
   }
 
   const fetchAll = useCallback(async () => {
@@ -160,7 +171,7 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ---- Departments CRUD (with HOD and Parent Department) ----
+  // ---- Departments CRUD ----
   const addDepartment = async (dept) => {
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
@@ -209,8 +220,15 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Attendance Methods ----
+  // ---- Attendance Methods with Status Enforcement ----
   const clockIn = async (employeeId, date, shiftType = 'Day') => {
+    // Check status first
+    const statusCheck = canPerformAttendance(employeeId)
+    if (!statusCheck.allowed) {
+      toast.error(statusCheck.reason)
+      return
+    }
+    
     const existing = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
     if (existing) throw new Error('Already clocked in for today')
     
@@ -226,6 +244,13 @@ export function HRProvider({ children }) {
   }
 
   const clockOut = async (employeeId, date) => {
+    // Check status first
+    const statusCheck = canPerformAttendance(employeeId)
+    if (!statusCheck.allowed) {
+      toast.error(statusCheck.reason)
+      return
+    }
+    
     const record = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
     if (!record) throw new Error('No open clock‑in record found')
     
@@ -233,20 +258,29 @@ export function HRProvider({ children }) {
     const now = new Date()
     const clockOutTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
     
-    const [inH, inM] = clockInTime.split(':').map(Number)
-    const [outH, outM] = clockOutTime.split(':').map(Number)
-    let totalMins = (outH * 60 + outM) - (inH * 60 + inM)
-    if (totalMins < 0) totalMins += 24 * 60
-    const totalHours = totalMins / 60
-    const overtime = Math.max(0, totalHours - 8)
+    // Calculate daily overtime using the utility function
+    const totalHours = (() => {
+      const [inH, inM] = clockInTime.split(':').map(Number)
+      const [outH, outM] = clockOutTime.split(':').map(Number)
+      let totalMins = (outH * 60 + outM) - (inH * 60 + inM)
+      if (totalMins < 0) totalMins += 24 * 60
+      return totalMins / 60
+    })()
+    
+    const dailyOvertime = calculateDailyOvertime(clockInTime, clockOutTime)
     
     const { error } = await supabase
       .from('employee_attendance')
-      .update({ clock_out: clockOutTime, total_hours: totalHours, overtime_hours: overtime, updated_at: new Date().toISOString() })
+      .update({ 
+        clock_out: clockOutTime, 
+        total_hours: totalHours, 
+        overtime_hours: dailyOvertime,
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', record.id)
     if (error) throw error
     await fetchAll()
-    await logHRAction('CLOCK_OUT', 'attendance', record.id, `${employeeId} on ${date}`, null, { totalHours, overtime })
+    await logHRAction('CLOCK_OUT', 'attendance', record.id, `${employeeId} on ${date}`, null, { totalHours, dailyOvertime })
   }
 
   const addAttendanceRecord = async (record) => {
@@ -290,32 +324,39 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Document Upload Methods ----
-  const uploadEmployeeDocument = async (employeeId, file, category) => {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${employeeId}/${category}/${Date.now()}.${fileExt}`
-    const filePath = `employee-docs/${fileName}`
-    
-    const { error: uploadError } = await supabase.storage
-      .from('hr-documents')
-      .upload(filePath, file)
-    
-    if (uploadError) throw uploadError
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from('hr-documents')
-      .getPublicUrl(filePath)
-    
-    // Save reference in a new table (optional – you can create employee_documents table)
-    // For now, we'll store the URL in the employee record (or a separate table)
-    return { url: publicUrl, path: filePath }
-  }
-
-  const deleteEmployeeDocument = async (filePath) => {
-    const { error } = await supabase.storage
-      .from('hr-documents')
-      .remove([filePath])
-    if (error) throw error
+  // ---- Document Storage Helpers ----
+  const getEmployeeDocuments = async (employeeId) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('hr-documents')
+        .list(`employees/${employeeId}/`, { recursive: true })
+      
+      if (error && error.message !== 'The resource was not found') {
+        console.error('Error fetching documents:', error)
+        return []
+      }
+      
+      if (!data || !data.length) return []
+      
+      return data.map(file => {
+        const pathParts = file.name.split('/')
+        const category = pathParts[pathParts.length - 2] || 'general'
+        const { data: { publicUrl } } = supabase.storage
+          .from('hr-documents')
+          .getPublicUrl(file.name)
+        return {
+          name: file.name.split('/').pop(),
+          path: file.name,
+          category: category,
+          url: publicUrl,
+          size: file.metadata?.size,
+          created_at: file.created_at
+        }
+      })
+    } catch (err) {
+      console.error('Error:', err)
+      return []
+    }
   }
 
   // Helper: get employees with expiring certifications (within 30 days)
@@ -329,6 +370,20 @@ export function HRProvider({ children }) {
     })
   }
 
+  // Helper: get weekly hours for an employee (centralized)
+  const getWeeklyHours = (employeeId, referenceDate = new Date()) => {
+    const { start, end } = getWeekStartEnd(referenceDate)
+    const weekRecords = attendance.filter(record => 
+      record.employee_id === employeeId &&
+      new Date(record.date) >= start &&
+      new Date(record.date) <= end &&
+      record.clock_out
+    )
+    const totalHours = weekRecords.reduce((sum, record) => sum + (record.total_hours || 0), 0)
+    const totalOvertime = weekRecords.reduce((sum, record) => sum + (record.overtime_hours || 0), 0)
+    return { totalHours, totalOvertime, recordCount: weekRecords.length }
+  }
+
   return (
     <HRContext.Provider value={{
       employees, departments, designations, attendance, skills, certifications, auditLogs, loading,
@@ -339,7 +394,9 @@ export function HRProvider({ children }) {
       addSkill, deleteSkill,
       addCertification, updateCertification, deleteCertification,
       getExpiringCertifications,
-      uploadEmployeeDocument, deleteEmployeeDocument,
+      getEmployeeDocuments,
+      getWeeklyHours,
+      canPerformAttendance,
       logHRAction,
       fetchAll,
     }}>
