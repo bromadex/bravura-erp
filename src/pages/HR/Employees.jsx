@@ -4,18 +4,23 @@ import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
-  const { employees, designations, addEmployee, updateEmployee, deleteEmployee, loading, fetchAll } = useHR()
+  const { employees, departments, designations, addEmployee, updateEmployee, deleteEmployee, loading, fetchAll } = useHR()
   const { user } = useAuth()
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)         // Add/Edit modal
+  const [viewModalOpen, setViewModalOpen] = useState(false) // Detail view modal
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [editing, setEditing] = useState(null)
   const [accountInfo, setAccountInfo] = useState(null)
   const [form, setForm] = useState({
-    name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '',
-    hire_date: '', emergency_contact: '', status: 'Active'
+    name: '', emp_id: '', designation_id: '', department_id: '',
+    phone: '', email: '', hire_date: '', date_of_birth: '',
+    residential_address: '', emergency_name: '', emergency_phone: '',
+    status: 'Active'
   })
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRole, setAccountRole] = useState('viewer')
 
+  // Open Add/Edit modal
   const openModal = (employee = null) => {
     setAccountInfo(null)
     if (employee) {
@@ -24,20 +29,50 @@ export default function Employees() {
         name: employee.name,
         emp_id: employee.emp_id || '',
         designation_id: employee.designation_id || '',
-        dept: employee.dept || '',
+        department_id: employee.department_id || '',
         phone: employee.phone || '',
         email: employee.email || '',
         hire_date: employee.hire_date || '',
-        emergency_contact: employee.emergency_contact || '',
+        date_of_birth: employee.date_of_birth || '',
+        residential_address: employee.residential_address || '',
+        emergency_name: employee.emergency_name || '',
+        emergency_phone: employee.emergency_phone || '',
         status: employee.status || 'Active'
       })
       setCreateAccount(false)
     } else {
       setEditing(null)
-      setForm({ name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
+      setForm({
+        name: '', emp_id: '', designation_id: '', department_id: '',
+        phone: '', email: '', hire_date: '', date_of_birth: '',
+        residential_address: '', emergency_name: '', emergency_phone: '',
+        status: 'Active'
+      })
       setCreateAccount(false)
     }
     setModalOpen(true)
+  }
+
+  // View details (click on card)
+  const openViewModal = (employee) => {
+    setSelectedEmployee(employee)
+    setViewModalOpen(true)
+  }
+
+  // Edit from view modal
+  const editFromView = () => {
+    setViewModalOpen(false)
+    openModal(selectedEmployee)
+  }
+
+  // Delete from view modal
+  const deleteFromView = async () => {
+    if (window.confirm(`Delete employee "${selectedEmployee.name}"? System account will also be removed.`)) {
+      await deleteEmployee(selectedEmployee.id)
+      toast.success('Deleted')
+      setViewModalOpen(false)
+      await fetchAll()
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -57,7 +92,12 @@ export default function Employees() {
         toast.success('Employee added (no system account)')
       }
       if (!editing) {
-        setForm({ name: '', emp_id: '', designation_id: '', dept: '', phone: '', email: '', hire_date: '', emergency_contact: '', status: 'Active' })
+        setForm({
+          name: '', emp_id: '', designation_id: '', department_id: '',
+          phone: '', email: '', hire_date: '', date_of_birth: '',
+          residential_address: '', emergency_name: '', emergency_phone: '',
+          status: 'Active'
+        })
         setCreateAccount(false)
         if (!accountResult) setModalOpen(false)
       } else {
@@ -76,6 +116,7 @@ export default function Employees() {
   }
 
   const getDesignationTitle = (id) => designations.find(d => d.id === id)?.title || '—'
+  const getDepartmentName = (id) => departments.find(d => d.id === id)?.name || '—'
 
   return (
     <div>
@@ -86,9 +127,10 @@ export default function Employees() {
         </button>
       </div>
 
+      {/* Employee Cards Grid */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
         {loading ? <div>Loading...</div> : employees.length === 0 ? <div className="empty-state">No employees</div> : employees.map(emp => (
-          <div key={emp.id} className="card" style={{ padding: 16 }}>
+          <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', gap: 12 }}>
                 <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>
@@ -103,19 +145,46 @@ export default function Employees() {
               <span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status}</span>
             </div>
             <div style={{ marginTop: 12 }}>
-              {emp.dept && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {emp.dept}</div>}
+              {emp.department_id && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
               {emp.phone && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
               {emp.email && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
               {emp.system_username && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => openModal(emp)}><span className="material-icons">edit</span></button>
-              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(emp)}><span className="material-icons">delete</span></button>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Detail View Modal (click on card) */}
+      {viewModalOpen && selectedEmployee && (
+        <div className="overlay" onClick={() => setViewModalOpen(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Employee Details: <span>{selectedEmployee.name}</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div><span className="text-dim">Employee ID:</span> {selectedEmployee.emp_id || '—'}</div>
+              <div><span className="text-dim">Status:</span> <span className={`badge ${selectedEmployee.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{selectedEmployee.status}</span></div>
+              <div><span className="text-dim">Designation:</span> {getDesignationTitle(selectedEmployee.designation_id)}</div>
+              <div><span className="text-dim">Department:</span> {getDepartmentName(selectedEmployee.department_id)}</div>
+              <div><span className="text-dim">Phone:</span> {selectedEmployee.phone || '—'}</div>
+              <div><span className="text-dim">Email:</span> {selectedEmployee.email || '—'}</div>
+              <div><span className="text-dim">Hire Date:</span> {selectedEmployee.hire_date || '—'}</div>
+              <div><span className="text-dim">Date of Birth:</span> {selectedEmployee.date_of_birth || '—'}</div>
+              <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Residential Address:</span> {selectedEmployee.residential_address || '—'}</div>
+              <div><span className="text-dim">Emergency Contact Name:</span> {selectedEmployee.emergency_name || '—'}</div>
+              <div><span className="text-dim">Emergency Contact Phone:</span> {selectedEmployee.emergency_phone || '—'}</div>
+              {selectedEmployee.system_username && (
+                <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {selectedEmployee.system_username}</div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
+              <button className="btn btn-primary" onClick={editFromView}><span className="material-icons">edit</span> Edit</button>
+              <button className="btn btn-danger" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -140,7 +209,12 @@ export default function Employees() {
                     {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Department (dept)</label><input className="form-control" value={form.dept} onChange={e => setForm({...form, dept: e.target.value})} placeholder="e.g. Electrical" /></div>
+                <div className="form-group"><label>Department</label>
+                  <select className="form-control" value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}>
+                    <option value="">Select</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
@@ -148,7 +222,12 @@ export default function Employees() {
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div>
-                <div className="form-group"><label>Emergency Contact</label><input className="form-control" value={form.emergency_contact} onChange={e => setForm({...form, emergency_contact: e.target.value})} /></div>
+                <div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div>
+              </div>
+              <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({...form, residential_address: e.target.value})} /></div>
+              <div className="form-row">
+                <div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div>
+                <div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div>
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Status</label>
