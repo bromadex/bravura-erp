@@ -133,7 +133,6 @@ export function FleetProvider({ children }) {
   // ---- Trip logging (vehicles) ----
   const addVehicleTrip = async (trip) => {
     const id = generateId()
-    // Update vehicle odometer
     const vehicle = vehicles.find(v => v.id === trip.vehicle_id)
     if (vehicle && trip.end_odometer > vehicle.odometer_km) {
       await supabase.from('fleet').update({ odometer_km: trip.end_odometer }).eq('id', trip.vehicle_id)
@@ -155,7 +154,7 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Issue reporting ----
+  // ---- Asset Issues ----
   const addAssetIssue = async (issue) => {
     const id = generateId()
     const { error } = await supabase.from('asset_issues').insert([{ id, ...issue, created_at: new Date().toISOString() }])
@@ -169,7 +168,22 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Helper functions (efficiency, health score) ----
+  // ---- Maintenance & Downtime Logs ----
+  const addMaintenanceLog = async (log) => {
+    const id = generateId()
+    const { error } = await supabase.from('service_maintenance_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const addDowntimeLog = async (log) => {
+    const id = generateId()
+    const { error } = await supabase.from('downtime_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ---- Helper functions for calculations ----
   const getVehicleFuelEfficiency = (reg) => {
     const fuelEntries = fuelLogs.filter(f => f.vehicle === reg)
     if (fuelEntries.length === 0) return null
@@ -269,20 +283,6 @@ export function FleetProvider({ children }) {
       }
     })
     return alerts
-  }
-
-  const addMaintenanceLog = async (log) => {
-    const id = generateId()
-    const { error } = await supabase.from('service_maintenance_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
-    if (error) throw error
-    await fetchAll()
-  }
-
-  const addDowntimeLog = async (log) => {
-    const id = generateId()
-    const { error } = await supabase.from('downtime_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
-    if (error) throw error
-    await fetchAll()
   }
 
   return (
