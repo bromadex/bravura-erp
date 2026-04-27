@@ -3,7 +3,7 @@ import { useHR } from '../../contexts/HRContext'
 import toast from 'react-hot-toast'
 
 export default function Employees() {
-  const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, loading, fetchAll } = useHR()
+  const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, loading, fetchAll } = useHR()
   
   // UI state
   const [modalOpen, setModalOpen] = useState(false)
@@ -19,6 +19,12 @@ export default function Employees() {
   const [filterDesignation, setFilterDesignation] = useState('ALL')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [sortBy, setSortBy] = useState('name-asc')
+  
+  // Skills & Certifications form states
+  const [newSkill, setNewSkill] = useState({ name: '', proficiency: 'Intermediate' })
+  const [certForm, setCertForm] = useState({ id: null, certification_name: '', issuing_body: '', issue_date: '', expiry_date: '', document_url: '', notes: '' })
+  const [showCertModal, setShowCertModal] = useState(false)
+  const [editingCert, setEditingCert] = useState(null)
   
   // Form state
   const [form, setForm] = useState({
@@ -61,6 +67,68 @@ export default function Employees() {
   // Get employee's audit history
   const getEmployeeHistory = (employeeId) => {
     return auditLogs.filter(log => log.entity_id === employeeId).slice(0, 20)
+  }
+
+  // Skills handlers
+  const handleAddSkill = async () => {
+    if (!newSkill.name.trim()) return toast.error('Skill name required')
+    try {
+      await addSkill(selectedEmployee.id, newSkill.name, newSkill.proficiency)
+      toast.success('Skill added')
+      setNewSkill({ name: '', proficiency: 'Intermediate' })
+      await fetchAll()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleDeleteSkill = async (skillId) => {
+    if (window.confirm('Remove this skill?')) {
+      await deleteSkill(skillId)
+      toast.success('Skill removed')
+      await fetchAll()
+    }
+  }
+
+  // Certifications handlers
+  const openCertModal = (cert = null) => {
+    if (cert) {
+      setEditingCert(cert)
+      setCertForm({
+        id: cert.id,
+        certification_name: cert.certification_name,
+        issuing_body: cert.issuing_body || '',
+        issue_date: cert.issue_date || '',
+        expiry_date: cert.expiry_date || '',
+        document_url: cert.document_url || '',
+        notes: cert.notes || ''
+      })
+    } else {
+      setEditingCert(null)
+      setCertForm({ id: null, certification_name: '', issuing_body: '', issue_date: '', expiry_date: '', document_url: '', notes: '' })
+    }
+    setShowCertModal(true)
+  }
+
+  const handleSaveCertification = async () => {
+    if (!certForm.certification_name) return toast.error('Certification name required')
+    try {
+      if (editingCert) {
+        await updateCertification(editingCert.id, { ...certForm, employee_id: selectedEmployee.id })
+        toast.success('Certification updated')
+      } else {
+        await addCertification({ ...certForm, employee_id: selectedEmployee.id })
+        toast.success('Certification added')
+      }
+      setShowCertModal(false)
+      await fetchAll()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleDeleteCertification = async (certId, name) => {
+    if (window.confirm(`Delete certification "${name}"?`)) {
+      await deleteCertification(certId)
+      toast.success('Deleted')
+      await fetchAll()
+    }
   }
 
   const openModal = (employee = null) => {
@@ -253,9 +321,7 @@ export default function Employees() {
                 </tr>
               ))}
               {empAttendance.length === 0 && (
-                <tr>
-                  <td colSpan="7" className="empty-state">No attendance records</td>
-                </tr>
+                <tr><td colSpan="7" className="empty-state">No attendance records</tr>
               )}
             </tbody>
           </table>
@@ -276,21 +342,55 @@ export default function Employees() {
     }
     return (
       <div>
-        <div style={{ marginBottom: 20 }}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Skills</h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {/* Skills Section */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700 }}>Skills</h4>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {empSkills.map(skill => (
-              <span key={skill.id} className="badge bg-purple">{skill.skill_name} ({skill.proficiency})</span>
+              <div key={skill.id} className="badge bg-purple" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {skill.skill_name} ({skill.proficiency})
+                <button onClick={() => handleDeleteSkill(skill.id)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>
+                  <span className="material-icons" style={{ fontSize: 14 }}>close</span>
+                </button>
+              </div>
             ))}
             {empSkills.length === 0 && <span className="text-dim">No skills added</span>}
           </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="New skill"
+              value={newSkill.name}
+              onChange={e => setNewSkill({ ...newSkill, name: e.target.value })}
+              style={{ flex: 2 }}
+            />
+            <select
+              className="form-control"
+              value={newSkill.proficiency}
+              onChange={e => setNewSkill({ ...newSkill, proficiency: e.target.value })}
+              style={{ width: 130 }}
+            >
+              <option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option>
+            </select>
+            <button className="btn btn-primary btn-sm" onClick={handleAddSkill}>Add</button>
+          </div>
         </div>
+
+        {/* Certifications Section */}
         <div>
-          <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Certifications</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700 }}>Certifications</h4>
+            <button className="btn btn-primary btn-sm" onClick={() => openCertModal()}>
+              <span className="material-icons">add</span> Add Certification
+            </button>
+          </div>
           <div className="table-wrap">
             <table className="stock-table">
               <thead>
-                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th></tr>
+                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {empCerts.map(cert => {
@@ -305,13 +405,15 @@ export default function Employees() {
                       <td>
                         {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
                       </td>
+                      <td>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
+                      </td>
                     </tr>
                   )
                 })}
                 {empCerts.length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="empty-state">No certifications</td>
-                  </tr>
+                  <tr><td colSpan="6" className="empty-state">No certifications</tr>
                 )}
               </tbody>
             </table>
@@ -343,18 +445,14 @@ export default function Employees() {
                 <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
                 <td style={{ color: getActionColor(log.action) }}>{log.action}</td>
                 <td>{log.user_name || 'System'}</td>
-                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  {log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}
-                </td>
+                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
               </tr>
             ))}
             {history.length === 0 && (
-              <tr>
-                <td colSpan="4" className="empty-state">No history records</td>
-              </tr>
+              <tr><td colSpan="4" className="empty-state">No history records</tr>
             )}
           </tbody>
-        </table>
+        <table>
       </div>
     )
   }
@@ -509,6 +607,26 @@ export default function Employees() {
         </div>
       )}
 
+      {/* Certification Modal */}
+      {showCertModal && (
+        <div className="overlay" onClick={() => setShowCertModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{editingCert ? 'Edit' : 'Add'} <span>Certification</span></div>
+            <div className="form-group"><label>Certification Name *</label><input className="form-control" required value={certForm.certification_name} onChange={e => setCertForm({...certForm, certification_name: e.target.value})} /></div>
+            <div className="form-group"><label>Issuing Body</label><input className="form-control" value={certForm.issuing_body} onChange={e => setCertForm({...certForm, issuing_body: e.target.value})} /></div>
+            <div className="form-row">
+              <div className="form-group"><label>Issue Date</label><input type="date" className="form-control" value={certForm.issue_date} onChange={e => setCertForm({...certForm, issue_date: e.target.value})} /></div>
+              <div className="form-group"><label>Expiry Date</label><input type="date" className="form-control" value={certForm.expiry_date} onChange={e => setCertForm({...certForm, expiry_date: e.target.value})} /></div>
+            </div>
+            <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={certForm.notes} onChange={e => setCertForm({...certForm, notes: e.target.value})} /></div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShowCertModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveCertification}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
@@ -523,6 +641,7 @@ export default function Employees() {
               </div>
             )}
             <form onSubmit={handleSubmit}>
+              {/* ... existing form fields (same as before) ... */}
               <div className="form-row">
                 <div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
                 <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div>
