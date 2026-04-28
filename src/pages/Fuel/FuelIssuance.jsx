@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 
 export default function FuelIssuance() {
   const { issuances, addIssuance, loading, fetchAll } = useFuel()
   const { user } = useAuth()
+  const canEdit = useCanEdit('fuel', 'issuance')
   const [showModal, setShowModal] = useState(false)
   const [vehicles, setVehicles] = useState([])
   const [generators, setGenerators] = useState([])
@@ -23,7 +25,7 @@ export default function FuelIssuance() {
     odometer: '',
     flowmeter: '',
   })
-  const [equipType, setEquipType] = useState('vehicle') // vehicle, generator, earthmover
+  const [equipType, setEquipType] = useState('vehicle')
 
   useEffect(() => {
     const fetchEquipment = async () => {
@@ -50,7 +52,7 @@ export default function FuelIssuance() {
         flowmeter: parseFloat(form.flowmeter) || 0,
         odometer: form.odometer ? parseFloat(form.odometer) : null,
         user_name: user?.full_name || user?.username,
-        vehicle: equipType === 'vehicle' ? form.vehicle : (equipType === 'generator' ? form.vehicle : form.vehicle), // adjust as needed
+        vehicle: equipType === 'vehicle' ? form.vehicle : (equipType === 'generator' ? form.vehicle : form.vehicle),
         driver: form.driver,
         authorized_by: form.authorized_by,
       })
@@ -65,16 +67,21 @@ export default function FuelIssuance() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Fuel Issuance</h1>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <span className="material-icons">local_gas_station</span> New Issuance
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <span className="material-icons">local_gas_station</span> New Issuance
+          </button>
+        )}
       </div>
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead><tr><th>Date</th><th>Time</th><th>Fuel Type</th><th>Vehicle/Equipment</th><th>Amount (L)</th><th>Driver</th><th>Authorized By</th></tr></thead>
           <tbody>
             {loading ? <tr><td colSpan="7">Loading...</td></tr> : issuances.length === 0 ? <tr><td colSpan="7">No records</td></tr> : issuances.map(i => (
-              <tr key={i.id}><td>{i.date}</td><td>{i.time || '-'}</td><td>{i.fuel_type}</td><td>{i.vehicle || '-'}</td><td>{i.amount}</td><td>{i.driver || '-'}</td><td>{i.authorized_by || '-'}</td></tr>
+              <tr key={i.id}>
+                <td>{i.date}</td><td>{i.time || '-'}</td><td>{i.fuel_type}</td>
+                <td>{i.vehicle || '-'}</td><td>{i.amount}</td><td>{i.driver || '-'}</td><td>{i.authorized_by || '-'}</td>
+              </tr>
             ))}
           </tbody>
         </table>
