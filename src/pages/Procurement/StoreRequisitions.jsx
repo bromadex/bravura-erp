@@ -13,15 +13,7 @@ const STATUS_COLORS = {
 }
 
 export default function StoreRequisitions() {
-  const {
-    storeRequisitions,
-    createStoreRequisition,
-    updateStoreRequisition,
-    approveStoreRequisition,
-    rejectStoreRequisition,
-    loading
-  } = useProcurement()
-
+  const { storeRequisitions, createStoreRequisition, updateStoreRequisition, approveStoreRequisition, rejectStoreRequisition, loading } = useProcurement()
   const { user } = useAuth()
   const canEdit = useCanEdit('procurement', 'store-requisitions')
   const canApprove = useCanApprove('procurement', 'store-requisitions')
@@ -39,7 +31,6 @@ export default function StoreRequisitions() {
     items: [{ name: '', category: '', qty: 1, unit: 'pcs', notes: '' }],
     notes: '',
   })
-
   const [form, setForm] = useState(emptyForm)
 
   const openCreate = () => {
@@ -52,36 +43,37 @@ export default function StoreRequisitions() {
     setEditing(r)
     setForm({
       ...r,
-      items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items
+      items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items,
     })
     setModalOpen(true)
   }
 
-  const addItem = () =>
-    setForm(f => ({
+  const addItem = () => {
+    setForm((f) => ({
       ...f,
-      items: [...f.items, { name: '', category: '', qty: 1, unit: 'pcs', notes: '' }]
+      items: [...f.items, { name: '', category: '', qty: 1, unit: 'pcs', notes: '' }],
     }))
+  }
 
-  const removeItem = (i) =>
-    setForm(f => ({
+  const removeItem = (i) => {
+    setForm((f) => ({
       ...f,
-      items: f.items.filter((_, idx) => idx !== i)
+      items: f.items.filter((_, idx) => idx !== i),
     }))
+  }
 
-  const setItem = (i, field, val) =>
-    setForm(f => {
+  const setItem = (i, field, val) => {
+    setForm((f) => {
       const items = [...f.items]
       items[i] = { ...items[i], [field]: val }
       return { ...f, items }
     })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.department) return toast.error('Department required')
-    if (form.items.some(it => !it.name || !it.qty))
-      return toast.error('All items need name & quantity')
-
+    if (form.items.some((it) => !it.name || !it.qty)) return toast.error('All items need name & quantity')
     try {
       if (editing) {
         await updateStoreRequisition(editing.id, { ...form, items: form.items })
@@ -90,7 +82,7 @@ export default function StoreRequisitions() {
         await createStoreRequisition({
           ...form,
           status: 'draft',
-          requester_id: user?.id
+          requester_id: user?.id,
         })
         toast.success('Requisition saved as draft')
       }
@@ -122,21 +114,14 @@ export default function StoreRequisitions() {
     const reason = prompt('Reason for rejection:')
     if (!reason) return
     try {
-      await rejectStoreRequisition(
-        id,
-        reason,
-        user?.full_name || user?.username,
-        user?.id
-      )
+      await rejectStoreRequisition(id, reason, user?.full_name || user?.username, user?.id)
       toast.success('Rejected')
     } catch (err) {
       toast.error(err.message)
     }
   }
 
-  const filtered = storeRequisitions.filter(
-    r => filterStatus === 'all' || r.status === filterStatus
-  )
+  const filtered = storeRequisitions.filter((r) => filterStatus === 'all' || r.status === filterStatus)
 
   return (
     <div>
@@ -150,7 +135,7 @@ export default function StoreRequisitions() {
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['all', 'draft', 'submitted', 'approved', 'rejected', 'fulfilled'].map(s => (
+        {['all', 'draft', 'submitted', 'approved', 'rejected', 'fulfilled'].map((s) => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
@@ -158,7 +143,7 @@ export default function StoreRequisitions() {
             style={{
               textTransform: 'capitalize',
               background: filterStatus === s ? 'var(--gold)' : '',
-              color: filterStatus === s ? '#0b0f1a' : ''
+              color: filterStatus === s ? '#0b0f1a' : '',
             }}
           >
             {s}
@@ -167,7 +152,7 @@ export default function StoreRequisitions() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
               <th>SR #</th>
@@ -180,7 +165,6 @@ export default function StoreRequisitions() {
               <th>Actions</th>
             </tr>
           </thead>
-
           <tbody>
             {loading ? (
               <tr>
@@ -196,95 +180,58 @@ export default function StoreRequisitions() {
               </tr>
             ) : (
               filtered.map((r, idx) => {
-                const items =
-                  typeof r.items === 'string'
-                    ? JSON.parse(r.items || '[]')
-                    : (r.items || [])
-
-                const showApproveButtons =
-                  canApprove && r.status === 'submitted'
-
-                const showEditButtons =
-                  canEdit && (r.status === 'draft' || r.status === 'submitted')
-
+                const items = typeof r.items === 'string' ? JSON.parse(r.items || '[]') : r.items || []
+                const showApproveButtons = canApprove && r.status === 'submitted'
+                const showEditButtons = canEdit && (r.status === 'draft' || r.status === 'submitted')
                 return (
-                  <tr
-                    key={r.id}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setViewReq(r)}
-                  >
+                  <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setViewReq(r)}>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--gold)' }}>
                       {r.req_number || `SR-${idx + 1}`}
                     </td>
-
                     <td>{r.date}</td>
                     <td style={{ fontWeight: 600 }}>{r.department}</td>
                     <td>{r.requester_name}</td>
-
                     <td>
                       <span
-                        className={`badge badge-${
+                        className={`badge ${
                           r.priority === 'critical'
-                            ? 'red'
+                            ? 'bg-red'
                             : r.priority === 'urgent'
-                            ? 'yellow'
-                            : 'blue'
+                            ? 'bg-yellow'
+                            : 'bg-blue'
                         }`}
                       >
                         {r.priority}
                       </span>
                     </td>
-
                     <td style={{ fontFamily: 'var(--mono)' }}>
                       {items.length} item{items.length !== 1 ? 's' : ''}
                     </td>
-
                     <td>
                       <span className={`badge ${STATUS_COLORS[r.status] || 'badge-blue'}`}>
                         {r.status}
                       </span>
                     </td>
-
-                    <td
-                      onClick={e => e.stopPropagation()}
-                      style={{ display: 'flex', gap: 4 }}
-                    >
+                    <td onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 4 }}>
                       {showEditButtons && (
                         <>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => openEdit(r)}
-                          >
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
                             <span className="material-icons">edit</span>
                           </button>
-
                           {r.status === 'draft' && (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => submitForApproval(r.id)}
-                            >
+                            <button className="btn btn-primary btn-sm" onClick={() => submitForApproval(r.id)}>
                               Submit
                             </button>
                           )}
                         </>
                       )}
-
                       {showApproveButtons && (
                         <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleApprove(r.id)}
-                          >
-                            <span className="material-icons">check_circle</span>
-                            Approve
+                          <button className="btn btn-primary btn-sm" onClick={() => handleApprove(r.id)}>
+                            <span className="material-icons">check_circle</span> Approve
                           </button>
-
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleReject(r.id)}
-                          >
-                            <span className="material-icons">cancel</span>
-                            Reject
+                          <button className="btn btn-danger btn-sm" onClick={() => handleReject(r.id)}>
+                            <span className="material-icons">cancel</span> Reject
                           </button>
                         </>
                       )}
@@ -297,12 +244,216 @@ export default function StoreRequisitions() {
         </table>
       </div>
 
+      {/* Create / Edit Modal */}
       {modalOpen && (
-        null
+        <div className="overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal modal-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">{editing ? 'Edit' : 'New'} Store <span>Requisition</span></div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>DATE</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.date}
+                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>DEPARTMENT *</label>
+                  <input
+                    className="form-control"
+                    required
+                    value={form.department}
+                    onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>PRIORITY</label>
+                  <select
+                    className="form-control"
+                    value={form.priority}
+                    onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>REQUESTED BY</label>
+                <input
+                  className="form-control"
+                  value={form.requester_name}
+                  onChange={(e) => setForm((f) => ({ ...f, requester_name: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ margin: '16px 0 8px', fontWeight: 700, fontSize: 12, color: 'var(--text-dim)' }}>
+                ITEMS REQUESTED
+              </div>
+              {form.items.map((it, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 1.5fr 0.7fr 0.7fr 1.5fr auto',
+                    gap: 6,
+                    marginBottom: 6,
+                  }}
+                >
+                  <input
+                    className="form-control"
+                    placeholder="Item name"
+                    value={it.name}
+                    onChange={(e) => setItem(i, 'name', e.target.value)}
+                  />
+                  <input
+                    className="form-control"
+                    placeholder="Category"
+                    value={it.category}
+                    onChange={(e) => setItem(i, 'category', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className="form-control"
+                    min="1"
+                    value={it.qty}
+                    onChange={(e) => setItem(i, 'qty', parseInt(e.target.value) || 1)}
+                  />
+                  <input
+                    className="form-control"
+                    placeholder="Unit"
+                    value={it.unit}
+                    onChange={(e) => setItem(i, 'unit', e.target.value)}
+                  />
+                  <input
+                    className="form-control"
+                    placeholder="Notes"
+                    value={it.notes}
+                    onChange={(e) => setItem(i, 'notes', e.target.value)}
+                  />
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}>
+                    <span className="material-icons">close</span>
+                  </button>
+                </div>
+              ))}
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addItem} style={{ marginBottom: 16 }}>
+                <span className="material-icons">add</span> Add Item
+              </button>
+
+              <div className="form-group">
+                <label>NOTES / JUSTIFICATION</label>
+                <textarea
+                  className="form-control"
+                  rows="2"
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Draft
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
+      {/* View Modal */}
       {viewReq && (
-        null
+        <div className="overlay" onClick={() => setViewReq(null)}>
+          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              {viewReq.req_number} — <span>{viewReq.department}</span>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 12,
+                marginBottom: 16,
+                fontSize: 13,
+              }}
+            >
+              <div>
+                <span className="text-dim">Date:</span> {viewReq.date}
+              </div>
+              <div>
+                <span className="text-dim">Status:</span>{' '}
+                <span className={`badge ${STATUS_COLORS[viewReq.status]}`}>{viewReq.status}</span>
+              </div>
+              <div>
+                <span className="text-dim">Requested by:</span> {viewReq.requester_name}
+              </div>
+              <div>
+                <span className="text-dim">Priority:</span> {viewReq.priority}
+              </div>
+              {viewReq.approver_name && (
+                <div>
+                  <span className="text-dim">Approved by:</span> {viewReq.approver_name}
+                </div>
+              )}
+              {viewReq.rejection_reason && (
+                <div style={{ gridColumn: 'span 2', color: 'var(--red)' }}>
+                  Rejected: {viewReq.rejection_reason}
+                </div>
+              )}
+            </div>
+            <div className="table-wrap">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(typeof viewReq.items === 'string'
+                    ? JSON.parse(viewReq.items || '[]')
+                    : viewReq.items || []
+                  ).map((it, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{it.name}</td>
+                      <td>{it.category}</td>
+                      <td style={{ fontFamily: 'var(--mono)' }}>{it.qty}</td>
+                      <td>{it.unit}</td>
+                      <td style={{ color: 'var(--text-dim)' }}>{it.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {viewReq.notes && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 10,
+                  background: 'var(--surface2)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: 'var(--text-dim)',
+                }}
+              >
+                {viewReq.notes}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setViewReq(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
