@@ -224,7 +224,7 @@ export default function Attendance() {
                   <td style={{ whiteSpace: 'nowrap' }}>{record.date}</td>
                   <td><strong>{getEmployeeName(record.employee_id)}</strong></td>
                   <td>{record.clock_in}</td>
-                  <td>{record.clock_out || '—'}<td>
+                  <td>{record.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{record.shift_type}</span></td>
                   <td>{record.total_hours?.toFixed(1) || '—'}</td>
                   <td>{record.overtime_hours?.toFixed(1) || '—'}</td>
