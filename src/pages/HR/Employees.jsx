@@ -1,3 +1,4 @@
+// src/pages/HR/Employees.jsx
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
@@ -6,9 +7,10 @@ import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 
 export default function Employees() {
   const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, getWeeklyHours, loading, fetchAll } = useHR()
+  
   const canEdit = useCanEdit('hr', 'employees')
   const canDelete = useCanDelete('hr', 'employees')
-  
+
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
@@ -18,23 +20,32 @@ export default function Employees() {
   const [documents, setDocuments] = useState([])
   const [uploading, setUploading] = useState(false)
   const [activeDocCategory, setActiveDocCategory] = useState('general')
-  
+
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('ALL')
   const [filterDesignation, setFilterDesignation] = useState('ALL')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [sortBy, setSortBy] = useState('name-asc')
-  
+
   const [newSkill, setNewSkill] = useState({ name: '', proficiency: 'Intermediate' })
   const [certForm, setCertForm] = useState({ id: null, certification_name: '', issuing_body: '', issue_date: '', expiry_date: '', document_url: '', notes: '' })
   const [showCertModal, setShowCertModal] = useState(false)
   const [editingCert, setEditingCert] = useState(null)
-  
+
   const [form, setForm] = useState({
-    name: '', employee_number: '', designation_id: '', department_id: '',
-    phone: '', email: '', hire_date: '', date_of_birth: '',
-    residential_address: '', emergency_name: '', emergency_phone: '',
-    employment_type: 'Full-time', status: 'Active'
+    name: '',
+    employee_number: '',
+    designation_id: '',
+    department_id: '',
+    phone: '',
+    email: '',
+    hire_date: '',
+    date_of_birth: '',
+    residential_address: '',
+    emergency_name: '',
+    emergency_phone: '',
+    employment_type: 'Full-time',
+    status: 'Active'
   })
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRoleId, setAccountRoleId] = useState('role_viewer')
@@ -51,12 +62,12 @@ export default function Employees() {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
-      
+
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
         return
       }
-      
+
       if (data && data.length) {
         const docsWithUrls = data.map(file => {
           const pathParts = file.name.split('/')
@@ -88,37 +99,37 @@ export default function Employees() {
       toast.error('No employee selected')
       return
     }
-    
+
     if (!file) {
       toast.error('No file selected')
       return
     }
-    
+
     setUploading(true)
-    
+
     try {
       const fileExt = file.name.split('.').pop()
       const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
       const filePath = `employees/${selectedEmployee.id}/${category}/${Date.now()}_${safeFileName}`
-      
+
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         })
-      
+
       if (error) {
         console.error('Upload error:', error)
         toast.error(`Upload failed: ${error.message}`)
         setUploading(false)
         return
       }
-      
+
       const { data: { publicUrl } } = supabase.storage
         .from('hr-documents')
         .getPublicUrl(filePath)
-      
+
       const newDoc = {
         name: safeFileName,
         path: filePath,
@@ -127,10 +138,10 @@ export default function Employees() {
         size: file.size,
         created_at: new Date().toISOString()
       }
-      
+
       setDocuments(prev => [...prev, newDoc])
       toast.success('Document uploaded successfully!')
-      
+
     } catch (err) {
       console.error('Upload error:', err)
       toast.error(err.message || 'Upload failed')
@@ -154,7 +165,7 @@ export default function Employees() {
   }
 
   const getEmployeeAttendance = (employeeId) => {
-    return attendance.filter(a => a.employee_id === employeeId).sort((a,b) => new Date(b.date) - new Date(a.date))
+    return attendance.filter(a => a.employee_id === employeeId).sort((a, b) => new Date(b.date) - new Date(a.date))
   }
 
   const getEmployeeSkills = (employeeId) => {
@@ -252,10 +263,19 @@ export default function Employees() {
     } else {
       setEditing(null)
       setForm({
-        name: '', employee_number: '', designation_id: '', department_id: '',
-        phone: '', email: '', hire_date: '', date_of_birth: '',
-        residential_address: '', emergency_name: '', emergency_phone: '',
-        employment_type: 'Full-time', status: 'Active'
+        name: '',
+        employee_number: '',
+        designation_id: '',
+        department_id: '',
+        phone: '',
+        email: '',
+        hire_date: '',
+        date_of_birth: '',
+        residential_address: '',
+        emergency_name: '',
+        emergency_phone: '',
+        employment_type: 'Full-time',
+        status: 'Active'
       })
       setCreateAccount(false)
     }
@@ -295,25 +315,43 @@ export default function Employees() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.name) return toast.error('Name required')
     
+    // 🔧 FIX: Clear any existing errors first
+    console.log('Form submitted', form)
+    
+    // Check required fields
+    if (!form.name || form.name.trim() === '') {
+      toast.error('Full Name is required')
+      return
+    }
+    
+    if (!form.department_id) {
+      toast.error('Please select a Department')
+      return
+    }
+    
+    if (!form.designation_id) {
+      toast.error('Please select a Designation')
+      return
+    }
+    
+    if (!form.hire_date) {
+      toast.error('Hire Date is required')
+      return
+    }
+
+    // Phone validation (optional but format check if provided)
     if (form.phone && !/^[0-9+\-\s()]{9,15}$/.test(form.phone)) {
-      return toast.error('Invalid phone number format')
+      toast.error('Invalid phone number format')
+      return
     }
+    
+    // Email validation (optional)
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) {
-      return toast.error('Invalid email format')
+      toast.error('Invalid email format')
+      return
     }
-    
-    const duplicate = employees.find(emp => 
-      emp.id !== editing?.id && 
-      (emp.name.toLowerCase() === form.name.toLowerCase() ||
-       (emp.phone && emp.phone === form.phone) ||
-       (emp.email && emp.email === form.email))
-    )
-    if (duplicate) {
-      return toast.warning('Possible duplicate: employee with similar name/phone/email exists')
-    }
-    
+
     try {
       if (editing) {
         await updateEmployee(editing.id, form)
@@ -325,6 +363,7 @@ export default function Employees() {
           accountResult = await addEmployee(form, true, accountRoleId)
           setAccountInfo(accountResult)
           toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
+          // Don't close modal – show credentials
         } else {
           await addEmployee(form, false)
           toast.success('Employee added')
@@ -333,7 +372,8 @@ export default function Employees() {
       }
       await fetchAll()
     } catch (err) { 
-      toast.error(err.message) 
+      console.error('Add employee error:', err)
+      toast.error(err.message || 'Failed to add employee') 
     }
   }
 
@@ -389,29 +429,20 @@ export default function Employees() {
             <div style={{ gridColumn: 'span 2' }}><span className="text-dim">System Username:</span> {employee.system_username}</div>
           )}
         </div>
-
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
           <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
             <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }}>folder</span>
             Documents
           </h4>
-          
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             {docCategories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setActiveDocCategory(cat.id)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 12px',
-                  borderRadius: 20,
-                  border: '1px solid var(--border)',
-                  background: activeDocCategory === cat.id ? 'var(--gold)' : 'transparent',
-                  color: activeDocCategory === cat.id ? '#0b0f1a' : 'var(--text-mid)',
-                  cursor: 'pointer',
-                  fontSize: 12
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20,
+                  border: '1px solid var(--border)', background: activeDocCategory === cat.id ? 'var(--gold)' : 'transparent',
+                  color: activeDocCategory === cat.id ? '#0b0f1a' : 'var(--text-mid)', cursor: 'pointer', fontSize: 12
                 }}
               >
                 <span className="material-icons" style={{ fontSize: 14 }}>{cat.icon}</span>
@@ -419,7 +450,6 @@ export default function Employees() {
               </button>
             ))}
           </div>
-
           <div style={{ marginBottom: 16 }}>
             <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
               <span className="material-icons" style={{ fontSize: 14 }}>upload</span>
@@ -439,7 +469,6 @@ export default function Employees() {
             </label>
             {uploading && <span style={{ marginLeft: 12, fontSize: 12 }}>Uploading...</span>}
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredDocs.length === 0 && (
               <div className="empty-state" style={{ padding: 24 }}>No documents in this category</div>
@@ -447,15 +476,7 @@ export default function Employees() {
             {filteredDocs.map(doc => {
               const isImage = doc.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)
               return (
-                <div key={doc.path} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: 8,
-                  background: 'var(--surface2)',
-                  borderRadius: 8,
-                  border: '1px solid var(--border)'
-                }}>
+                <div key={doc.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <span className="material-icons" style={{ fontSize: 24, color: isImage ? 'var(--teal)' : 'var(--blue)' }}>
                     {isImage ? 'image' : 'description'}
                   </span>
@@ -497,17 +518,7 @@ export default function Employees() {
         </div>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Clock In</th>
-                <th>Clock Out</th>
-                <th>Shift</th>
-                <th>Hours</th>
-                <th>Overtime</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr></thead>
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
@@ -521,9 +532,7 @@ export default function Employees() {
                 </tr>
               ))}
               {empAttendance.length === 0 && (
-                <tr>
-                  <td colSpan="7" className="empty-state">No attendance records</td>
-                </tr>
+                <tr><td colSpan="7" className="empty-state">No attendance records</td></tr>
               )}
             </tbody>
           </table>
@@ -576,11 +585,7 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead>
-                <tr>
-                  <th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th>
-                </tr>
-              </thead>
+              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -602,9 +607,7 @@ export default function Employees() {
                   )
                 })}
                 {empCerts.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="empty-state">No certifications</td>
-                  </tr>
+                  <tr><td colSpan="6" className="empty-state">No certifications</td></tr>
                 )}
               </tbody>
             </table>
@@ -625,11 +628,7 @@ export default function Employees() {
     return (
       <div className="table-wrap">
         <table className="stock-table">
-          <thead>
-            <tr>
-              <th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
           <tbody>
             {history.map(log => (
               <tr key={log.id}>
@@ -640,9 +639,7 @@ export default function Employees() {
               </tr>
             ))}
             {history.length === 0 && (
-              <tr>
-                <td colSpan="4" className="empty-state">No history records</td>
-              </tr>
+              <tr><td colSpan="4" className="empty-state">No history records</td></tr>
             )}
           </tbody>
         </table>
@@ -661,16 +658,44 @@ export default function Employees() {
         )}
       </div>
 
+      {/* Search, Filter, Sort Bar */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <div className="form-row">
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label><input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label><select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}><option value="ALL">All Departments</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label><select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}><option value="ALL">All Designations</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div>
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label><select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="ALL">All Status</option><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div>
-          <div className="form-group"><label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label><select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}><option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option><option value="hire-date-asc">Hire Date (Oldest)</option><option value="hire-date-desc">Hire Date (Newest)</option></select></div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14 }}>search</span> Search</label>
+            <input type="text" className="form-control" placeholder="Name, phone, ID, or designation..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label>
+            <select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
+              <option value="ALL">All Departments</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label>
+            <select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}>
+              <option value="ALL">All Designations</option>
+              {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label>
+            <select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="ALL">All Status</option><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label>
+            <select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option>
+              <option value="hire-date-asc">Hire Date (Oldest)</option><option value="hire-date-desc">Hire Date (Newest)</option>
+            </select>
+          </div>
         </div>
       </div>
 
+      {/* Employee Cards Grid */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
         {loading ? <div>Loading...</div> : filteredEmployees.length === 0 ? <div className="empty-state">No employees match your filters</div> : filteredEmployees.map(emp => {
           const weeklyStats = getWeeklyHours(emp.id)
@@ -678,10 +703,19 @@ export default function Employees() {
             <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>{emp.name?.charAt(0).toUpperCase() || '?'}</div>
-                  <div><div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div><div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div></div>
+                  <div className="emp-avatar-lg" style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>
+                    {emp.name?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div>
+                  </div>
                 </div>
-                <div><span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span><div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div></div>
+                <div>
+                  <span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span>
+                  <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div>
+                </div>
               </div>
               <div style={{ marginTop: 12 }}>
                 {emp.department_id && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
@@ -702,6 +736,7 @@ export default function Employees() {
         })}
       </div>
 
+      {/* Detail View Modal */}
       {viewModalOpen && selectedEmployee && (
         <div className="overlay" onClick={() => setViewModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
@@ -715,7 +750,9 @@ export default function Employees() {
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
               {['profile', 'attendance', 'performance', 'history'].map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
-                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>{tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}</span>{tab}
+                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
+                    {tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}
+                  </span>{tab}
                 </button>
               ))}
             </div>
@@ -725,11 +762,14 @@ export default function Employees() {
               {activeTab === 'performance' && <PerformanceTab employee={selectedEmployee} />}
               {activeTab === 'history' && <HistoryTab employee={selectedEmployee} />}
             </div>
-            <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button></div>
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Cert Modal */}
       {showCertModal && (
         <div className="overlay" onClick={() => setShowCertModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -743,6 +783,7 @@ export default function Employees() {
         </div>
       )}
 
+      {/* Add/Edit Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -756,20 +797,78 @@ export default function Employees() {
               </div>
             )}
             <form onSubmit={handleSubmit}>
-              <div className="form-row"><div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div><div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Designation</label><select className="form-control" value={form.designation_id} onChange={e => setForm({...form, designation_id: e.target.value})}><option value="">Select</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div><div className="form-group"><label>Department</label><select className="form-control" value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}><option value="">Select</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div></div>
-              <div className="form-row"><div className="form-group"><label>Employment Type</label><select className="form-control" value={form.employment_type} onChange={e => setForm({...form, employment_type: e.target.value})}><option>Full-time</option><option>Contract</option><option>Casual</option></select></div><div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div></div>
-              <div className="form-row"><div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div><div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div><div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div></div>
+              <div className="form-row">
+                <div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+                <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Designation *</label>
+                  <select className="form-control" required value={form.designation_id} onChange={e => setForm({...form, designation_id: e.target.value})}>
+                    <option value="">Select Designation</option>
+                    {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Department *</label>
+                  <select className="form-control" required value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}>
+                    <option value="">Select Department</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Employment Type</label>
+                  <select className="form-control" value={form.employment_type} onChange={e => setForm({...form, employment_type: e.target.value})}>
+                    <option>Full-time</option><option>Contract</option><option>Casual</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Status</label>
+                  <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                    <option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+                <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Hire Date *</label><input type="date" className="form-control" required value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div>
+                <div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div>
+              </div>
               <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({...form, residential_address: e.target.value})} /></div>
-              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div><div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div></div>
+              <div className="form-row">
+                <div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div>
+                <div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div>
+              </div>
               {!editing && (
                 <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} /><span>Create system account (username + password)</span></label>
-                  {createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRoleId} onChange={e => setAccountRoleId(e.target.value)}><option value="role_super_admin">Super Admin</option><option value="role_hr_manager">HR Manager</option><option value="role_dept_manager">Department Manager</option><option value="role_storekeeper">Storekeeper</option><option value="role_fuel_attendant">Fuel Attendant</option><option value="role_viewer">Viewer</option></select></div>)}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} />
+                    <span>Create system account (username + password)</span>
+                  </label>
+                  {createAccount && (
+                    <div style={{ marginTop: 8 }}>
+                      <label>System Role</label>
+                      <select className="form-control" value={accountRoleId} onChange={e => setAccountRoleId(e.target.value)}>
+                        <option value="role_super_admin">Super Admin</option>
+                        <option value="role_hr_manager">HR Manager</option>
+                        <option value="role_dept_manager">Department Manager</option>
+                        <option value="role_storekeeper">Storekeeper</option>
+                        <option value="role_fuel_attendant">Fuel Attendant</option>
+                        <option value="role_viewer">Viewer</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button></div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button>
+              </div>
             </form>
           </div>
         </div>
