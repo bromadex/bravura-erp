@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   // Helper: fetch permissions for a user
   const fetchUserPermissions = async (userId) => {
     try {
-      // Get role permissions
+      // Get user's role
       const { data: userData } = await supabase
         .from('app_users')
         .select('role_id')
@@ -60,6 +60,19 @@ export function AuthProvider({ children }) {
         return { module_name, page_name: page_name || null, ...perms }
       })
       
+      // Store in localStorage cache for fast access from other contexts
+      const permsCache = {}
+      merged.forEach(p => {
+        const cacheKey = `${p.module_name}|${p.page_name || ''}`
+        permsCache[cacheKey] = {
+          can_view: p.can_view,
+          can_edit: p.can_edit,
+          can_delete: p.can_delete,
+          can_approve: p.can_approve
+        }
+      })
+      localStorage.setItem('user_permissions_cache', JSON.stringify(permsCache))
+      
       return merged
     } catch (err) {
       console.error('Error fetching permissions:', err)
@@ -67,11 +80,11 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Helper: check permission
+  // Helper: check permission (used by components via context)
   const hasPermission = (moduleName, pageName, action) => {
     if (!user) return false
     
-    // Super Admin bypass (role_id = 'role_super_admin')
+    // Super Admin bypass
     if (user.role_id === 'role_super_admin') return true
     
     const perm = permissions.find(p => 
@@ -97,7 +110,7 @@ export function AuthProvider({ children }) {
       try { 
         const parsed = JSON.parse(saved)
         setUser(parsed)
-        // Fetch permissions after setting user
+        // Also load permissions for this user
         fetchUserPermissions(parsed.id).then(setPermissions)
       } catch {}
     }
@@ -134,7 +147,7 @@ export function AuthProvider({ children }) {
     
     setUser(session)
     
-    // Fetch and store permissions
+    // Fetch and store permissions (also stores cache in localStorage)
     const userPerms = await fetchUserPermissions(data.id)
     setPermissions(userPerms)
     
@@ -149,6 +162,7 @@ export function AuthProvider({ children }) {
     setPermissions([])
     localStorage.removeItem('bravura_session')
     sessionStorage.removeItem('bravura_session')
+    localStorage.removeItem('user_permissions_cache')
   }
 
   return (
