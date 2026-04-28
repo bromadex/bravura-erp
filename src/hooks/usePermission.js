@@ -1,37 +1,29 @@
- // src/hooks/usePermission.js
-// 🔧 TEMPORARY: All permission checks DISABLED
-
+// src/hooks/usePermission.js
 import { usePermission } from '../contexts/PermissionContext'
 
 export const useCanView = (module, page = null) => {
   const { canView } = usePermission()
-  return canView(module, page)  // Always returns true
+  return canView(module, page)
 }
 
 export const useCanEdit = (module, page = null) => {
   const { canEdit } = usePermission()
-  return canEdit(module, page)  // Always returns true
+  return canEdit(module, page)
 }
 
 export const useCanDelete = (module, page = null) => {
   const { canDelete } = usePermission()
-  return canDelete(module, page)  // Always returns true
+  return canDelete(module, page)
 }
 
 export const useCanApprove = (module, page = null) => {
   const { canApprove } = usePermission()
-  return canApprove(module, page)  // Always returns true
+  return canApprove(module, page)
 }
 
 export const useCanManagePermissions = () => {
   const { canManagePermissions } = usePermission()
-  return canManagePermissions()  // Always returns true
+  return canManagePermissions()
 }
 
-export default {
-  useCanView,
-  useCanEdit,
-  useCanDelete,
-  useCanApprove,
-  useCanManagePermissions,
-}
+export default { useCanView, useCanEdit, useCanDelete, useCanApprove, useCanManagePermissions }
