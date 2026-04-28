@@ -40,10 +40,10 @@ export default function Employees() {
   const [accountRoleId, setAccountRoleId] = useState('role_viewer')
 
   const docCategories = [
-    { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/jpeg,image/png,image/jpg' },
-    { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/jpeg,image/png,image/jpg,application/pdf' },
-    { id: 'certifications', label: 'Certifications', icon: 'verified', accept: 'image/jpeg,image/png,image/jpg,application/pdf' },
-    { id: 'general', label: 'General', icon: 'description', accept: 'application/pdf,image/jpeg,image/png,image/jpg,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+    { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
+    { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/*,application/pdf' },
+    { id: 'certifications', label: 'Certifications', icon: 'verified', accept: 'image/*,application/pdf' },
+    { id: 'general', label: 'General', icon: 'description', accept: '*' }
   ]
 
   const fetchDocuments = async (employeeId) => {
