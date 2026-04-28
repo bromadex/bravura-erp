@@ -81,7 +81,7 @@ export default function GoodsReceived() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
               <th>GRN #</th><th>Date</th><th>Supplier</th><th>Driver / Vehicle</th>
@@ -90,30 +90,34 @@ export default function GoodsReceived() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>Loading...<\/td><\/tr>
+              <tr>
+                <td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>Loading...</td>
+              </tr>
             ) : goodsReceived.length === 0 ? (
-              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>No GRNs yet<\/td><\/tr>
+              <tr>
+                <td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>No GRNs yet</td>
+              </tr>
             ) : (
               goodsReceived.map(grn => {
                 const items = typeof grn.items === 'string' ? JSON.parse(grn.items || '[]') : (grn.items || [])
                 const total = items.reduce((s, it) => s + ((it.received || 0) * (it.unit_cost || 0)), 0)
                 return (
                   <tr key={grn.id} style={{ cursor: 'pointer' }} onClick={() => setViewGRN(grn)}>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontWeight: 700 }}>{grn.grn_number}<\/td>
-                    <td>{grn.date}<\/td>
-                    <td style={{ fontWeight: 600 }}>{grn.supplier_name || '—'}<\/td>
-                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{grn.driver || '—'} {grn.vehicle ? `/ ${grn.vehicle}` : ''}<\/td>
-                    <td>{grn.received_by || '—'}<\/td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{items.length}<\/td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${total.toFixed(2)}<\/td>
-                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{grn.notes || '—'}<\/td>
-                  <\/tr>
+                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontWeight: 700 }}>{grn.grn_number}</td>
+                    <td>{grn.date}</td>
+                    <td style={{ fontWeight: 600 }}>{grn.supplier_name || '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{grn.driver || '—'} {grn.vehicle ? `/ ${grn.vehicle}` : ''}</td>
+                    <td>{grn.received_by || '—'}</td>
+                    <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
+                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${total.toFixed(2)}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{grn.notes || '—'}</td>
+                  </tr>
                 )
               })
             )}
-          <\/tbody>
-        <\/table>
-      <\/div>
+          </tbody>
+        </table>
+      </div>
 
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
@@ -121,30 +125,30 @@ export default function GoodsReceived() {
             <div className="modal-title">
               <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>move_to_inbox</span>
               New Goods Received <span>Note</span>
-            <\/div>
+            </div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
-                <div className="form-group"><label>DATE *<\/label><input type="date" className="form-control" required value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} /><\/div>
-                <div className="form-group"><label>LINK TO PURCHASE ORDER<\/label>
+                <div className="form-group"><label>DATE *</label><input type="date" className="form-control" required value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} /></div>
+                <div className="form-group"><label>LINK TO PURCHASE ORDER</label>
                   <select className="form-control" value={form.po_id} onChange={e => handlePOSelect(e.target.value)}>
-                    <option value="">— None (direct delivery) —<\/option>
+                    <option value="">— None (direct delivery) —</option>
                     {purchaseOrders.filter(po => po.status !== 'completed').map(po => (
-                      <option key={po.id} value={po.id}>{po.po_number} — {po.supplier_name}<\/option>
+                      <option key={po.id} value={po.id}>{po.po_number} — {po.supplier_name}</option>
                     ))}
-                  <\/select>
-                <\/div>
-              <\/div>
+                  </select>
+                </div>
+              </div>
               <div className="form-row">
-                <div className="form-group"><label>SUPPLIER<\/label><input className="form-control" value={form.supplier_name} onChange={e => setForm(f => ({...f, supplier_name: e.target.value}))} /><\/div>
-                <div className="form-group"><label>DRIVER / VEHICLE<\/label><input className="form-control" placeholder="Driver name / vehicle reg" value={form.driver} onChange={e => setForm(f => ({...f, driver: e.target.value}))} /><\/div>
-              <\/div>
-              <div className="form-group"><label>RECEIVED BY<\/label><input className="form-control" value={form.received_by} onChange={e => setForm(f => ({...f, received_by: e.target.value}))} /><\/div>
+                <div className="form-group"><label>SUPPLIER</label><input className="form-control" value={form.supplier_name} onChange={e => setForm(f => ({...f, supplier_name: e.target.value}))} /></div>
+                <div className="form-group"><label>DRIVER / VEHICLE</label><input className="form-control" placeholder="Driver name / vehicle reg" value={form.driver} onChange={e => setForm(f => ({...f, driver: e.target.value}))} /></div>
+              </div>
+              <div className="form-group"><label>RECEIVED BY</label><input className="form-control" value={form.received_by} onChange={e => setForm(f => ({...f, received_by: e.target.value}))} /></div>
 
-              <div style={{ margin: '16px 0 8px', fontWeight: 700, fontSize: 12, color: 'var(--text-dim)' }}>ITEMS RECEIVED<\/div>
+              <div style={{ margin: '16px 0 8px', fontWeight: 700, fontSize: 12, color: 'var(--text-dim)' }}>ITEMS RECEIVED</div>
               <div style={{ overflowX: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, minWidth: 700, marginBottom: 6, fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>
-                  <span>ITEM NAME<\/span><span>CATEGORY<\/span><span>UNIT<\/span><span>ORDERED<\/span><span>RECEIVED<\/span><span>UNIT COST<\/span><span>LOT/BATCH<\/span><span><\/span>
-                <\/div>
+                  <span>ITEM NAME</span><span>CATEGORY</span><span>UNIT</span><span>ORDERED</span><span>RECEIVED</span><span>UNIT COST</span><span>LOT/BATCH</span><span></span>
+                </div>
                 {form.items.map((it, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, marginBottom: 6, minWidth: 700 }}>
                     <input className="form-control" placeholder="Item name" value={it.name} onChange={e => setItem(i, 'name', e.target.value)} />
@@ -154,68 +158,70 @@ export default function GoodsReceived() {
                     <input type="number" className="form-control" min="0" value={it.received} onChange={e => setItem(i, 'received', parseInt(e.target.value) || 0)} style={{ border: it.received > it.ordered && it.ordered > 0 ? '1px solid var(--yellow)' : '' }} />
                     <input type="number" className="form-control" min="0" step="0.01" placeholder="0.00" value={it.unit_cost} onChange={e => setItem(i, 'unit_cost', parseFloat(e.target.value) || 0)} />
                     <input className="form-control" placeholder="Lot/Batch#" value={it.lot_batch} onChange={e => setItem(i, 'lot_batch', e.target.value)} />
-                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons">close<\/span><\/button>
-                  <\/div>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}><span className="material-icons">close</span></button>
+                  </div>
                 ))}
-              <\/div>
+              </div>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, marginBottom: 16 }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
-                  <span className="material-icons">add<\/span> Add Item
-                <\/button>
+                  <span className="material-icons">add</span> Add Item
+                </button>
                 <div style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--teal)' }}>
-                  Total Value: <strong>${totalValue.toFixed(2)}<\/strong>
-                <\/div>
-              <\/div>
+                  Total Value: <strong>${totalValue.toFixed(2)}</strong>
+                </div>
+              </div>
 
-              <div className="form-group"><label>NOTES<\/label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} /><\/div>
+              <div className="form-group"><label>NOTES</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} /></div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel<\/button>
+                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">
-                  <span className="material-icons">save<\/span> Save GRN & Update Stock
-                <\/button>
-              <\/div>
-            <\/form>
-          <\/div>
-        <\/div>
+                  <span className="material-icons">save</span> Save GRN & Update Stock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {viewGRN && (
         <div className="overlay" onClick={() => setViewGRN(null)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-title">
-              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>receipt<\/span>
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>receipt</span>
               {viewGRN.grn_number}
-            <\/div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 13 }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Date:<\/span> <strong>{viewGRN.date}<\/strong><\/div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Supplier:<\/span> <strong>{viewGRN.supplier_name || '—'}<\/strong><\/div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Driver:<\/span> {viewGRN.driver || '—'}<\/div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Received By:<\/span> {viewGRN.received_by || '—'}<\/div>
-              {viewGRN.notes && <div style={{ gridColumn: 'span 2', color: 'var(--text-dim)', fontSize: 12 }}>{viewGRN.notes}<\/div>}
-            <\/div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Date:</span> <strong>{viewGRN.date}</strong></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Supplier:</span> <strong>{viewGRN.supplier_name || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Driver:</span> {viewGRN.driver || '—'}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Received By:</span> {viewGRN.received_by || '—'}</div>
+              {viewGRN.notes && <div style={{ gridColumn: 'span 2', color: 'var(--text-dim)', fontSize: 12 }}>{viewGRN.notes}</div>}
+            </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Item<\/th><th>Category<\/th><th>Unit<\/th><th>Ordered<\/th><th>Received<\/th><th>Unit Cost<\/th><th>Total<\/th><th>Lot/Batch<\/th></tr></thead>
+                <thead>
+                  <tr><th>Item</th><th>Category</th><th>Unit</th><th>Ordered</th><th>Received</th><th>Unit Cost</th><th>Total</th><th>Lot/Batch</th></tr>
+                </thead>
                 <tbody>
                   {(typeof viewGRN.items === 'string' ? JSON.parse(viewGRN.items || '[]') : (viewGRN.items || [])).map((it, i) => (
                     <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{it.name}<\/td>
-                      <td>{it.category}<\/td>
-                      <td>{it.unit || 'pcs'}<\/td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{it.ordered || '—'}<\/td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 700 }}>{it.received}<\/td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>${(it.unit_cost || 0).toFixed(2)}<\/td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${((it.received || 0) * (it.unit_cost || 0)).toFixed(2)}<\/td>
-                      <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{it.lot_batch || '—'}<\/td>
-                    <\/tr>
+                      <td style={{ fontWeight: 600 }}>{it.name}</td>
+                      <td>{it.category}</td>
+                      <td>{it.unit || 'pcs'}</td>
+                      <td style={{ fontFamily: 'var(--mono)' }}>{it.ordered || '—'}</td>
+                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 700 }}>{it.received}</td>
+                      <td style={{ fontFamily: 'var(--mono)' }}>${(it.unit_cost || 0).toFixed(2)}</td>
+                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${((it.received || 0) * (it.unit_cost || 0)).toFixed(2)}</td>
+                      <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{it.lot_batch || '—'}</td>
+                    </tr>
                   ))}
-                <\/tbody>
+                </tbody>
               </table>
-            <\/div>
-            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close<\/button><\/div>
-          <\/div>
-        <\/div>
+            </div>
+            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button></div>
+          </div>
+        </div>
       )}
-    <\/div>
+    </div>
   )
 }
