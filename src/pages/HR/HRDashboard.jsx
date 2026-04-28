@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useNavigate } from 'react-router-dom'
+import { useCanView } from '../../hooks/usePermission'
 
 export default function HRDashboard() {
   const navigate = useNavigate()
   const { employees, departments, attendance, certifications, fetchAll } = useHR()
+  const canViewEmployees = useCanView('hr', 'employees')
+  const canViewAttendance = useCanView('hr', 'attendance')
+  
   const [dashboardData, setDashboardData] = useState({
     totalEmployees: 0,
     activeEmployees: 0,
@@ -49,7 +53,7 @@ export default function HRDashboard() {
         deptMap.get(e.department_id).count++
       }
     })
-    const departmentHeadcounts = Array.from(deptMap.values()).sort((a, b) => b.count - a.count)
+    const departmentHeadcounts = Array.from(deptMap.values()).sort((a,b) => b.count - a.count)
 
     const alerts = []
 
@@ -143,12 +147,16 @@ export default function HRDashboard() {
       <div className="page-header">
         <h1 className="page-title">HR Dashboard</h1>
         <div>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/employees')} style={{ marginRight: 8 }}>
-            <span className="material-icons">people</span> Employees
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/attendance')}>
-            <span className="material-icons">schedule</span> Attendance
-          </button>
+          {canViewEmployees && (
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/employees')} style={{ marginRight: 8 }}>
+              <span className="material-icons">people</span> Employees
+            </button>
+          )}
+          {canViewAttendance && (
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/attendance')}>
+              <span className="material-icons">schedule</span> Attendance
+            </button>
+          )}
         </div>
       </div>
 
@@ -166,7 +174,7 @@ export default function HRDashboard() {
         <div className="kpi-card">
           <div className="kpi-label">Overtime Alerts</div>
           <div className="kpi-val" style={{ color: dashboardData.overtimeAlerts > 0 ? 'var(--red)' : 'var(--green)' }}>{dashboardData.overtimeAlerts}</div>
-          <div className="kpi-sub">{'>'}10hrs this week</div>
+          <div className="kpi-sub">>10hrs this week</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Departments</div>
@@ -180,7 +188,9 @@ export default function HRDashboard() {
         <div className="table-wrap">
           <table className="stock-table">
             <thead>
-              <tr><th>Department</th><th>Employees</th><th>% of Total</th></tr>
+              <tr>
+                <th>Department</th><th>Employees</th><th>% of Total</th>
+              </tr>
             </thead>
             <tbody>
               {dashboardData.departmentHeadcounts.map(dept => (
@@ -190,7 +200,11 @@ export default function HRDashboard() {
                   <td>{((dept.count / dashboardData.totalEmployees) * 100).toFixed(1)}%</td>
                 </tr>
               ))}
-              {dashboardData.departmentHeadcounts.length === 0 && <tr><td colSpan="3" className="empty-state">No departments</td></tr>}
+              {dashboardData.departmentHeadcounts.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="empty-state">No departments</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
