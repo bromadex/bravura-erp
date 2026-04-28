@@ -23,18 +23,15 @@ export default function HRDashboard() {
   useEffect(() => {
     if (!employees.length) return
 
-    // Basic KPIs
     const total = employees.length
     const active = employees.filter(e => e.status === 'Active').length
     const inactive = total - active
 
-    // Attendance today
     const today = new Date().toISOString().split('T')[0]
     const todayAttendance = attendance.filter(a => a.date === today && a.clock_in)
     const attendanceToday = todayAttendance.length
     const attendanceRate = active > 0 ? ((attendanceToday / active) * 100).toFixed(1) : 0
 
-    // Overtime alerts – employees with >10 overtime hours this week
     const startOfWeek = new Date()
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
     const weeklyOvertime = {}
@@ -45,7 +42,6 @@ export default function HRDashboard() {
     })
     const overtimeAlerts = Object.values(weeklyOvertime).filter(ot => ot > 10).length
 
-    // Department headcounts
     const deptMap = new Map()
     departments.forEach(d => deptMap.set(d.id, { name: d.name, count: 0 }))
     employees.forEach(e => {
@@ -53,12 +49,10 @@ export default function HRDashboard() {
         deptMap.get(e.department_id).count++
       }
     })
-    const departmentHeadcounts = Array.from(deptMap.values()).sort((a,b) => b.count - a.count)
+    const departmentHeadcounts = Array.from(deptMap.values()).sort((a, b) => b.count - a.count)
 
-    // Smart Alerts
     const alerts = []
 
-    // 1. Missing attendance today
     const activeEmployees = employees.filter(e => e.status === 'Active')
     const attendedIds = new Set(todayAttendance.map(a => a.employee_id))
     const missingAttendance = activeEmployees.filter(e => !attendedIds.has(e.id))
@@ -72,7 +66,6 @@ export default function HRDashboard() {
       })
     }
 
-    // 2. Employees without department
     const noDept = employees.filter(e => !e.department_id)
     if (noDept.length > 0) {
       alerts.push({
@@ -84,7 +77,6 @@ export default function HRDashboard() {
       })
     }
 
-    // 3. Expiring certifications (within 30 days)
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
     const expiringCerts = certifications.filter(c => {
@@ -102,7 +94,6 @@ export default function HRDashboard() {
       })
     }
 
-    // 4. Missing contact info
     const missingContact = employees.filter(e => !e.phone || !e.email)
     if (missingContact.length > 0) {
       alerts.push({
@@ -114,7 +105,6 @@ export default function HRDashboard() {
       })
     }
 
-    // 5. Incomplete profile (missing hire date or designation)
     const incompleteProfile = employees.filter(e => !e.hire_date || !e.designation_id)
     if (incompleteProfile.length > 0) {
       alerts.push({
@@ -126,7 +116,6 @@ export default function HRDashboard() {
       })
     }
 
-    // 6. Overtime threshold exceeded
     if (overtimeAlerts > 0) {
       alerts.push({
         type: 'warning',
@@ -163,7 +152,6 @@ export default function HRDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Total Employees</div>
@@ -178,7 +166,7 @@ export default function HRDashboard() {
         <div className="kpi-card">
           <div className="kpi-label">Overtime Alerts</div>
           <div className="kpi-val" style={{ color: dashboardData.overtimeAlerts > 0 ? 'var(--red)' : 'var(--green)' }}>{dashboardData.overtimeAlerts}</div>
-          <div className="kpi-sub">>10hrs this week</div>
+          <div className="kpi-sub">{'>'}10hrs this week</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Departments</div>
@@ -187,12 +175,13 @@ export default function HRDashboard() {
         </div>
       </div>
 
-      {/* Department Headcounts */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Department Headcounts</h3>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead><tr><th>Department</th><th>Employees</th><th>% of Total</th></tr></thead>
+            <thead>
+              <tr><th>Department</th><th>Employees</th><th>% of Total</th></tr>
+            </thead>
             <tbody>
               {dashboardData.departmentHeadcounts.map(dept => (
                 <tr key={dept.name}>
@@ -207,7 +196,6 @@ export default function HRDashboard() {
         </div>
       </div>
 
-      {/* Smart Alerts Panel */}
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Smart Alerts</h3>
         {dashboardData.alerts.length === 0 ? (
