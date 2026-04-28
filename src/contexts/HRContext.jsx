@@ -1,3 +1,4 @@
+// src/contexts/HRContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -13,46 +14,34 @@ export function HRProvider({ children }) {
   const [skills, setSkills] = useState([])
   const [certifications, setCertifications] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
-  const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
-  // Helper: generate employee number with BRA prefix
+  // ✅ FIXED: Generate unique BRA number by querying the actual max from DB
   const generateEmployeeNumber = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('employees')
       .select('employee_number')
       .ilike('employee_number', 'BRA%')
-      .order('employee_number', { ascending: false })
-      .limit(1)
-    
-    let nextNum = 1
-    if (data && data.length > 0) {
-      const lastNumber = data[0].employee_number
-      const match = lastNumber.match(/BRA(\d+)/)
-      if (match) {
-        nextNum = parseInt(match[1]) + 1
-      }
-    }
-    return `BRA${String(nextNum).padStart(3, '0')}`
-  }
 
-  // Helper: check permission from cache
-  const checkPermission = (module, page, action) => {
-    const permsCache = JSON.parse(localStorage.getItem('user_permissions_cache') || '{}')
-    const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-    if (user.role_id === 'role_super_admin') return true
-    const key = `${module}|${page || ''}`
-    const perm = permsCache[key]
-    if (!perm) return false
-    switch(action) {
-      case 'view': return perm.can_view
-      case 'edit': return perm.can_edit
-      case 'delete': return perm.can_delete
-      case 'approve': return perm.can_approve
-      default: return false
+    if (error) {
+      console.error('Error fetching employee numbers:', error)
+      return 'BRA164'
     }
+
+    let maxNum = 0
+    data?.forEach(emp => {
+      if (emp.employee_number) {
+        const num = parseInt(emp.employee_number.replace('BRA', ''), 10)
+        if (!isNaN(num) && num > maxNum) maxNum = num
+      }
+    })
+
+    // Start from BRA164 if no existing numbers
+    if (maxNum === 0) return 'BRA164'
+    
+    return `BRA${maxNum + 1}`
   }
 
   // Helper: log HR actions
@@ -75,8 +64,32 @@ export function HRProvider({ children }) {
 
   // Helper: create system account
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {
-    const username = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
+    // Generate base username from full name
+    let baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
+    if (!baseUsername) baseUsername = 'user'
+    
+    let username = baseUsername
+    let counter = 1
+    
+    // Ensure username is unique
+    let exists = true
+    while (exists) {
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('username')
+        .eq('username', username)
+        .maybeSingle()
+      
+      if (error || !data) {
+        exists = false
+      } else {
+        counter++
+        username = `${baseUsername}${counter}`
+      }
+    }
+    
     const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
+    
     const { data, error } = await supabase.from('app_users').insert([{
       id: generateId(),
       username,
@@ -89,6 +102,7 @@ export function HRProvider({ children }) {
       employee_id: employeeId,
       created_at: new Date().toISOString()
     }]).select().single()
+    
     if (error) throw error
     await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { roleId })
     return { username, password: rawPassword, userId: data.id }
@@ -107,9 +121,7 @@ export function HRProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [
-        empRes, deptRes, desRes, attRes, skillRes, certRes, auditRes, rolesRes
-      ] = await Promise.all([
+      const [empRes, deptRes, desRes, attRes, skillRes, certRes, auditRes] = await Promise.all([
         supabase.from('employees').select('*').order('name'),
         supabase.from('departments').select('*').order('name'),
         supabase.from('designations').select('*').order('title'),
@@ -117,7 +129,6 @@ export function HRProvider({ children }) {
         supabase.from('employee_skills').select('*'),
         supabase.from('employee_certifications').select('*'),
         supabase.from('hr_audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('roles').select('*').order('name'),
       ])
       if (empRes.data) setEmployees(empRes.data)
       if (deptRes.data) setDepartments(deptRes.data)
@@ -126,7 +137,6 @@ export function HRProvider({ children }) {
       if (skillRes.data) setSkills(skillRes.data)
       if (certRes.data) setCertifications(certRes.data)
       if (auditRes.data) setAuditLogs(auditRes.data)
-      if (rolesRes.data) setRoles(rolesRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load HR data')
@@ -137,13 +147,11 @@ export function HRProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ---- Employees CRUD with permission checks ----
+  // ---- Employees CRUD ----
   const addEmployee = async (employee, createAccount = false, accountRoleId = 'role_viewer') => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to add employees')
-    }
     const id = generateId()
     const employeeNumber = await generateEmployeeNumber()
+    
     const newEmployee = { 
       id, 
       employee_number: employeeNumber,
@@ -151,12 +159,14 @@ export function HRProvider({ children }) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
+    
     let accountInfo = null
     if (createAccount) {
       accountInfo = await createSystemAccount(id, employee.name, accountRoleId)
       newEmployee.system_username = accountInfo.username
       newEmployee.system_user_id = accountInfo.userId
     }
+    
     const { error } = await supabase.from('employees').insert([newEmployee])
     if (error) throw error
     await logHRAction('CREATE_EMPLOYEE', 'employee', id, employee.name, null, employee)
@@ -165,23 +175,14 @@ export function HRProvider({ children }) {
   }
 
   const updateEmployee = async (id, updates) => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to edit employees')
-    }
     const oldEmployee = employees.find(e => e.id === id)
-    const { error } = await supabase
-      .from('employees')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
+    const { error } = await supabase.from('employees').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw error
     await logHRAction('UPDATE_EMPLOYEE', 'employee', id, oldEmployee?.name, oldEmployee, updates)
     await fetchAll()
   }
 
   const deleteEmployee = async (id) => {
-    if (!checkPermission('hr', 'employees', 'delete')) {
-      throw new Error('You do not have permission to delete employees')
-    }
     const emp = employees.find(e => e.id === id)
     if (emp?.system_user_id) {
       await supabase.from('app_users').delete().eq('id', emp.system_user_id)
@@ -193,9 +194,6 @@ export function HRProvider({ children }) {
   }
 
   const setEmployeeStatus = async (id, newStatus) => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to change employee status')
-    }
     const emp = employees.find(e => e.id === id)
     const oldStatus = emp?.status
     if (oldStatus === newStatus) return
@@ -203,11 +201,8 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ---- Departments CRUD with permission checks ----
+  // ---- Departments CRUD ----
   const addDepartment = async (dept) => {
-    if (!checkPermission('hr', 'departments', 'edit')) {
-      throw new Error('You do not have permission to add departments')
-    }
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
     if (error) throw error
@@ -216,9 +211,6 @@ export function HRProvider({ children }) {
   }
 
   const updateDepartment = async (id, updates) => {
-    if (!checkPermission('hr', 'departments', 'edit')) {
-      throw new Error('You do not have permission to edit departments')
-    }
     const oldDept = departments.find(d => d.id === id)
     const { error } = await supabase.from('departments').update(updates).eq('id', id)
     if (error) throw error
@@ -227,9 +219,6 @@ export function HRProvider({ children }) {
   }
 
   const deleteDepartment = async (id) => {
-    if (!checkPermission('hr', 'departments', 'delete')) {
-      throw new Error('You do not have permission to delete departments')
-    }
     const dept = departments.find(d => d.id === id)
     const employeesInDept = employees.filter(e => e.department_id === id)
     if (employeesInDept.length > 0) {
@@ -241,11 +230,8 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Designations CRUD with permission checks ----
+  // ---- Designations CRUD ----
   const addDesignation = async (des) => {
-    if (!checkPermission('hr', 'designations', 'edit')) {
-      throw new Error('You do not have permission to add designations')
-    }
     const id = generateId()
     const { error } = await supabase.from('designations').insert([{ id, ...des, created_at: new Date().toISOString() }])
     if (error) throw error
@@ -253,82 +239,54 @@ export function HRProvider({ children }) {
   }
 
   const updateDesignation = async (id, updates) => {
-    if (!checkPermission('hr', 'designations', 'edit')) {
-      throw new Error('You do not have permission to edit designations')
-    }
     const { error } = await supabase.from('designations').update(updates).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
   const deleteDesignation = async (id) => {
-    if (!checkPermission('hr', 'designations', 'delete')) {
-      throw new Error('You do not have permission to delete designations')
-    }
     const { error } = await supabase.from('designations').delete().eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
-  // ---- Attendance Methods with permission checks ----
+  // ---- Attendance Methods ----
   const clockIn = async (employeeId, date, shiftType = 'Day') => {
-    if (!checkPermission('hr', 'attendance', 'edit')) {
-      toast.error('You do not have permission to clock in')
-      return
-    }
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) {
       toast.error(statusCheck.reason)
       return
     }
-    
     const existing = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
     if (existing) throw new Error('Already clocked in for today')
-    
     const id = generateId()
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    const { error } = await supabase.from('employee_attendance').insert([{
-      id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType
-    }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType }])
     if (error) throw error
     await fetchAll()
     await logHRAction('CLOCK_IN', 'attendance', id, `${employeeId} on ${date}`, null, { time })
   }
 
   const clockOut = async (employeeId, date) => {
-    if (!checkPermission('hr', 'attendance', 'edit')) {
-      toast.error('You do not have permission to clock out')
-      return
-    }
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) {
       toast.error(statusCheck.reason)
       return
     }
-    
     const record = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
     if (!record) throw new Error('No open clock‑in record found')
-    
     const clockInTime = record.clock_in
     const now = new Date()
     const clockOutTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    
     const [inH, inM] = clockInTime.split(':').map(Number)
     const [outH, outM] = clockOutTime.split(':').map(Number)
     let totalMins = (outH * 60 + outM) - (inH * 60 + inM)
     if (totalMins < 0) totalMins += 24 * 60
     const totalHours = totalMins / 60
     const dailyOvertime = calculateDailyOvertime(clockInTime, clockOutTime)
-    
-    const { error } = await supabase
-      .from('employee_attendance')
-      .update({ 
-        clock_out: clockOutTime, 
-        total_hours: totalHours, 
-        overtime_hours: dailyOvertime,
-        updated_at: new Date().toISOString() 
-      })
+    const { error } = await supabase.from('employee_attendance')
+      .update({ clock_out: clockOutTime, total_hours: totalHours, overtime_hours: dailyOvertime, updated_at: new Date().toISOString() })
       .eq('id', record.id)
     if (error) throw error
     await fetchAll()
@@ -336,20 +294,14 @@ export function HRProvider({ children }) {
   }
 
   const addAttendanceRecord = async (record) => {
-    if (!checkPermission('hr', 'attendance', 'edit')) {
-      throw new Error('You do not have permission to add attendance records')
-    }
     const id = generateId()
     const { error } = await supabase.from('employee_attendance').insert([{ id, ...record }])
     if (error) throw error
     await fetchAll()
   }
 
-  // ---- Skills Methods with permission checks ----
+  // ---- Skills Methods ----
   const addSkill = async (employeeId, skillName, proficiency = 'Intermediate') => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to add skills')
-    }
     const id = generateId()
     const { error } = await supabase.from('employee_skills').insert([{ id, employee_id: employeeId, skill_name: skillName, proficiency }])
     if (error) throw error
@@ -357,19 +309,13 @@ export function HRProvider({ children }) {
   }
 
   const deleteSkill = async (id) => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to delete skills')
-    }
     const { error } = await supabase.from('employee_skills').delete().eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
-  // ---- Certifications Methods with permission checks ----
+  // ---- Certifications Methods ----
   const addCertification = async (cert) => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to add certifications')
-    }
     const id = generateId()
     const { error } = await supabase.from('employee_certifications').insert([{ id, ...cert, created_at: new Date().toISOString() }])
     if (error) throw error
@@ -377,47 +323,36 @@ export function HRProvider({ children }) {
   }
 
   const updateCertification = async (id, updates) => {
-    if (!checkPermission('hr', 'employees', 'edit')) {
-      throw new Error('You do not have permission to edit certifications')
-    }
     const { error } = await supabase.from('employee_certifications').update(updates).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
   const deleteCertification = async (id) => {
-    if (!checkPermission('hr', 'employees', 'delete')) {
-      throw new Error('You do not have permission to delete certifications')
-    }
     const { error } = await supabase.from('employee_certifications').delete().eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
-  // ---- Document Storage Helpers (no permission checks - read only) ----
+  // ---- Document Storage Helpers ----
   const getEmployeeDocuments = async (employeeId) => {
     try {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
-      
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
         return []
       }
-      
       if (!data || !data.length) return []
-      
       return data.map(file => {
         const pathParts = file.name.split('/')
         const category = pathParts[pathParts.length - 2] || 'general'
-        const { data: { publicUrl } } = supabase.storage
-          .from('hr-documents')
-          .getPublicUrl(file.name)
+        const { data: { publicUrl } } = supabase.storage.from('hr-documents').getPublicUrl(file.name)
         return {
           name: file.name.split('/').pop(),
           path: file.name,
-          category: category,
+          category,
           url: publicUrl,
           size: file.metadata?.size,
           created_at: file.created_at
@@ -452,159 +387,9 @@ export function HRProvider({ children }) {
     return { totalHours, totalOvertime, recordCount: weekRecords.length }
   }
 
-  // ---- Role & Permission Management (with can_manage_permissions check) ----
-  const checkManagePermissions = () => {
-    const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-    if (user.role_id === 'role_super_admin') return true
-    return user.can_manage_permissions === true
-  }
-
-  const getRoles = async () => {
-    const { data, error } = await supabase.from('roles').select('*').order('name')
-    if (error) throw error
-    return data
-  }
-
-  const createRole = async (role) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to manage roles')
-    const id = generateId()
-    const { error } = await supabase.from('roles').insert([{ id, ...role, created_at: new Date().toISOString() }])
-    if (error) throw error
-    await logHRAction('CREATE_ROLE', 'role', id, role.name)
-    await fetchAll()
-    return id
-  }
-
-  const updateRole = async (id, updates) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to manage roles')
-    const { error } = await supabase.from('roles').update(updates).eq('id', id)
-    if (error) throw error
-    await logHRAction('UPDATE_ROLE', 'role', id, updates.name)
-    await fetchAll()
-  }
-
-  const deleteRole = async (id) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to delete roles')
-    const { data: users } = await supabase.from('app_users').select('id').eq('role_id', id).limit(1)
-    if (users && users.length > 0) {
-      throw new Error('Cannot delete role assigned to users')
-    }
-    const { error } = await supabase.from('roles').delete().eq('id', id)
-    if (error) throw error
-    await logHRAction('DELETE_ROLE', 'role', id, '')
-    await fetchAll()
-  }
-
-  const getRolePermissions = async (roleId) => {
-    const { data, error } = await supabase.from('role_permissions').select('*').eq('role_id', roleId)
-    if (error) throw error
-    return data
-  }
-
-  const setRolePermissions = async (roleId, permissionsList) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to change role permissions')
-    await supabase.from('role_permissions').delete().eq('role_id', roleId)
-    
-    if (permissionsList.length > 0) {
-      const { error } = await supabase.from('role_permissions').insert(
-        permissionsList.map(p => ({
-          id: generateId(),
-          role_id: roleId,
-          module_name: p.module_name,
-          page_name: p.page_name || null,
-          can_view: p.can_view || false,
-          can_edit: p.can_edit || false,
-          can_delete: p.can_delete || false,
-          can_approve: p.can_approve || false,
-          created_at: new Date().toISOString()
-        }))
-      )
-      if (error) throw error
-    }
-    await logHRAction('UPDATE_ROLE_PERMISSIONS', 'role', roleId, 'Updated permissions')
-    await fetchAll()
-  }
-
-  const getUserPermissions = async (userId) => {
-    const { data, error } = await supabase.from('user_permissions').select('*').eq('user_id', userId)
-    if (error) throw error
-    return data
-  }
-
-  const setUserPermissions = async (userId, permissionsList) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to change user permissions')
-    await supabase.from('user_permissions').delete().eq('user_id', userId)
-    
-    if (permissionsList.length > 0) {
-      const { error } = await supabase.from('user_permissions').insert(
-        permissionsList.map(p => ({
-          id: generateId(),
-          user_id: userId,
-          module_name: p.module_name,
-          page_name: p.page_name || null,
-          can_view: p.can_view || false,
-          can_edit: p.can_edit || false,
-          can_delete: p.can_delete || false,
-          can_approve: p.can_approve || false,
-          created_at: new Date().toISOString()
-        }))
-      )
-      if (error) throw error
-    }
-    await logHRAction('UPDATE_USER_PERMISSIONS', 'user', userId, 'Updated permissions')
-    await fetchAll()
-  }
-
-  const assignUserRole = async (userId, roleId) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to assign roles')
-    const { error } = await supabase.from('app_users').update({ role_id: roleId }).eq('id', userId)
-    if (error) throw error
-    await logHRAction('ASSIGN_ROLE', 'user', userId, `Role assigned: ${roleId}`)
-    await fetchAll()
-  }
-
-  const getUserRole = async (userId) => {
-    const { data, error } = await supabase.from('app_users').select('role_id').eq('id', userId).single()
-    if (error) throw error
-    return data?.role_id
-  }
-
-  const setUserActive = async (userId, isActive) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to change user status')
-    const { error } = await supabase.from('app_users').update({ is_active: isActive }).eq('id', userId)
-    if (error) throw error
-    await logHRAction(isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', 'user', userId, `is_active: ${isActive}`)
-    await fetchAll()
-  }
-
-  const resetUserPassword = async (userId) => {
-    if (!checkManagePermissions()) throw new Error('You do not have permission to reset passwords')
-    const tempPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
-    const { error } = await supabase
-      .from('app_users')
-      .update({ 
-        password_plain: tempPassword,
-        password_hash: btoa(tempPassword),
-        must_change_password: true 
-      })
-      .eq('id', userId)
-    if (error) throw error
-    await logHRAction('RESET_PASSWORD', 'user', userId, 'Password reset')
-    return tempPassword
-  }
-
-  const getSystemUsers = async () => {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('*, employees(name)')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data
-  }
-
   return (
     <HRContext.Provider value={{
-      employees, departments, designations, attendance, skills, certifications, auditLogs, roles, loading,
+      employees, departments, designations, attendance, skills, certifications, auditLogs, loading,
       addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus,
       addDepartment, updateDepartment, deleteDepartment,
       addDesignation, updateDesignation, deleteDesignation,
@@ -615,12 +400,6 @@ export function HRProvider({ children }) {
       getEmployeeDocuments,
       getWeeklyHours,
       canPerformAttendance,
-      getRoles, createRole, updateRole, deleteRole,
-      getRolePermissions, setRolePermissions,
-      getUserPermissions, setUserPermissions,
-      assignUserRole, getUserRole,
-      setUserActive, resetUserPassword,
-      getSystemUsers,
       logHRAction,
       fetchAll,
     }}>
