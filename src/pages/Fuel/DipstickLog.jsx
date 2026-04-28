@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 export default function DipstickLog() {
   const { dipstickLog, addDipstick, getLitresFromCm, loading, fetchAll } = useFuel()
   const { user } = useAuth()
+  const canEdit = useCanEdit('fuel', 'dipstick')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -74,12 +76,14 @@ export default function DipstickLog() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Dipstick Log</h1>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <span className="material-icons">straighten</span> New Record
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <span className="material-icons">straighten</span> New Record
+          </button>
+        )}
       </div>
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead><tr><th>Date</th><th>Start (cm)</th><th>End (cm)</th><th>Start (L)</th><th>End (L)</th><th>Actual (L)</th><th>Flowmeter (L)</th><th>Error (L)</th><th>Error %</th><th>Done By</th></tr></thead>
           <tbody>
             {loading ? <tr><td colSpan="10">Loading...</td></tr> : dipstickLog.length === 0 ? <tr><td colSpan="10">No records</td></tr> : dipstickLog.map(r => (
@@ -102,10 +106,14 @@ export default function DipstickLog() {
             <div className="modal-title">New <span>Dipstick Record</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row"><div className="form-group"><label>DATE</label><input type="date" className="form-control" required value={form.date} onChange={e => setForm({...form, date: e.target.value})} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Dipstick Start (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_start} onChange={e => setForm({...form, dip_start: e.target.value})} onBlur={handleCalculate} /></div>
-              <div className="form-group"><label>Dipstick End (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_end} onChange={e => setForm({...form, dip_end: e.target.value})} onBlur={handleCalculate} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Flowmeter Start (L)</label><input type="number" step="0.1" className="form-control" value={form.fm_start} onChange={e => setForm({...form, fm_start: e.target.value})} onBlur={handleCalculate} /></div>
-              <div className="form-group"><label>Flowmeter End (L)</label><input type="number" step="0.1" className="form-control" value={form.fm_end} onChange={e => setForm({...form, fm_end: e.target.value})} onBlur={handleCalculate} /></div></div>
+              <div className="form-row">
+                <div className="form-group"><label>Dipstick Start (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_start} onChange={e => setForm({...form, dip_start: e.target.value})} onBlur={handleCalculate} /></div>
+                <div className="form-group"><label>Dipstick End (cm)</label><input type="number" step="0.01" className="form-control" value={form.dip_end} onChange={e => setForm({...form, dip_end: e.target.value})} onBlur={handleCalculate} /></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Flowmeter Start (L)</label><input type="number" step="0.1" className="form-control" value={form.fm_start} onChange={e => setForm({...form, fm_start: e.target.value})} onBlur={handleCalculate} /></div>
+                <div className="form-group"><label>Flowmeter End (L)</label><input type="number" step="0.1" className="form-control" value={form.fm_end} onChange={e => setForm({...form, fm_end: e.target.value})} onBlur={handleCalculate} /></div>
+              </div>
               {calculation && (
                 <div style={{ background: 'var(--surface2)', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
                   <div>Start: <strong>{calculation.startL.toFixed(0)} L</strong> | End: <strong>{calculation.endL.toFixed(0)} L</strong></div>
