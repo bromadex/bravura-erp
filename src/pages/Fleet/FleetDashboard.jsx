@@ -1,9 +1,13 @@
 import { useFleet } from '../../contexts/FleetContext'
 import { useNavigate } from 'react-router-dom'
+import { useCanView } from '../../hooks/usePermission'
 
 export default function FleetDashboard() {
   const navigate = useNavigate()
   const { vehicles, generators, earthMovers, getOverdueAlerts, getVehicleFuelEfficiency, getHealthScore, getHealthStatus } = useFleet()
+  const canViewVehicles = useCanView('fleet', 'vehicles')
+  const canViewGenerators = useCanView('fleet', 'generators')
+  const canViewHeavyEquipment = useCanView('fleet', 'heavy-equipment')
   const alerts = getOverdueAlerts()
 
   const totalVehicles = vehicles.length
@@ -47,9 +51,9 @@ export default function FleetDashboard() {
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚙️ Quick Actions</h3>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={() => navigate('/module/fleet/vehicles')}>Manage Vehicles</button>
-          <button className="btn btn-primary" onClick={() => navigate('/module/fleet/generators')}>Manage Generators</button>
-          <button className="btn btn-primary" onClick={() => navigate('/module/fleet/heavy-equipment')}>Manage Heavy Equipment</button>
+          {canViewVehicles && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/vehicles')}>Manage Vehicles</button>}
+          {canViewGenerators && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/generators')}>Manage Generators</button>}
+          {canViewHeavyEquipment && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/heavy-equipment')}>Manage Heavy Equipment</button>}
         </div>
       </div>
     </div>
