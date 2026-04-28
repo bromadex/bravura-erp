@@ -1,36 +1,32 @@
+// src/components/PermissionRoute.jsx
+// 🔧 TEMPORARY: All permission checks DISABLED – always renders children
+
+import { Navigate } from 'react-router-dom'
 import { usePermission } from '../contexts/PermissionContext'
+import { useAuth } from '../contexts/AuthContext'
 
-// Convenience hooks for common permission checks
-export const useCanView = (module, page = null) => {
-  const { canView } = usePermission()
-  return canView(module, page)
-}
+export default function PermissionRoute({ children, module, page, redirectTo = '/access-denied' }) {
+  const { user, loading } = useAuth()
 
-export const useCanEdit = (module, page = null) => {
-  const { canEdit } = usePermission()
-  return canEdit(module, page)
-}
+  // 🔧 TEMPORARY: No permission checks – just auth check
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        color: 'var(--text-dim)',
+      }}>
+        Loading…
+      </div>
+    )
+  }
 
-export const useCanDelete = (module, page = null) => {
-  const { canDelete } = usePermission()
-  return canDelete(module, page)
-}
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
 
-export const useCanApprove = (module, page = null) => {
-  const { canApprove } = usePermission()
-  return canApprove(module, page)
-}
-
-export const useCanManagePermissions = () => {
-  const { canManagePermissions } = usePermission()
-  return canManagePermissions()
-}
-
-// Default export with all hooks
-export default {
-  useCanView,
-  useCanEdit,
-  useCanDelete,
-  useCanApprove,
-  useCanManagePermissions,
+  // Always render children – no permission check
+  return children
 }
