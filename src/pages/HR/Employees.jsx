@@ -508,7 +508,7 @@ export default function Employees() {
                   <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
-                  <td><span className="badge bg-blue">{att.shift_type}</span><tr>
+                  <td><span className="badge bg-blue">{att.shift_type}</span></td>
                   <td>{att.total_hours?.toFixed(1) || '—'}</td>
                   <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
