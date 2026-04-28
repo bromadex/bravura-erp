@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { usePermission } from '../../contexts/PermissionContext'
 
-const MODULE_NAV = {
+const ALL_MODULES = {
   dashboard: {
     label: 'Dashboard', icon: 'dashboard', color: '#f4a261',
     sections: [
@@ -116,7 +117,26 @@ const MODULE_NAV = {
 export default function Sidebar({ module }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const config = MODULE_NAV[module]
+  const { canView } = usePermission()
+  
+  // Filter module configuration based on permissions
+  const config = (() => {
+    const fullConfig = ALL_MODULES[module]
+    if (!fullConfig) return null
+    
+    // Filter sections and pages based on canView permission
+    const filteredSections = fullConfig.sections
+      .map(section => {
+        const filteredPages = section.pages.filter(page => canView(module, page.id))
+        if (filteredPages.length === 0) return null
+        return { ...section, pages: filteredPages }
+      })
+      .filter(section => section !== null)
+    
+    if (filteredSections.length === 0) return null
+    
+    return { ...fullConfig, sections: filteredSections }
+  })()
 
   const storageKey = `sidebar_exp_${module}`
   const [expanded, setExpanded] = useState(() => {
