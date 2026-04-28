@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 export default function Suppliers() {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier, loading } = useProcurement()
+  const canEdit = useCanEdit('procurement', 'suppliers')
+  const canDelete = useCanDelete('procurement', 'suppliers')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({
@@ -53,41 +56,58 @@ export default function Suppliers() {
     }
   }
 
+  const colSpan = canEdit ? 8 : 7
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Suppliers</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}>
-          <span className="material-icons">add</span> Add Supplier
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => openModal()}>
+            <span className="material-icons">add</span> Add Supplier
+          </button>
+        )}
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
-              <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Terms</th><th>Lead Time</th><th>Status</th><th></th>
+              <th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Terms</th><th>Lead Time</th><th>Status</th>
+              {canEdit && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8">Loading...</td></tr>
+              <tr>
+                <td colSpan={colSpan} style={{ textAlign: 'center', padding: 40 }}>Loading...</td>
+              </tr>
             ) : suppliers.length === 0 ? (
-              <tr><td colSpan="8">No suppliers</td></tr>
+              <tr>
+                <td colSpan={colSpan} style={{ textAlign: 'center', padding: 40 }}>No suppliers</td>
+              </tr>
             ) : (
               suppliers.map(s => (
                 <tr key={s.id}>
-                  <td><strong>{s.name}</strong></td>
+                  <td style={{ fontWeight: 600 }}>{s.name}</td>
                   <td>{s.contact_person || '-'}</td>
                   <td>{s.phone || '-'}</td>
                   <td>{s.email || '-'}</td>
                   <td>{s.payment_terms || '-'}</td>
                   <td>{s.lead_time_days || 0} days</td>
                   <td><span className="badge bg-good">{s.status}</span></td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => openModal(s)}><span className="material-icons">edit</span></button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id, s.name)}><span className="material-icons">delete</span></button>
-                  </td>
+                  {canEdit && (
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openModal(s)}>
+                        <span className="material-icons">edit</span>
+                      </button>
+                      {canDelete && (
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id, s.name)}>
+                          <span className="material-icons">delete</span>
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -106,7 +126,7 @@ export default function Suppliers() {
               </div>
               <div className="form-row">
                 <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-                <div className="form-group"><label>Email</label><input className="form-control" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+                <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
               </div>
               <div className="form-group"><label>Address</label><textarea className="form-control" rows="2" value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></div>
               <div className="form-row">
