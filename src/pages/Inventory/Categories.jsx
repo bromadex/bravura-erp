@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 const getMaterialIcon = (name) => {
@@ -17,6 +18,8 @@ export default function Categories() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [newName, setNewName] = useState('')
+  const canEdit = useCanEdit('inventory', 'categories')
+  const canDelete = useCanDelete('inventory', 'categories')
 
   useEffect(() => { fetchCategories() }, [])
 
@@ -52,9 +55,11 @@ export default function Categories() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Categories</h1>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
-          <span className="material-icons">add</span> Add Category
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+            <span className="material-icons">add</span> Add Category
+          </button>
+        )}
       </div>
 
       <div className="table-wrap">
@@ -63,14 +68,14 @@ export default function Categories() {
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
               <th style={{ width: 40, padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Icon</th>
               <th style={{ padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Category Name</th>
-              <th style={{ width: 40, padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Action</th>
+              {canDelete && <th style={{ width: 40, padding: '4px 2px', textAlign: 'left', fontSize: 10 }}>Action</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="3" style={{ padding: 16, textAlign: 'center' }}>Loading...</td></tr>
+              <tr><td colSpan={canDelete ? 3 : 2} style={{ padding: 16, textAlign: 'center' }}>Loading...<\/td><\/tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan="3" style={{ padding: 16, textAlign: 'center' }}>No categories</td></tr>
+              <tr><td colSpan={canDelete ? 3 : 2} style={{ padding: 16, textAlign: 'center' }}>No categories<\/td><\/tr>
             ) : (
               categories.map(cat => (
                 <tr key={cat.name} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -78,39 +83,34 @@ export default function Categories() {
                     <span className="material-icons" style={{ fontSize: 18, color: 'var(--gold)' }}>
                       {cat.icon || getMaterialIcon(cat.name)}
                     </span>
-                  </td>
-                  <td style={{ padding: '4px 2px', fontWeight: 500 }}>{cat.name}</td>
-                  <td style={{ padding: '4px 2px' }}>
-                    <button onClick={() => handleDelete(cat.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
-                      <span className="material-icons" style={{ fontSize: 16, color: 'var(--red)' }}>delete</span>
-                    </button>
-                  </td>
-                </tr>
+                  <\/td>
+                  <td style={{ padding: '4px 2px', fontWeight: 500 }}>{cat.name}<\/td>
+                  {canDelete && (
+                    <td style={{ padding: '4px 2px' }}>
+                      <button onClick={() => handleDelete(cat.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                        <span className="material-icons" style={{ fontSize: 16, color: 'var(--red)' }}>delete<\/span>
+                      <\/button>
+                    <\/td>
+                  )}
+                <\/tr>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          <\/tbody>
+        <\/table>
+      <\/div>
 
       {showModal && (
         <div className="overlay" onClick={() => setShowModal(false)}>
           <div className="modal" style={{ maxWidth: 320, padding: 16 }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Add Category</div>
-            <input
-              className="form-control"
-              placeholder="Category name"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              style={{ padding: '6px 8px', fontSize: 13, marginBottom: 12 }}
-              autoFocus
-            />
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Add Category<\/div>
+            <input className="form-control" placeholder="Category name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '6px 8px', fontSize: 13, marginBottom: 12 }} autoFocus />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={handleAdd}>Add</button>
-            </div>
-          </div>
-        </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(false)}>Cancel<\/button>
+              <button className="btn btn-primary btn-sm" onClick={handleAdd}>Add<\/button>
+            <\/div>
+          <\/div>
+        <\/div>
       )}
-    </div>
+    <\/div>
   )
 }
