@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { PermissionProvider } from './contexts/PermissionContext'
 import { InventoryProvider } from './contexts/InventoryContext'
 import { ProcurementProvider } from './contexts/ProcurementContext'
 import { FuelProvider } from './contexts/FuelContext'
@@ -9,6 +10,8 @@ import { HRProvider } from './contexts/HRContext'
 import Login from './pages/Login'
 import HomeGrid from './pages/HomeGrid'
 import Layout from './components/layout/Layout'
+import PermissionRoute from './components/PermissionRoute'
+import AccessDenied from './pages/Errors/AccessDenied'
 
 // Inventory Pages
 import StockBalance from './pages/Inventory/StockBalance'
@@ -55,7 +58,6 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// Placeholder for other modules that are not yet built
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -87,12 +89,27 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
+      <Route path="/access-denied" element={<AccessDenied />} />
 
       {/* Dashboard placeholder */}
-      <Route path="/module/dashboard" element={<ProtectedRoute><ModulePlaceholder module="dashboard" page="overview" /></ProtectedRoute>} />
+      <Route path="/module/dashboard" element={
+        <ProtectedRoute>
+          <PermissionRoute module="dashboard" page="overview">
+            <ModulePlaceholder module="dashboard" page="overview" />
+          </PermissionRoute>
+        </ProtectedRoute>
+      } />
 
       {/* INVENTORY */}
-      <Route path="/module/inventory" element={<ProtectedRoute><InventoryProvider><Layout module="inventory" /></InventoryProvider></ProtectedRoute>}>
+      <Route path="/module/inventory" element={
+        <ProtectedRoute>
+          <PermissionRoute module="inventory" page="stock-balance">
+            <InventoryProvider>
+              <Layout module="inventory" />
+            </InventoryProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index element={<StockBalance />} />
         <Route path="stock-balance" element={<StockBalance />} />
         <Route path="stock-in" element={<StockIn />} />
@@ -103,7 +120,15 @@ function AppRoutes() {
       </Route>
 
       {/* PROCUREMENT */}
-      <Route path="/module/procurement" element={<ProtectedRoute><ProcurementProvider><Layout module="procurement" /></ProcurementProvider></ProtectedRoute>}>
+      <Route path="/module/procurement" element={
+        <ProtectedRoute>
+          <PermissionRoute module="procurement" page="suppliers">
+            <ProcurementProvider>
+              <Layout module="procurement" />
+            </ProcurementProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index element={<Suppliers />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="store-requisitions" element={<StoreRequisitions />} />
@@ -115,11 +140,13 @@ function AppRoutes() {
       {/* FUEL MANAGEMENT */}
       <Route path="/module/fuel" element={
         <ProtectedRoute>
-          <ProcurementProvider>
-            <FuelProvider>
-              <Layout module="fuel" />
-            </FuelProvider>
-          </ProcurementProvider>
+          <PermissionRoute module="fuel" page="tanks">
+            <ProcurementProvider>
+              <FuelProvider>
+                <Layout module="fuel" />
+              </FuelProvider>
+            </ProcurementProvider>
+          </PermissionRoute>
         </ProtectedRoute>
       }>
         <Route index element={<FuelTanks />} />
@@ -133,9 +160,11 @@ function AppRoutes() {
       {/* FLEET & ASSETS */}
       <Route path="/module/fleet" element={
         <ProtectedRoute>
-          <FleetProvider>
-            <Layout module="fleet" />
-          </FleetProvider>
+          <PermissionRoute module="fleet" page="dashboard">
+            <FleetProvider>
+              <Layout module="fleet" />
+            </FleetProvider>
+          </PermissionRoute>
         </ProtectedRoute>
       }>
         <Route index element={<FleetDashboard />} />
@@ -150,9 +179,11 @@ function AppRoutes() {
       {/* HUMAN RESOURCES */}
       <Route path="/module/hr" element={
         <ProtectedRoute>
-          <HRProvider>
-            <Layout module="hr" />
-          </HRProvider>
+          <PermissionRoute module="hr" page="dashboard">
+            <HRProvider>
+              <Layout module="hr" />
+            </HRProvider>
+          </PermissionRoute>
         </ProtectedRoute>
       }>
         <Route index element={<HRDashboard />} />
@@ -168,7 +199,13 @@ function AppRoutes() {
 
       {/* OTHER MODULES – placeholders */}
       {OTHER_MODULES.map(mod => (
-        <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><Layout module={mod.id} /></ProtectedRoute>}>
+        <Route key={mod.id} path={`/module/${mod.id}`} element={
+          <ProtectedRoute>
+            <PermissionRoute module={mod.id} page={mod.pages[0]}>
+              <Layout module={mod.id} />
+            </PermissionRoute>
+          </ProtectedRoute>
+        }>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
           {mod.pages.map(page => <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />)}
         </Route>
@@ -182,14 +219,16 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <Toaster position="top-right" toastOptions={{
-          style: { background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border2)' },
-          success: { iconTheme: { primary:'var(--green)', secondary:'var(--surface)' } },
-          error: { iconTheme: { primary:'var(--red)', secondary:'var(--surface)' } },
-        }} />
-      </BrowserRouter>
+      <PermissionProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster position="top-right" toastOptions={{
+            style: { background:'var(--surface)', color:'var(--text)', border:'1px solid var(--border2)' },
+            success: { iconTheme: { primary:'var(--green)', secondary:'var(--surface)' } },
+            error: { iconTheme: { primary:'var(--red)', secondary:'var(--surface)' } },
+          }} />
+        </BrowserRouter>
+      </PermissionProvider>
     </AuthProvider>
   )
 }
