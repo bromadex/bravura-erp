@@ -1,130 +1,168 @@
 // src/components/layout/Sidebar.jsx
-//
-// FIX: use `const { canView } = usePermission()` then call canView(module, page).
-// Never do `const canView = useCanView()` here – that returns a boolean, not a function.
+// ✅ Uses real permissions from PermissionContext
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { usePermission } from '../../contexts/PermissionContext'
 
-// Full module / page manifest.  Sections without any visible page are hidden automatically.
+// Full module / page manifest
 const ALL_MODULES = {
   dashboard: {
-    label: 'Dashboard', icon: 'dashboard', color: '#f4a261',
-    sections: [
-      { label: 'Overview', pages: [
-        { id: 'overview', label: 'Dashboard', icon: 'dashboard' },
-      ]},
-    ],
+    label: 'Dashboard',
+    icon: 'dashboard',
+    color: '#f4a261',
+    sections: [{ label: 'Overview', pages: [{ id: 'overview', label: 'Dashboard', icon: 'dashboard' }] }],
   },
   procurement: {
-    label: 'Procurement', icon: 'shopping_cart', color: '#a78bfa',
+    label: 'Procurement',
+    icon: 'shopping_cart',
+    color: '#a78bfa',
     sections: [
-      { label: 'Purchasing', pages: [
-        { id: 'suppliers',              label: 'Suppliers',              icon: 'store' },
-        { id: 'store-requisitions',     label: 'Store Requisitions',     icon: 'assignment' },
-        { id: 'purchase-requisitions',  label: 'Purchase Requisitions',  icon: 'request_quote' },
-        { id: 'purchase-orders',        label: 'Purchase Orders',        icon: 'shopping_bag' },
-        { id: 'goods-received',         label: 'Goods Received',         icon: 'move_to_inbox' },
-      ]},
+      {
+        label: 'Purchasing',
+        pages: [
+          { id: 'suppliers', label: 'Suppliers', icon: 'store' },
+          { id: 'store-requisitions', label: 'Store Requisitions', icon: 'assignment' },
+          { id: 'purchase-requisitions', label: 'Purchase Requisitions', icon: 'request_quote' },
+          { id: 'purchase-orders', label: 'Purchase Orders', icon: 'shopping_bag' },
+          { id: 'goods-received', label: 'Goods Received', icon: 'move_to_inbox' },
+        ],
+      },
     ],
   },
   inventory: {
-    label: 'Inventory', icon: 'inventory', color: '#2dd4bf',
+    label: 'Inventory',
+    icon: 'inventory',
+    color: '#2dd4bf',
     sections: [
-      { label: 'Stock Management', pages: [
-        { id: 'stock-balance', label: 'Stock Balance', icon: 'list_alt' },
-        { id: 'stock-in',      label: 'Stock In',      icon: 'add_circle' },
-        { id: 'stock-out',     label: 'Stock Out',     icon: 'remove_circle' },
-        { id: 'transactions',  label: 'Transactions',  icon: 'swap_horiz' },
-        { id: 'stock-taking',  label: 'Stock Taking',  icon: 'fact_check' },
-        { id: 'categories',    label: 'Categories',    icon: 'category' },
-      ]},
+      {
+        label: 'Stock Management',
+        pages: [
+          { id: 'stock-balance', label: 'Stock Balance', icon: 'list_alt' },
+          { id: 'stock-in', label: 'Stock In', icon: 'add_circle' },
+          { id: 'stock-out', label: 'Stock Out', icon: 'remove_circle' },
+          { id: 'transactions', label: 'Transactions', icon: 'swap_horiz' },
+          { id: 'stock-taking', label: 'Stock Taking', icon: 'fact_check' },
+          { id: 'categories', label: 'Categories', icon: 'category' },
+        ],
+      },
     ],
   },
   logistics: {
-    label: 'Logistics', icon: 'local_shipping', color: '#60a5fa',
+    label: 'Logistics',
+    icon: 'local_shipping',
+    color: '#60a5fa',
     sections: [
-      { label: 'Operations', pages: [
-        { id: 'goods-received', label: 'Goods Received', icon: 'move_to_inbox' },
-        { id: 'batch-plant',    label: 'Batch Plant',    icon: 'factory' },
-        { id: 'campsite',       label: 'Campsite',       icon: 'cabin' },
-      ]},
+      {
+        label: 'Operations',
+        pages: [
+          { id: 'goods-received', label: 'Goods Received', icon: 'move_to_inbox' },
+          { id: 'batch-plant', label: 'Batch Plant', icon: 'factory' },
+          { id: 'campsite', label: 'Campsite', icon: 'cabin' },
+        ],
+      },
     ],
   },
   fuel: {
-    label: 'Fuel Management', icon: 'local_gas_station', color: '#fbbf24',
+    label: 'Fuel Management',
+    icon: 'local_gas_station',
+    color: '#fbbf24',
     sections: [
-      { label: 'Fuel Operations', pages: [
-        { id: 'tanks',      label: 'Fuel Tanks',    icon: 'water' },
-        { id: 'dipstick',   label: 'Dipstick Log',  icon: 'straighten' },
-        { id: 'issuance',   label: 'Fuel Issuance', icon: 'local_gas_station' },
-        { id: 'deliveries', label: 'Deliveries',    icon: 'local_shipping' },
-        { id: 'reports',    label: 'Fuel Reports',  icon: 'bar_chart' },
-      ]},
+      {
+        label: 'Fuel Operations',
+        pages: [
+          { id: 'tanks', label: 'Fuel Tanks', icon: 'water' },
+          { id: 'dipstick', label: 'Dipstick Log', icon: 'straighten' },
+          { id: 'issuance', label: 'Fuel Issuance', icon: 'local_gas_station' },
+          { id: 'deliveries', label: 'Deliveries', icon: 'local_shipping' },
+          { id: 'reports', label: 'Fuel Reports', icon: 'bar_chart' },
+        ],
+      },
     ],
   },
   fleet: {
-    label: 'Fleet & Assets', icon: 'directions_car', color: '#34d399',
+    label: 'Fleet & Assets',
+    icon: 'directions_car',
+    color: '#34d399',
     sections: [
-      { label: 'Operations', pages: [
-        { id: 'dashboard',           label: 'Fleet Dashboard',    icon: 'dashboard' },
-        { id: 'vehicles',            label: 'Vehicles',           icon: 'directions_car' },
-        { id: 'generators',          label: 'Generators',         icon: 'bolt' },
-        { id: 'heavy-equipment',     label: 'Heavy Equipment',    icon: 'construction' },
-        { id: 'maintenance-alerts',  label: 'Maintenance Alerts', icon: 'notifications_active' },
-        { id: 'asset-issues',        label: 'Asset Issues',       icon: 'bug_report' },
-      ]},
+      {
+        label: 'Operations',
+        pages: [
+          { id: 'dashboard', label: 'Fleet Dashboard', icon: 'dashboard' },
+          { id: 'vehicles', label: 'Vehicles', icon: 'directions_car' },
+          { id: 'generators', label: 'Generators', icon: 'bolt' },
+          { id: 'heavy-equipment', label: 'Heavy Equipment', icon: 'construction' },
+          { id: 'maintenance-alerts', label: 'Maintenance Alerts', icon: 'notifications_active' },
+          { id: 'asset-issues', label: 'Asset Issues', icon: 'bug_report' },
+        ],
+      },
     ],
   },
   hr: {
-    label: 'Human Resources', icon: 'badge', color: '#f87171',
+    label: 'Human Resources',
+    icon: 'badge',
+    color: '#f87171',
     sections: [
-      { label: 'Overview', pages: [
-        { id: 'dashboard', label: 'HR Dashboard', icon: 'dashboard' },
-      ]},
-      { label: 'Organisation', pages: [
-        { id: 'employees',    label: 'Employees',    icon: 'people' },
-        { id: 'departments',  label: 'Departments',  icon: 'business' },
-        { id: 'designations', label: 'Designations', icon: 'work' },
-        { id: 'permissions',  label: 'Permissions',  icon: 'admin_panel_settings' },
-      ]},
-      { label: 'Time & Attendance', pages: [
-        { id: 'attendance', label: 'Attendance', icon: 'schedule' },
-        { id: 'leave',      label: 'Leave',      icon: 'event_busy' },
-      ]},
-      { label: 'Travel', pages: [
-        { id: 'travel', label: 'Travel', icon: 'flight' },
-      ]},
+      { label: 'Overview', pages: [{ id: 'dashboard', label: 'HR Dashboard', icon: 'dashboard' }] },
+      {
+        label: 'Organisation',
+        pages: [
+          { id: 'employees', label: 'Employees', icon: 'people' },
+          { id: 'departments', label: 'Departments', icon: 'business' },
+          { id: 'designations', label: 'Designations', icon: 'work' },
+          { id: 'permissions', label: 'Permissions', icon: 'admin_panel_settings' },
+        ],
+      },
+      {
+        label: 'Time & Attendance',
+        pages: [
+          { id: 'attendance', label: 'Attendance', icon: 'schedule' },
+          { id: 'leave', label: 'Leave', icon: 'event_busy' },
+        ],
+      },
+      {
+        label: 'Travel',
+        pages: [{ id: 'travel', label: 'Travel', icon: 'flight' }],
+      },
     ],
   },
   accounting: {
-    label: 'Accounting', icon: 'receipt', color: '#818cf8',
+    label: 'Accounting',
+    icon: 'receipt',
+    color: '#818cf8',
     sections: [
-      { label: 'Finance', pages: [
-        { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'account_tree' },
-        { id: 'journal-entries',   label: 'Journal Entries',   icon: 'book' },
-        { id: 'reports',           label: 'Financial Reports', icon: 'assessment' },
-      ]},
+      {
+        label: 'Finance',
+        pages: [
+          { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: 'account_tree' },
+          { id: 'journal-entries', label: 'Journal Entries', icon: 'book' },
+          { id: 'reports', label: 'Financial Reports', icon: 'assessment' },
+        ],
+      },
     ],
   },
   reports: {
-    label: 'Reports', icon: 'bar_chart', color: '#38bdf8',
+    label: 'Reports',
+    icon: 'bar_chart',
+    color: '#38bdf8',
     sections: [
-      { label: 'Analytics', pages: [
-        { id: 'overview',   label: 'Overview',    icon: 'dashboard' },
-        { id: 'audit-log',  label: 'Audit Trail', icon: 'history' },
-        { id: 'drafts',     label: 'Drafts',      icon: 'drafts' },
-      ]},
+      {
+        label: 'Analytics',
+        pages: [
+          { id: 'overview', label: 'Overview', icon: 'dashboard' },
+          { id: 'audit-log', label: 'Audit Trail', icon: 'history' },
+          { id: 'drafts', label: 'Drafts', icon: 'drafts' },
+        ],
+      },
     ],
   },
 }
 
 export default function Sidebar({ module }) {
-  const navigate  = useNavigate()
-  const location  = useLocation()
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  // ✅ Correct: get canView as a function from context
+  // ✅ Get canView function from permission context
   const { canView } = usePermission()
 
   // Build permission-filtered config for this module
@@ -139,16 +177,17 @@ export default function Sidebar({ module }) {
       })
       .filter(Boolean)
 
-    return filteredSections.length > 0
-      ? { ...fullConfig, sections: filteredSections }
-      : null
+    return filteredSections.length > 0 ? { ...fullConfig, sections: filteredSections } : null
   })()
 
   // Persist expanded state per module
   const storageKey = `sidebar_exp_${module}`
   const [expanded, setExpanded] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) || '{}') }
-    catch { return {} }
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || '{}')
+    } catch {
+      return {}
+    }
   })
 
   useEffect(() => {
@@ -167,34 +206,53 @@ export default function Sidebar({ module }) {
   }
 
   const sidebarContent = (
-    <aside style={{
-      width: 248,
-      background: 'var(--surface)',
-      borderRight: '1px solid var(--border)',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
+    <aside
+      style={{
+        width: 248,
+        background: 'var(--surface)',
+        borderRight: '1px solid var(--border)',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
       {/* Module header */}
-      <div style={{
-        padding: '16px 16px 12px',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: `${config.color}22`,
-          border: `1px solid ${config.color}44`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+      <div
+        style={{
+          padding: '16px 16px 12px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: `${config.color}22`,
+            border: `1px solid ${config.color}44`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <span className="material-icons" style={{ color: config.color, fontSize: 20 }}>
             {config.icon}
           </span>
         </div>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)' }}>{config.label}</div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1 }}>
+          <div
+            style={{
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              fontFamily: 'var(--mono)',
+              letterSpacing: 1,
+            }}
+          >
             MODULE
           </div>
         </div>
@@ -205,16 +263,32 @@ export default function Sidebar({ module }) {
         <button
           onClick={() => navigate('/')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            width: '100%', padding: '8px 12px', borderRadius: 8,
-            background: 'transparent', border: '1px solid var(--border2)',
-            cursor: 'pointer', color: 'var(--text-mid)',
-            fontSize: 12, fontWeight: 600, transition: 'all .15s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'transparent',
+            border: '1px solid var(--border2)',
+            cursor: 'pointer',
+            color: 'var(--text-mid)',
+            fontSize: 12,
+            fontWeight: 600,
+            transition: 'all .15s',
           }}
-          onMouseOver={e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)' }}
-          onMouseOut={e =>  { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-mid)' }}
+          onMouseOver={e => {
+            e.currentTarget.style.background = 'var(--surface2)'
+            e.currentTarget.style.color = 'var(--text)'
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--text-mid)'
+          }}
         >
-          <span className="material-icons" style={{ fontSize: 16 }}>home</span>
+          <span className="material-icons" style={{ fontSize: 16 }}>
+            home
+          </span>
           Back to Home
         </button>
       </div>
@@ -228,12 +302,21 @@ export default function Sidebar({ module }) {
               <button
                 onClick={() => toggleSection(section.label)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  width: '100%', padding: '8px 10px', borderRadius: 8,
-                  background: 'transparent', border: 'none',
-                  cursor: 'pointer', color: 'var(--text-dim)',
-                  fontSize: 10, fontWeight: 700, letterSpacing: 1,
-                  fontFamily: 'var(--mono)', textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-dim)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  fontFamily: 'var(--mono)',
+                  textTransform: 'uppercase',
                 }}
               >
                 <span style={{ flex: 1, textAlign: 'left' }}>{section.label}</span>
@@ -243,30 +326,59 @@ export default function Sidebar({ module }) {
               </button>
 
               {isExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    marginBottom: 8,
+                  }}
+                >
                   {section.pages.map(page => {
-                    const isActive = currentPage === page.id ||
+                    const isActive =
+                      currentPage === page.id ||
                       (page.id === config.sections[0]?.pages[0]?.id &&
-                       location.pathname === `/module/${module}`)
+                        location.pathname === `/module/${module}`)
                     return (
                       <button
                         key={page.id}
-                        onClick={() => { navigate(`/module/${module}/${page.id}`); setMobileOpen(false) }}
+                        onClick={() => {
+                          navigate(`/module/${module}/${page.id}`)
+                          setMobileOpen(false)
+                        }}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          width: '100%', padding: '8px 12px 8px 20px',
-                          borderRadius: 8, border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          width: '100%',
+                          padding: '8px 12px 8px 20px',
+                          borderRadius: 8,
+                          border: 'none',
                           background: isActive ? `${config.color}18` : 'transparent',
                           cursor: 'pointer',
                           color: isActive ? config.color : 'var(--text-mid)',
-                          fontSize: 12, fontWeight: isActive ? 700 : 400,
-                          textAlign: 'left', transition: 'all .12s',
+                          fontSize: 12,
+                          fontWeight: isActive ? 700 : 400,
+                          textAlign: 'left',
+                          transition: 'all .12s',
                           borderLeft: isActive ? `3px solid ${config.color}` : '3px solid transparent',
                         }}
-                        onMouseOver={e => { if (!isActive) { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)' } }}
-                        onMouseOut={e =>  { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-mid)' } }}
+                        onMouseOver={e => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'var(--surface2)'
+                            e.currentTarget.style.color = 'var(--text)'
+                          }
+                        }}
+                        onMouseOut={e => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.color = 'var(--text-mid)'
+                          }
+                        }}
                       >
-                        <span className="material-icons" style={{ fontSize: 15 }}>{page.icon}</span>
+                        <span className="material-icons" style={{ fontSize: 15 }}>
+                          {page.icon}
+                        </span>
                         {page.label}
                       </button>
                     )
@@ -293,9 +405,16 @@ export default function Sidebar({ module }) {
         onClick={() => setMobileOpen(!mobileOpen)}
         style={{
           display: 'none',
-          position: 'fixed', top: 12, left: 12, zIndex: 300,
-          background: 'var(--surface)', border: '1px solid var(--border2)',
-          borderRadius: 8, padding: 8, cursor: 'pointer', color: 'var(--text)',
+          position: 'fixed',
+          top: 12,
+          left: 12,
+          zIndex: 300,
+          background: 'var(--surface)',
+          border: '1px solid var(--border2)',
+          borderRadius: 8,
+          padding: 8,
+          cursor: 'pointer',
+          color: 'var(--text)',
         }}
       >
         <span className="material-icons">{mobileOpen ? 'close' : 'menu'}</span>
