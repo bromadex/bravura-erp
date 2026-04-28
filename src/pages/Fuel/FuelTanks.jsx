@@ -1,10 +1,15 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
+import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
 export default function FuelTanks() {
-  const navigate = useNavigate()
-  const { issuances, deliveries, getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES } = useFuel()
+  const { issuances, deliveries, getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES, loading, fetchAll } = useFuel()
+  const canEdit = useCanEdit('fuel', 'tanks')
+  const canDelete = useCanDelete('fuel', 'tanks')
+  const { user } = useAuth()
 
   const currentLevel = getCurrentTankLevel()
   const percentage = getTankPercentage()
@@ -52,12 +57,12 @@ export default function FuelTanks() {
             </div>
           </div>
           <div className="kpi-grid" style={{ flex: 2, marginBottom: 0 }}>
-            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/module/fuel/issuance')}>
+            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/module/fuel/issuance'}>
               <div className="kpi-label">Total Issued</div>
               <div className="kpi-val">{totalIssued.toLocaleString()} L</div>
               <div className="kpi-sub">{issuances.length} transactions – click to view</div>
             </div>
-            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/module/fuel/deliveries')}>
+            <div className="kpi-card" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/module/fuel/deliveries'}>
               <div className="kpi-label">Total Delivered</div>
               <div className="kpi-val" style={{ color: 'var(--green)' }}>{totalDelivered.toLocaleString()} L</div>
               <div className="kpi-sub">{deliveries.length} deliveries – click to view</div>
@@ -66,33 +71,40 @@ export default function FuelTanks() {
         </div>
       </div>
 
-      {/* Recent Issuances table remains unchanged */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Recent Fuel Issuances</h3>
         <div className="table-wrap">
-          <table>
+          <table className="stock-table">
             <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Amount (L)</th><th>Purpose</th></tr></thead>
             <tbody>
               {issuances.slice(0, 5).map(i => (
-                <tr key={i.id}><td>{i.date}</td><td>{i.vehicle || '-'}</td><td>{i.driver || '-'}</td><td className="mono">{i.amount} L</td><td>{i.purpose || '-'}</td></tr>
+                <tr key={i.id}><td>{i.date}</td>
+                  <td>{i.vehicle || '-'}</td>
+                  <td>{i.driver || '-'}</td>
+                  <td className="mono">{i.amount} L</td>
+                  <td>{i.purpose || '-'}</td>
+                </tr>
               ))}
-              {issuances.length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center' }}>No issues yet</td></tr>}
+              {issuances.length === 0 && <tr><td colSpan="5" className="empty-state">No issues yet</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Recent Deliveries table unchanged */}
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Recent Fuel Deliveries</h3>
         <div className="table-wrap">
-          <table>
+          <table className="stock-table">
             <thead><tr><th>Date</th><th>Supplier</th><th>Quantity (L)</th><th>Fuel Type</th></tr></thead>
             <tbody>
               {deliveries.slice(0, 5).map(d => (
-                <tr key={d.id}><td>{d.date}</td><td>{d.supplier || '-'}</td><td className="mono">{d.qty} L</td><td>{d.fuel_type}</td></tr>
+                <tr key={d.id}><td>{d.date}</td>
+                  <td>{d.supplier || '-'}</td>
+                  <td className="mono">{d.qty} L</td>
+                  <td>{d.fuel_type}</td>
+                </tr>
               ))}
-              {deliveries.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center' }}>No deliveries yet</td></tr>}
+              {deliveries.length === 0 && <tr><td colSpan="4" className="empty-state">No deliveries yet</td></tr>}
             </tbody>
           </table>
         </div>
