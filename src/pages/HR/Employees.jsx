@@ -40,10 +40,10 @@ export default function Employees() {
   const [accountRoleId, setAccountRoleId] = useState('role_viewer')
 
   const docCategories = [
-    { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
-    { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/*,application/pdf' },
-    { id: 'certifications', label: 'Certifications', icon: 'verified', accept: 'image/*,application/pdf' },
-    { id: 'general', label: 'General', icon: 'description', accept: '*' }
+    { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/jpeg,image/png,image/jpg' },
+    { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/jpeg,image/png,image/jpg,application/pdf' },
+    { id: 'certifications', label: 'Certifications', icon: 'verified', accept: 'image/jpeg,image/png,image/jpg,application/pdf' },
+    { id: 'general', label: 'General', icon: 'description', accept: 'application/pdf,image/jpeg,image/png,image/jpg,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
   ]
 
   const fetchDocuments = async (employeeId) => {
@@ -700,80 +700,4 @@ export default function Employees() {
             </div>
           )
         })}
-      </div>
-
-      {viewModalOpen && selectedEmployee && (
-        <div className="overlay" onClick={() => setViewModalOpen(false)}>
-          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Employee Details: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div>
-                {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>}
-                {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-              {['profile', 'attendance', 'performance', 'history'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
-                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>{tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}</span>{tab}
-                </button>
-              ))}
-            </div>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 8 }}>
-              {activeTab === 'profile' && <ProfileTab employee={selectedEmployee} />}
-              {activeTab === 'attendance' && <AttendanceTab employee={selectedEmployee} />}
-              {activeTab === 'performance' && <PerformanceTab employee={selectedEmployee} />}
-              {activeTab === 'history' && <HistoryTab employee={selectedEmployee} />}
-            </div>
-            <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button></div>
-          </div>
-        </div>
-      )}
-
-      {showCertModal && (
-        <div className="overlay" onClick={() => setShowCertModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editingCert ? 'Edit' : 'Add'} <span>Certification</span></div>
-            <div className="form-group"><label>Certification Name *</label><input className="form-control" required value={certForm.certification_name} onChange={e => setCertForm({...certForm, certification_name: e.target.value})} /></div>
-            <div className="form-group"><label>Issuing Body</label><input className="form-control" value={certForm.issuing_body} onChange={e => setCertForm({...certForm, issuing_body: e.target.value})} /></div>
-            <div className="form-row"><div className="form-group"><label>Issue Date</label><input type="date" className="form-control" value={certForm.issue_date} onChange={e => setCertForm({...certForm, issue_date: e.target.value})} /></div><div className="form-group"><label>Expiry Date</label><input type="date" className="form-control" value={certForm.expiry_date} onChange={e => setCertForm({...certForm, expiry_date: e.target.value})} /></div></div>
-            <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={certForm.notes} onChange={e => setCertForm({...certForm, notes: e.target.value})} /></div>
-            <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setShowCertModal(false)}>Cancel</button><button className="btn btn-primary" onClick={handleSaveCertification}>Save</button></div>
-          </div>
-        </div>
-      )}
-
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Employee</span></div>
-            {accountInfo && (
-              <div className="info-box" style={{ marginBottom: 16, background: 'rgba(52,211,153,.1)', borderColor: 'rgba(52,211,153,.3)' }}>
-                <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle' }}>check_circle</span> Account created!<br />
-                <strong>Username:</strong> {accountInfo.username}<br />
-                <strong>Password:</strong> {accountInfo.password}<br />
-                <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(`Username: ${accountInfo.username}\nPassword: ${accountInfo.password}`)}>Copy Credentials</button>
-              </div>
-            )}
-            <form onSubmit={handleSubmit}>
-              <div className="form-row"><div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div><div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Designation</label><select className="form-control" value={form.designation_id} onChange={e => setForm({...form, designation_id: e.target.value})}><option value="">Select</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div><div className="form-group"><label>Department</label><select className="form-control" value={form.department_id} onChange={e => setForm({...form, department_id: e.target.value})}><option value="">Select</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div></div>
-              <div className="form-row"><div className="form-group"><label>Employment Type</label><select className="form-control" value={form.employment_type} onChange={e => setForm({...form, employment_type: e.target.value})}><option>Full-time</option><option>Contract</option><option>Casual</option></select></div><div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div></div>
-              <div className="form-row"><div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div><div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div></div>
-              <div className="form-row"><div className="form-group"><label>Hire Date</label><input type="date" className="form-control" value={form.hire_date} onChange={e => setForm({...form, hire_date: e.target.value})} /></div><div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({...form, date_of_birth: e.target.value})} /></div></div>
-              <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({...form, residential_address: e.target.value})} /></div>
-              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({...form, emergency_name: e.target.value})} /></div><div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({...form, emergency_phone: e.target.value})} /></div></div>
-              {!editing && (
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} /><span>Create system account (username + password)</span></label>
-                  {createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRoleId} onChange={e => setAccountRoleId(e.target.value)}><option value="role_super_admin">Super Admin</option><option value="role_hr_manager">HR Manager</option><option value="role_dept_manager">Department Manager</option><option value="role_storekeeper">Storekeeper</option><option value="role_fuel_attendant">Fuel Attendant</option><option value="role_viewer">Viewer</option></select></div>)}
-                </div>
-              )}
-              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+      </
