@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 function getStatus(balance, threshold) {
@@ -11,6 +12,9 @@ function getStatus(balance, threshold) {
 
 export default function StockBalance() {
   const { items, loading, deleteItem } = useInventory()
+  const canEdit = useCanEdit('inventory', 'stock-balance')
+  const canDelete = useCanDelete('inventory', 'stock-balance')
+  
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -43,11 +47,14 @@ export default function StockBalance() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Stock Balance</h1>
-        <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowAddModal(true) }}>
-          <span className="material-icons">add</span> Add Item
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowAddModal(true) }}>
+            <span className="material-icons" style={{ fontSize: 18 }}>add</span> Add Item
+          </button>
+        )}
       </div>
 
+      {/* Filters (no permission needed) */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 250 }}>
           <span className="material-icons" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: 'var(--text-dim)' }}>search</span>
@@ -66,43 +73,52 @@ export default function StockBalance() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
               <th>#</th><th>Item Name</th><th>Category</th><th>Unit</th>
-              <th>In</th><th>Out</th><th>Balance</th><th>Status</th><th>Threshold</th><th>Actions</th>
+              <th>In</th><th>Out</th><th>Balance</th><th>Status</th><th>Threshold</th>
+              {canEdit && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="10" style={{ textAlign: 'center', padding: 40 }}>Loading...</td></tr>
+              <tr><td colSpan={canEdit ? 10 : 9} style={{ textAlign: 'center', padding: 40 }}>Loading...<\/td><\/tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan="10" style={{ textAlign: 'center', padding: 40 }}>No items found</td></tr>
+              <tr><td colSpan={canEdit ? 10 : 9} style={{ textAlign: 'center', padding: 40 }}>No items found<\/td><\/tr>
             ) : (
               filteredItems.map((item, idx) => {
                 const status = getStatus(item.balance, item.threshold)
                 return (
                   <tr key={item.id}>
-                    <td>{idx + 1}</td>
-                    <td style={{ fontWeight: 600 }}>{item.name}</td>
-                    <td>{item.category}</td>
-                    <td>{item.unit || 'pcs'}</td>
-                    <td style={{ color: 'var(--green)' }}>{item.total_in || 0}</td>
-                    <td style={{ color: 'var(--red)' }}>{item.total_out || 0}</td>
-                    <td style={{ fontWeight: 700, color: status.color }}>{item.balance}</td>
-                    <td><span className="badge" style={{ background: status.bg, color: status.color }}>{status.label}</span></td>
-                    <td>{item.threshold || 5}</td>
-                    <td style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(item)}><span className="material-icons">edit</span></button>
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}><span className="material-icons">delete</span></button>
-                    </td>
-                  </tr>
+                    <td>{idx + 1}<\/td>
+                    <td style={{ fontWeight: 600 }}>{item.name}<\/td>
+                    <td>{item.category}<\/td>
+                    <td>{item.unit || 'pcs'}<\/td>
+                    <td style={{ color: 'var(--green)' }}>{item.total_in || 0}<\/td>
+                    <td style={{ color: 'var(--red)' }}>{item.total_out || 0}<\/td>
+                    <td style={{ fontWeight: 700, color: status.color }}>{item.balance}<\/td>
+                    <td><span className="badge" style={{ background: status.bg, color: status.color }}>{status.label}<\/span><\/td>
+                    <td>{item.threshold || 5}<\/td>
+                    {canEdit && (
+                      <td style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(item)}>
+                          <span className="material-icons" style={{ fontSize: 16 }}>edit<\/span>
+                        </button>
+                        {canDelete && (
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
+                            <span className="material-icons" style={{ fontSize: 16 }}>delete<\/span>
+                          </button>
+                        )}
+                      <\/td>
+                    )}
+                  <\/tr>
                 )
               })
             )}
-          </tbody>
-        </table>
-      </div>
+          <\/tbody>
+        <\/table>
+      <\/div>
 
       {showAddModal && (
         <ItemModal
@@ -112,10 +128,11 @@ export default function StockBalance() {
           onSave={() => { setShowAddModal(false); setEditingItem(null) }}
         />
       )}
-    </div>
+    <\/div>
   )
 }
 
+// ItemModal component remains the same (add/edit logic)
 function ItemModal({ item, categories, onClose, onSave }) {
   const { addItem, updateItem } = useInventory()
   const [form, setForm] = useState({
@@ -154,22 +171,22 @@ function ItemModal({ item, categories, onClose, onSave }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title"><span className="material-icons">{item ? 'edit' : 'add'}</span> {item ? 'Edit' : 'Add'} <span>Item</span></div>
+        <div className="modal-title"><span className="material-icons">{item ? 'edit' : 'add'}<\/span> {item ? 'Edit' : 'Add'} <span>Item<\/span><\/div>
         <form onSubmit={handleSubmit}>
-          <div className="form-group"><label>Item Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+          <div className="form-group"><label>Item Name *<\/label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /><\/div>
           <div className="form-row">
-            <div className="form-group"><label>Category</label><select className="form-control" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>{categories.map(c => <option key={c}>{c}</option>)}</select></div>
-            <div className="form-group"><label>Unit</label><input className="form-control" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} /></div>
-          </div>
+            <div className="form-group"><label>Category<\/label><select className="form-control" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>{categories.map(c => <option key={c}>{c}<\/option>)}<\/select><\/div>
+            <div className="form-group"><label>Unit<\/label><input className="form-control" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} /><\/div>
+          <\/div>
           <div className="form-row">
-            <div className="form-group"><label>Unit Cost (USD)</label><input type="number" step="0.01" className="form-control" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} /></div>
-            <div className="form-group"><label>Low Stock Threshold</label><input type="number" className="form-control" value={form.threshold} onChange={e => setForm({...form, threshold: parseInt(e.target.value) || 5})} /></div>
-          </div>
-          {!item && <div className="form-group"><label>Opening Stock</label><input type="number" className="form-control" value={form.openingStock} onChange={e => setForm({...form, openingStock: parseInt(e.target.value) || 0})} /></div>}
-          <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /></div>
-          <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button><button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : (item ? 'Save Changes' : 'Add Item')}</button></div>
-        </form>
-      </div>
-    </div>
+            <div className="form-group"><label>Unit Cost (USD)<\/label><input type="number" step="0.01" className="form-control" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} /><\/div>
+            <div className="form-group"><label>Low Stock Threshold<\/label><input type="number" className="form-control" value={form.threshold} onChange={e => setForm({...form, threshold: parseInt(e.target.value) || 5})} /><\/div>
+          <\/div>
+          {!item && <div className="form-group"><label>Opening Stock<\/label><input type="number" className="form-control" value={form.openingStock} onChange={e => setForm({...form, openingStock: parseInt(e.target.value) || 0})} /><\/div>}
+          <div className="form-group"><label>Notes<\/label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /><\/div>
+          <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={onClose}>Cancel<\/button><button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : (item ? 'Save Changes' : 'Add Item')}<\/button><\/div>
+        <\/form>
+      <\/div>
+    <\/div>
   )
 }
