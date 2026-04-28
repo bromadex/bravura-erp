@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useHR } from '../../contexts/HRContext'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 export default function Departments() {
   const { departments, employees, addDepartment, updateDepartment, deleteDepartment, loading, fetchAll } = useHR()
+  const canEdit = useCanEdit('hr', 'departments')
+  const canDelete = useCanDelete('hr', 'departments')
+  
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewEmployeesDept, setViewEmployeesDept] = useState(null)
@@ -53,16 +57,18 @@ export default function Departments() {
   }
 
   const getEmployeesInDept = (deptId) => employees.filter(e => e.department_id === deptId)
-  const getDepartmentName = (id) => departments.find(d => d.id === id)?.name || '—'
   const getEmployeeName = (id) => employees.find(e => e.id === id)?.name || '—'
+  const getDepartmentName = (id) => departments.find(d => d.id === id)?.name || '—'
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Departments</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}>
-          <span className="material-icons">add</span> Add Department
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => openModal()}>
+            <span className="material-icons">add</span> Add Department
+          </button>
+        )}
       </div>
 
       <div className="table-wrap">
@@ -84,13 +90,25 @@ export default function Departments() {
                   <td>{getDepartmentName(dept.parent_id) || '—'}</td>
                   <td style={{ textAlign: 'center' }}>{empList.length} <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle' }}>people</span></td>
                   <td>
-                    <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openModal(dept) }}><span className="material-icons">edit</span></button>
-                    <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(dept.id, dept.name) }}><span className="material-icons">delete</span></button>
+                    {canEdit && (
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openModal(dept) }}>
+                        <span className="material-icons">edit</span>
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(dept.id, dept.name) }}>
+                        <span className="material-icons">delete</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
             })}
-            {departments.length === 0 && <tr><td colSpan="7" className="empty-state">No departments</td></tr>}
+            {departments.length === 0 && (
+              <tr>
+                <td colSpan="7" className="empty-state">No departments</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -102,17 +120,25 @@ export default function Departments() {
             <div className="modal-title">Employees in <span>{viewEmployeesDept.name}</span></div>
             <div className="table-wrap">
               <table className="stock-table">
-                <thead><tr><th>Name</th><th>Employee ID</th><th>Designation</th><th>Status</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Name</th><th>Employee ID</th><th>Designation</th><th>Status</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {getEmployeesInDept(viewEmployeesDept.id).map(emp => (
                     <tr key={emp.id}>
                       <td style={{ fontWeight: 600 }}>{emp.name}</td>
                       <td>{emp.employee_number || '—'}</td>
-                      <td>{emp.designation_id ? '-' : '—'} {/* Add designation lookup if needed */}</td>
+                      <td>—</td>
                       <td><span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status || 'Active'}</span></td>
                     </tr>
                   ))}
-                  {getEmployeesInDept(viewEmployeesDept.id).length === 0 && <tr><td colSpan="4">No employees in this department</td></tr>}
+                  {getEmployeesInDept(viewEmployeesDept.id).length === 0 && (
+                    <tr>
+                      <td colSpan="4">No employees in this department</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
