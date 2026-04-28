@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 
 export default function Employees() {
   const { employees, departments, designations, attendance, skills, certifications, auditLogs, addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus, addSkill, deleteSkill, addCertification, updateCertification, deleteCertification, getWeeklyHours, loading, fetchAll } = useHR()
+  const canEdit = useCanEdit('hr', 'employees')
+  const canDelete = useCanDelete('hr', 'employees')
   
   const [modalOpen, setModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
@@ -34,7 +37,7 @@ export default function Employees() {
     employment_type: 'Full-time', status: 'Active'
   })
   const [createAccount, setCreateAccount] = useState(false)
-  const [accountRole, setAccountRole] = useState('viewer')
+  const [accountRoleId, setAccountRoleId] = useState('role_viewer')
 
   const docCategories = [
     { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
@@ -319,7 +322,7 @@ export default function Employees() {
       } else {
         let accountResult = null
         if (createAccount) {
-          accountResult = await addEmployee(form, true, accountRole)
+          accountResult = await addEmployee(form, true, accountRoleId)
           setAccountInfo(accountResult)
           toast.success(`Employee added. Username: ${accountResult.username}, Password: ${accountResult.password}`)
         } else {
@@ -505,7 +508,7 @@ export default function Employees() {
                   <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
-                  <td><span className="badge bg-blue">{att.shift_type}</span></td>
+                  <td><span className="badge bg-blue">{att.shift_type}</span><tr>
                   <td>{att.total_hours?.toFixed(1) || '—'}</td>
                   <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
@@ -645,9 +648,11 @@ export default function Employees() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Employees</h1>
-        <button className="btn btn-primary" onClick={() => openModal()}>
-          <span className="material-icons">add</span> Add Employee
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => openModal()}>
+            <span className="material-icons">add</span> Add Employee
+          </button>
+        )}
       </div>
 
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
@@ -680,7 +685,11 @@ export default function Employees() {
               </div>
               <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{weeklyStats.totalHours.toFixed(1)}h</strong> (OT: {weeklyStats.totalOvertime.toFixed(1)}h)</span>
-                <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}><span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span></button>
+                {canEdit && (
+                  <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span>
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -692,7 +701,10 @@ export default function Employees() {
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Employee Details: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div><button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button><button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button></div>
+              <div>
+                {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>}
+                {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
               {['profile', 'attendance', 'performance', 'history'].map(tab => (
@@ -748,7 +760,7 @@ export default function Employees() {
               {!editing && (
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} /><span>Create system account (username + password)</span></label>
-                  {createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRole} onChange={e => setAccountRole(e.target.value)}><option value="viewer">Viewer</option><option value="storekeeper">Storekeeper</option><option value="fuel_attendant">Fuel Attendant</option><option value="hr_officer">HR Officer</option><option value="requisition_officer">Requisition Officer</option><option value="manager">Manager</option><option value="super_admin">Super Admin</option></select></div>)}
+                  {createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRoleId} onChange={e => setAccountRoleId(e.target.value)}><option value="role_super_admin">Super Admin</option><option value="role_hr_manager">HR Manager</option><option value="role_dept_manager">Department Manager</option><option value="role_storekeeper">Storekeeper</option><option value="role_fuel_attendant">Fuel Attendant</option><option value="role_viewer">Viewer</option></select></div>)}
                 </div>
               )}
               <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button></div>
