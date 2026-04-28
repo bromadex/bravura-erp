@@ -499,7 +499,13 @@ export default function Employees() {
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Shift</th>
+                <th>Hours</th>
+                <th>Overtime</th>
+                <th>Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -771,4 +777,3 @@ export default function Employees() {
     </div>
   )
 }
-
