@@ -19,7 +19,6 @@ export default function MaintenanceAlerts() {
     return { asset, nextService, isOverdue, health, healthScore }
   }).filter(a => a.isOverdue || a.healthScore < 50)
 
-  // Critical open issues (urgency 'critical' and status != 'resolved')
   const criticalIssues = assetIssues.filter(i => i.urgency === 'critical' && i.status !== 'resolved')
 
   const alerts = [...assetAlerts, ...criticalIssues.map(i => ({
