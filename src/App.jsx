@@ -1,6 +1,4 @@
 // src/App.jsx
-// 🔧 Full working version with correct provider order
-
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
@@ -17,8 +15,9 @@ import HomeGrid from './pages/HomeGrid'
 import Layout from './components/layout/Layout'
 import PermissionRoute from './components/PermissionRoute'
 import AccessDenied from './pages/Errors/AccessDenied'
+import ChangePassword from './pages/ChangePassword'
 
-// Inventory
+// Inventory Pages
 import StockBalance from './pages/Inventory/StockBalance'
 import StockIn from './pages/Inventory/StockIn'
 import StockOut from './pages/Inventory/StockOut'
@@ -26,21 +25,21 @@ import Transactions from './pages/Inventory/Transactions'
 import StockTaking from './pages/Inventory/StockTaking'
 import Categories from './pages/Inventory/Categories'
 
-// Procurement
+// Procurement Pages
 import Suppliers from './pages/Procurement/Suppliers'
 import StoreRequisitions from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
 import PurchaseOrders from './pages/Procurement/PurchaseOrders'
 import GoodsReceived from './pages/Procurement/GoodsReceived'
 
-// Fuel
+// Fuel Pages
 import FuelTanks from './pages/Fuel/FuelTanks'
 import FuelIssuance from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
 import DipstickLog from './pages/Fuel/DipstickLog'
 import FuelReports from './pages/Fuel/FuelReports'
 
-// Fleet
+// Fleet Pages
 import FleetDashboard from './pages/Fleet/FleetDashboard'
 import Vehicles from './pages/Fleet/Vehicles'
 import Generators from './pages/Fleet/Generators'
@@ -48,7 +47,7 @@ import HeavyEquipment from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues from './pages/Fleet/AssetIssues'
 
-// HR
+// HR Pages
 import HRDashboard from './pages/HR/HRDashboard'
 import Employees from './pages/HR/Employees'
 import Departments from './pages/HR/Departments'
@@ -56,8 +55,12 @@ import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
 import Attendance from './pages/HR/Attendance'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ProtectedRoute with password change enforcement
+// ─────────────────────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
+
   if (loading) {
     return (
       <div style={{
@@ -68,10 +71,22 @@ function ProtectedRoute({ children }) {
       </div>
     )
   }
-  if (!user) return <Navigate to="/login" replace />
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  // ✅ Force password change if required
+  if (user.must_change_password === true && window.location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
+  }
+
   return children
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Placeholder for modules not yet built
+// ─────────────────────────────────────────────────────────────────────────────
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -104,15 +119,20 @@ const OTHER_MODULES = [
   { id: 'reports', pages: ['overview', 'audit-log', 'drafts'] },
 ]
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────────────────────────────────────
 function AppRoutes() {
   const { user } = useAuth()
   return (
     <Routes>
+      {/* Auth routes */}
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/access-denied" element={<AccessDenied />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Dashboard */}
+      {/* Dashboard placeholder */}
       <Route path="/module/dashboard" element={
         <ProtectedRoute>
           <PermissionRoute module="dashboard" page="overview">
@@ -195,7 +215,7 @@ function AppRoutes() {
         <Route path="asset-issues" element={<AssetIssues />} />
       </Route>
 
-      {/* HR */}
+      {/* HUMAN RESOURCES */}
       <Route path="/module/hr" element={
         <ProtectedRoute>
           <PermissionRoute module="hr" page="dashboard">
@@ -216,7 +236,7 @@ function AppRoutes() {
         <Route path="travel" element={<ModulePlaceholder module="hr" page="travel" />} />
       </Route>
 
-      {/* OTHER MODULES */}
+      {/* OTHER MODULES – placeholders */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
@@ -232,11 +252,15 @@ function AppRoutes() {
         </Route>
       ))}
 
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// App root
+// ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <AuthProvider>
