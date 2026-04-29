@@ -261,7 +261,7 @@ export default function Employees() {
       return
     }
 
-    // ✅ Manual Employee ID validation
+    // Manual Employee ID validation
     if (!editing && manualEmployeeId) {
       if (!form.employee_number?.match(/^BRA\d+$/)) {
         toast.error('Employee number must start with BRA followed by digits (e.g., BRA185)')
@@ -476,7 +476,9 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
+              <thead>
+                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr>
+              </thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -485,7 +487,7 @@ export default function Employees() {
                     <tr key={cert.id}>
                       <td style={{ fontWeight: 600 }}>{cert.certification_name}</td>
                       <td>{cert.issuing_body || '—'}</td>
-                      <td>{cert.issue_date || '—'}</td>
+                      <td>{cert.issue_date || '—'}<tr>
                       <td>{cert.expiry_date || '—'}</td>
                       <td>{expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}</td>
                       <td style={{ display: 'flex', gap: 4 }}>
@@ -495,7 +497,11 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && (<tr><td colSpan="6" className="empty-state">No certifications</td></table>)}
+                {empCerts.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="empty-state">No certifications</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -664,7 +670,7 @@ export default function Employees() {
                 <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || (manualEmployeeId ? 'Enter manually' : 'Auto-generated')} /></div>
               </div>
 
-              {/* ✅ Manual/Auto Employee ID Toggle */}
+              {/* Manual/Auto Employee ID Toggle */}
               {!editing && (
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
