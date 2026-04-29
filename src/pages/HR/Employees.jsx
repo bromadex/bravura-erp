@@ -487,7 +487,7 @@ export default function Employees() {
                     <tr key={cert.id}>
                       <td style={{ fontWeight: 600 }}>{cert.certification_name}</td>
                       <td>{cert.issuing_body || '—'}</td>
-                      <td>{cert.issue_date || '—'}<tr>
+                      <td>{cert.issue_date || '—'}</td>
                       <td>{cert.expiry_date || '—'}</td>
                       <td>{expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}</td>
                       <td style={{ display: 'flex', gap: 4 }}>
