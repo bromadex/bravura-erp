@@ -7,7 +7,11 @@ import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
 export default function Attendance() {
-  const { employees, attendance, clockIn, clockOut, addAttendanceRecord, approveAttendance, rejectAttendance, bulkApproveAttendance, fetchAll } = useHR()
+  const { 
+    employees, attendance, clockIn, clockOut, addAttendanceRecord, 
+    approveAttendance, rejectAttendance, bulkApproveAttendance,
+    updateAttendanceRecord, deleteAttendanceRecord, fetchAll 
+  } = useHR()
   const { user } = useAuth()
   const canApprove = useCanApprove('hr', 'attendance')
 
@@ -18,6 +22,7 @@ export default function Attendance() {
   const [selectedRecords, setSelectedRecords] = useState([])
   const [rejectModal, setRejectModal] = useState({ open: false, recordId: null, reason: '' })
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState({
     employee_id: '',
     date: new Date().toISOString().split('T')[0],
@@ -33,11 +38,9 @@ export default function Attendance() {
     if (filterDateFrom && record.date < filterDateFrom) return false
     if (filterDateTo && record.date > filterDateTo) return false
     if (filterStatus !== 'ALL' && record.status !== filterStatus) return false
-    // Regular users see only their own records
     if (!canApprove && record.employee_id !== user?.employee_id) return false
     return true
   }).sort((a, b) => {
-    // Show pending first
     if (a.status === 'pending' && b.status !== 'pending') return -1
     if (a.status !== 'pending' && b.status === 'pending') return 1
     return new Date(b.date) - new Date(a.date)
@@ -46,14 +49,95 @@ export default function Attendance() {
   // KPIs
   const totalHours = filteredAttendance.reduce((sum, r) => sum + (r.total_hours || 0), 0)
   const totalOvertime = filteredAttendance.reduce((sum, r) => sum + (r.overtime_hours || 0), 0)
-  const pendingCount = filteredAttendance.filter(r => r.status === 'pending').length
+  const pendingCount = attendance.filter(r => r.status === 'pending').length
   const uniqueDays = new Set(filteredAttendance.map(r => r.date)).size
   const activeEmployees = employees.filter(e => e.status === 'Active').length
   const attendanceRate = uniqueDays > 0 ? (filteredAttendance.length / (activeEmployees * uniqueDays) * 100).toFixed(1) : 0
 
   const getEmployeeName = (id) => employees.find(e => e.id === id)?.name || '—'
 
-  // Handle approve/reject
+  // Open edit modal
+  const openEditModal = (record) => {
+    if (record.status === 'approved') {
+      toast.error('Approved records cannot be edited')
+      return
+    }
+    setEditingRecord(record)
+    setForm({
+      employee_id: record.employee_id,
+      date: record.date,
+      clock_in: record.clock_in,
+      clock_out: record.clock_out || '',
+      shift_type: record.shift_type || 'Day',
+      notes: record.notes || ''
+    })
+    setModalOpen(true)
+  }
+
+  // Handle edit submit
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.employee_id || !form.date || !form.clock_in) {
+      toast.error('Employee, date, and clock‑in time required')
+      return
+    }
+    
+    let clockOutTime = form.clock_out
+    let totalHours = 0
+    let overtime = 0
+    if (clockOutTime) {
+      const [inH, inM] = form.clock_in.split(':').map(Number)
+      const [outH, outM] = clockOutTime.split(':').map(Number)
+      let mins = (outH * 60 + outM) - (inH * 60 + inM)
+      if (mins < 0) mins += 24 * 60
+      totalHours = mins / 60
+      overtime = Math.max(0, totalHours - 8)
+    }
+    
+    try {
+      const result = await updateAttendanceRecord(
+        editingRecord.id,
+        {
+          employee_id: form.employee_id,
+          date: form.date,
+          clock_in: form.clock_in,
+          clock_out: clockOutTime || null,
+          shift_type: form.shift_type,
+          total_hours: totalHours || null,
+          overtime_hours: overtime || null,
+          notes: form.notes
+        },
+        editingRecord.status
+      )
+      
+      if (result?.reset) {
+        toast.success('Record updated – status reset to pending for approval')
+      } else {
+        toast.success('Attendance record updated')
+      }
+      setModalOpen(false)
+      setEditingRecord(null)
+      setForm({ employee_id: '', date: new Date().toISOString().split('T')[0], clock_in: '', clock_out: '', shift_type: 'Day', notes: '' })
+      await fetchAll()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  // Handle delete
+  const handleDelete = async (record) => {
+    if (record.status === 'approved') {
+      toast.error('Approved records cannot be deleted')
+      return
+    }
+    if (window.confirm(`Delete attendance record for ${getEmployeeName(record.employee_id)} on ${record.date}?`)) {
+      try {
+        await deleteAttendanceRecord(record.id, record.status)
+        toast.success('Record deleted')
+        await fetchAll()
+      } catch (err) { toast.error(err.message) }
+    }
+  }
+
+  // Approve/Reject handlers
   const handleApprove = async (recordId) => {
     try {
       await approveAttendance(recordId, user?.full_name || user?.username, canApprove)
@@ -145,7 +229,7 @@ export default function Attendance() {
         notes: form.notes,
         status: 'pending'
       })
-      toast.success('Attendance record saved')
+      toast.success('Attendance record saved (pending approval)')
       setModalOpen(false)
       setForm({ employee_id: '', date: new Date().toISOString().split('T')[0], clock_in: '', clock_out: '', shift_type: 'Day', notes: '' })
       await fetchAll()
@@ -187,7 +271,7 @@ export default function Attendance() {
       <div className="page-header">
         <h1 className="page-title">Attendance Tracking</h1>
         <div>
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)} style={{ marginRight: 8 }}>
+          <button className="btn btn-primary" onClick={() => { setEditingRecord(null); setModalOpen(true) }} style={{ marginRight: 8 }}>
             <span className="material-icons">add</span> Manual Entry
           </button>
           <button className="btn btn-secondary" onClick={exportToExcel}>
@@ -256,7 +340,7 @@ export default function Attendance() {
         </div>
       </div>
 
-      {/* Quick Clock In/Out for Approvers */}
+      {/* Quick Clock In/Out */}
       {canApprove && (
         <div className="card" style={{ padding: 16, marginBottom: 20 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Quick Clock In / Out – Today</h3>
@@ -291,12 +375,13 @@ export default function Attendance() {
                 <th style={{ width: 32 }}>{canApprove && <input type="checkbox" onChange={e => setSelectedRecords(e.target.checked ? filteredAttendance.filter(r => r.status === 'pending').map(r => r.id) : [])} />}</th>
                 <th>Date</th><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Shift</th>
                 <th>Hours</th><th>Overtime</th><th>Status</th><th>Approved By</th><th>Notes</th>
-                {canApprove && <th>Actions</th>}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredAttendance.map(record => {
                 const isPending = record.status === 'pending'
+                const isApproved = record.status === 'approved'
                 const isSelected = selectedRecords.includes(record.id)
                 return (
                   <tr key={record.id} style={{ background: isPending ? 'rgba(251,191,36,.05)' : 'transparent' }}>
@@ -313,37 +398,45 @@ export default function Attendance() {
                     <td>{record.total_hours?.toFixed(1) || '—'}</td>
                     <td>{record.overtime_hours?.toFixed(1) || '—'}</td>
                     <td>{getStatusBadge(record.status)}</td>
-                    <td style={{ fontSize: 12 }}>
-                      {record.approved_by || '—'}
-                      {record.approved_at && (
-                        <>
-                          <br />
-                          <small>{new Date(record.approved_at).toLocaleDateString()}</small>
-                        </>
-                      )}
-                    </td>
+                    <td style={{ fontSize: 12 }}>{record.approved_by || '—'}{record.approved_at ? <br/><small>{new Date(record.approved_at).toLocaleDateString()}</small> : ''}</td>
                     <td style={{ color: 'var(--text-dim)', maxWidth: 150 }}>{record.notes || '—'}</td>
-                    {canApprove && (
-                      <td>
-                        {isPending ? (
-                          <div style={{ display: 'flex', gap: 4 }}>
+                    <td style={{ display: 'flex', gap: 4 }}>
+                      {isPending ? (
+                        canApprove ? (
+                          <>
                             <button className="btn btn-green btn-sm" onClick={() => handleApprove(record.id)}>
                               <span className="material-icons" style={{ fontSize: 14 }}>check_circle</span> Approve
                             </button>
                             <button className="btn btn-red btn-sm" onClick={() => setRejectModal({ open: true, recordId: record.id, reason: '' })}>
                               <span className="material-icons" style={{ fontSize: 14 }}>cancel</span> Reject
                             </button>
-                          </div>
+                          </>
                         ) : (
-                          <span className="badge">{record.status}</span>
-                        )}
-                      </td>
-                    )}
+                          <span className="badge bg-yellow">Pending</span>
+                        )
+                      ) : (
+                        <>
+                          {!isApproved && (
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(record)}>
+                              <span className="material-icons" style={{ fontSize: 14 }}>edit</span>
+                            </button>
+                          )}
+                          {!isApproved && (
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(record)}>
+                              <span className="material-icons" style={{ fontSize: 14 }}>delete</span>
+                            </button>
+                          )}
+                          {isApproved && (
+                            <span className="badge bg-green" style={{ fontSize: 11 }}>Locked</span>
+                          )}
+                        </>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
               {filteredAttendance.length === 0 && (
-                <tr><td colSpan={canApprove ? 12 : 11} className="empty-state">No attendance records found</td></tr>
+                <tr><td colSpan={12} className="empty-state">No attendance records found</td></tr>
               )}
             </tbody>
           </table>
@@ -367,12 +460,18 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* Manual Entry Modal */}
+      {/* Manual Entry / Edit Modal */}
       {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
+        <div className="overlay" onClick={() => { setModalOpen(false); setEditingRecord(null) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Manual Attendance Entry</div>
-            <form onSubmit={handleManualSubmit}>
+            <div className="modal-title">{editingRecord ? 'Edit Attendance' : 'Manual Attendance Entry'}</div>
+            {editingRecord?.status === 'rejected' && (
+              <div className="info-box" style={{ marginBottom: 16, background: 'rgba(251,191,36,.1)', borderColor: 'var(--yellow)', padding: 8 }}>
+                <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle' }}>info</span>
+                This record was rejected. Editing will reset its status to <strong>Pending</strong> for re-approval.
+              </div>
+            )}
+            <form onSubmit={editingRecord ? handleEditSubmit : handleManualSubmit}>
               <div className="form-group">
                 <label>Employee *</label>
                 <select className="form-control" required value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
@@ -390,8 +489,8 @@ export default function Attendance() {
               </div>
               <div className="form-group"><label>Notes</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Record (Pending)</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setModalOpen(false); setEditingRecord(null) }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editingRecord ? 'Save Changes' : 'Save Record (Pending)'}</button>
               </div>
             </form>
           </div>
