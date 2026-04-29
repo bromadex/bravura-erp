@@ -1,4 +1,4 @@
-// src/pages/HR/UserPermissions.jsx (debug – shows errors)
+// src/pages/HR/UserPermissions.jsx
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import toast from 'react-hot-toast'
@@ -22,30 +22,26 @@ export default function UserPermissions() {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [permState, setPermState] = useState({})
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
+  // ✅ SAFE: only run when selectedEmployee has a valid system_user_id
   useEffect(() => {
-    if (!selectedEmployee) return
-    try {
-      const userPerms = permissions.filter(p => p.user_id === selectedEmployee.system_user_id)
-      const newState = {}
-      MODULES.forEach(mod => {
-        mod.pages.forEach(page => {
-          const existing = userPerms.find(p => p.module_name === mod.name && p.page_name === page)
-          newState[`${mod.name}:${page}`] = {
-            view: existing?.can_view || false,
-            edit: existing?.can_edit || false,
-            delete: existing?.can_delete || false,
-            approve: existing?.can_approve || false,
-          }
-        })
+    if (!selectedEmployee?.system_user_id) return
+    if (!permissions || permissions.length === 0) return
+
+    const userPerms = permissions.filter(p => p.user_id === selectedEmployee.system_user_id)
+    const newState = {}
+    MODULES.forEach(mod => {
+      mod.pages.forEach(page => {
+        const existing = userPerms.find(p => p.module_name === mod.name && p.page_name === page)
+        newState[`${mod.name}:${page}`] = {
+          view:    existing?.can_view    ?? false,
+          edit:    existing?.can_edit    ?? false,
+          delete:  existing?.can_delete  ?? false,
+          approve: existing?.can_approve ?? false,
+        }
       })
-      setPermState(newState)
-      setError(null)
-    } catch (err) {
-      console.error('Permission load error:', err)
-      setError(err.message)
-    }
+    })
+    setPermState(newState)
   }, [selectedEmployee, permissions])
 
   const handleCheck = (module, page, action, checked) => {
@@ -65,12 +61,21 @@ export default function UserPermissions() {
   }
 
   const savePermissions = async () => {
-    if (!selectedEmployee) return
+    if (!selectedEmployee?.system_user_id) {
+      toast.error('Selected employee has no system account')
+      return
+    }
     setSaving(true)
     try {
       const permsList = Object.entries(permState).map(([key, perms]) => {
         const [module, page] = key.split(':')
-        return { module, page, can_view: perms.view, can_edit: perms.edit, can_delete: perms.delete, can_approve: perms.approve }
+        return {
+          module, page,
+          can_view:    perms.view    ?? false,
+          can_edit:    perms.edit    ?? false,
+          can_delete:  perms.delete  ?? false,
+          can_approve: perms.approve ?? false,
+        }
       })
       await setUserPermissions(selectedEmployee.system_user_id, permsList)
       toast.success(`Permissions saved for ${selectedEmployee.name}`)
@@ -83,7 +88,12 @@ export default function UserPermissions() {
   }
 
   if (!canManage) {
-    return <div className="empty-state"><span className="material-icons">lock</span><p>You don't have permission to manage permissions.</p></div>
+    return (
+      <div className="empty-state" style={{ marginTop: 60 }}>
+        <span className="material-icons" style={{ fontSize: 48, opacity: 0.4 }}>lock</span>
+        <p>You don't have permission to manage user permissions.</p>
+      </div>
+    )
   }
 
   const eligibleEmployees = employees.filter(e => e.system_user_id)
@@ -99,8 +109,6 @@ export default function UserPermissions() {
         )}
       </div>
 
-      {error && <div className="card" style={{ background: 'rgba(248,113,113,.1)', padding: 16, marginBottom: 16, color: 'var(--red)' }}>Error: {error}</div>}
-
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <div className="form-group">
           <label>Select Employee (must have a system account)</label>
@@ -114,16 +122,20 @@ export default function UserPermissions() {
               <option key={emp.id} value={emp.id}>{emp.name} ({emp.system_username})</option>
             ))}
           </select>
-          {eligibleEmployees.length === 0 && <p style={{ fontSize: 12, marginTop: 8 }}>No employees with system accounts. Create one first.</p>}
+          {eligibleEmployees.length === 0 && (
+            <p style={{ fontSize: 12, marginTop: 8, color: 'var(--text-dim)' }}>
+              No employees with system accounts found. Create a system account in the Employees page first.
+            </p>
+          )}
         </div>
       </div>
 
       {selectedEmployee && (
         <>
-          <div className="table-wrap">
-            <table className="stock-table">
+          <div className="table-wrap" style={{ overflowX: 'auto' }}>
+            <table className="stock-table" style={{ minWidth: 600 }}>
               <thead>
-                <tr><th>Module</th><th>Page</th><th>View</th><th>Edit</th><th>Delete</th><th>Approve</th></tr>
+                <tr><th>Module</th><th>Page</th><th style={{ textAlign: 'center' }}>View</th><th style={{ textAlign: 'center' }}>Edit</th><th style={{ textAlign: 'center' }}>Delete</th><th style={{ textAlign: 'center' }}>Approve</th></tr>
               </thead>
               <tbody>
                 {MODULES.map(mod => {
@@ -131,9 +143,10 @@ export default function UserPermissions() {
                   return mod.pages.map((page, idx) => {
                     const key = `${mod.name}:${page}`
                     const perms = permState[key] || { view: false, edit: false, delete: false, approve: false }
+                    const isFirstRow = idx === 0
                     return (
                       <tr key={key}>
-                        {idx === 0 && (
+                        {isFirstRow && (
                           <td rowSpan={mod.pages.length} style={{ fontWeight: 700, verticalAlign: 'top', paddingTop: 14 }}>
                             <div>{mod.name}</div>
                             <button className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => toggleModule(mod.name, !allViewed)}>
@@ -141,10 +154,15 @@ export default function UserPermissions() {
                             </button>
                           </td>
                         )}
-                        <td>{page}</td>
+                        <td style={{ color: 'var(--text-mid)' }}>{page}</td>
                         {['view', 'edit', 'delete', 'approve'].map(action => (
                           <td key={action} style={{ textAlign: 'center' }}>
-                            <input type="checkbox" checked={perms[action] || false} onChange={e => handleCheck(mod.name, page, action, e.target.checked)} />
+                            <input
+                              type="checkbox"
+                              checked={perms[action] || false}
+                              onChange={e => handleCheck(mod.name, page, action, e.target.checked)}
+                              style={{ cursor: 'pointer', width: 16, height: 16 }}
+                            />
                           </td>
                         ))}
                       </tr>
@@ -155,7 +173,9 @@ export default function UserPermissions() {
             </table>
           </div>
           <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={savePermissions} disabled={saving}>Save Permissions</button>
+            <button className="btn btn-primary" onClick={savePermissions} disabled={saving}>
+              <span className="material-icons">save</span> Save Permissions
+            </button>
           </div>
         </>
       )}
