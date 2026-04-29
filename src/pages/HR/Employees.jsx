@@ -25,6 +25,7 @@ export default function Employees() {
   const [documents, setDocuments] = useState([])
   const [uploading, setUploading] = useState(false)
   const [activeDocCategory, setActiveDocCategory] = useState('general')
+  const [manualEmployeeId, setManualEmployeeId] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('ALL')
@@ -61,10 +62,12 @@ export default function Employees() {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
+
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
         return
       }
+
       if (data && data.length) {
         const docsWithUrls = data.map(file => {
           const pathParts = file.name.split('/')
@@ -175,6 +178,7 @@ export default function Employees() {
 
   const openModal = (employee = null) => {
     setAccountInfo(null)
+    setManualEmployeeId(false)
     if (employee) {
       setEditing(employee)
       setForm({
@@ -210,6 +214,7 @@ export default function Employees() {
   }
 
   const editFromView = () => { setViewModalOpen(false); openModal(selectedEmployee) }
+  
   const deleteFromView = async () => {
     if (!window.confirm(`Delete employee "${selectedEmployee.name}"? System account will also be removed.`)) return
     await deleteEmployee(selectedEmployee.id)
@@ -228,6 +233,7 @@ export default function Employees() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Required field validations
     if (!form.name || form.name.trim() === '') {
       toast.error('Full Name is required')
       return
@@ -244,6 +250,8 @@ export default function Employees() {
       toast.error('Hire Date is required')
       return
     }
+
+    // Phone format validation (optional)
     if (form.phone && !/^[0-9+\-\s()]{9,15}$/.test(form.phone)) {
       toast.error('Invalid phone number format')
       return
@@ -252,19 +260,39 @@ export default function Employees() {
       toast.error('Invalid email format')
       return
     }
-    
+
+    // ✅ Manual Employee ID validation
+    if (!editing && manualEmployeeId) {
+      if (!form.employee_number?.match(/^BRA\d+$/)) {
+        toast.error('Employee number must start with BRA followed by digits (e.g., BRA185)')
+        return
+      }
+      const exists = employees.some(e => e.employee_number === form.employee_number && e.id !== editing?.id)
+      if (exists) {
+        toast.error('Employee number already exists')
+        return
+      }
+    }
+
+    // Prepare data for submission – if manual ID, use it; otherwise leave empty for auto-generation
+    const submitData = { ...form }
+    if (!editing && !manualEmployeeId) {
+      submitData.employee_number = '' // HRContext will auto-generate
+    }
+
     try {
       if (editing) {
-        await updateEmployee(editing.id, form)
+        await updateEmployee(editing.id, submitData)
         toast.success('Employee updated')
         setModalOpen(false)
       } else {
         if (createAccount) {
-          const accountResult = await addEmployee(form, true, accountRoleId)
+          const accountResult = await addEmployee(submitData, true, accountRoleId)
           setAccountInfo(accountResult)
           toast.success(`Employee added! Username: ${accountResult.username}, Password: ${accountResult.password}`)
+          // Keep modal open to show credentials
         } else {
-          await addEmployee(form, false)
+          await addEmployee(submitData, false)
           toast.success('Employee added')
           setModalOpen(false)
         }
@@ -303,7 +331,8 @@ export default function Employees() {
     Active: 'bg-green', 'On Leave': 'bg-yellow', Suspended: 'bg-orange', Terminated: 'bg-red'
   }
 
-  // Profile Tab
+  // ========== TAB COMPONENTS ==========
+
   const ProfileTab = ({ employee }) => {
     const filteredDocs = documents.filter(doc => doc.category === activeDocCategory)
     return (
@@ -369,7 +398,6 @@ export default function Employees() {
     )
   }
 
-  // Attendance Tab
   const AttendanceTab = ({ employee }) => {
     const empAttendance = getEmployeeAttendance(employee.id)
     const weeklyStats = getWeeklyHours(employee.id)
@@ -385,24 +413,20 @@ export default function Employees() {
         </div>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead>
-              <tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr>
-            </thead>
+            <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Shift</th><th>Hours</th><th>Overtime</th><th>Notes</th></tr></thead>
             <tbody>
               {empAttendance.map(att => (
                 <tr key={att.id}>
-                  <td>{att.date}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{att.date}</td>
                   <td>{att.clock_in}</td>
                   <td>{att.clock_out || '—'}</td>
                   <td><span className="badge bg-blue">{att.shift_type}</span></td>
                   <td>{att.total_hours?.toFixed(1) || '—'}</td>
                   <td>{att.overtime_hours?.toFixed(1) || '—'}</td>
-                  <td>{att.notes || '—'}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && (
-                <tr><td colSpan="7" className="empty-state">No attendance records</td></tr>
-              )}
+              {empAttendance.length === 0 && (<tr><td colSpan="7" className="empty-state">No attendance records</td></tr>)}
             </tbody>
           </table>
         </div>
@@ -410,7 +434,6 @@ export default function Employees() {
     )
   }
 
-  // Performance Tab
   const PerformanceTab = ({ employee }) => {
     const empSkills = getEmployeeSkills(employee.id)
     const empCerts = getEmployeeCertifications(employee.id)
@@ -453,9 +476,7 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead>
-                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr>
-              </thead>
+              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -466,19 +487,15 @@ export default function Employees() {
                       <td>{cert.issuing_body || '—'}</td>
                       <td>{cert.issue_date || '—'}</td>
                       <td>{cert.expiry_date || '—'}</td>
-                      <td>
-                        {expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}
-                      </td>
-                      <td>
+                      <td>{expired ? <span className="badge bg-red">Expired</span> : expiring ? <span className="badge bg-yellow">Expiring Soon</span> : <span className="badge bg-green">Valid</span>}</td>
+                      <td style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => openCertModal(cert)}><span className="material-icons">edit</span></button>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteCertification(cert.id, cert.certification_name)}><span className="material-icons">delete</span></button>
                       </td>
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && (
-                  <tr><td colSpan="6" className="empty-state">No certifications</td></tr>
-                )}
+                {empCerts.length === 0 && (<tr><td colSpan="6" className="empty-state">No certifications</td></table>)}
               </tbody>
             </table>
           </div>
@@ -487,7 +504,6 @@ export default function Employees() {
     )
   }
 
-  // History Tab
   const HistoryTab = ({ employee }) => {
     const history = getEmployeeHistory(employee.id)
     const getActionColor = (action) => {
@@ -499,28 +515,24 @@ export default function Employees() {
     return (
       <div className="table-wrap">
         <table className="stock-table">
-          <thead>
-            <tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr>
-          </thead>
+          <thead><tr><th>Timestamp</th><th>Action</th><th>User</th><th>Changes</th></tr></thead>
           <tbody>
             {history.map(log => (
               <tr key={log.id}>
-                <td>{new Date(log.created_at).toLocaleString()}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</td>
                 <td style={{ color: getActionColor(log.action) }}>{log.action}</td>
                 <td>{log.user_name || 'System'}</td>
-                <td>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
+                <td style={{ fontSize: 12 }}>{log.new_values ? Object.keys(log.new_values).slice(0, 2).join(', ') : '—'}</td>
               </tr>
             ))}
-            {history.length === 0 && (
-              <tr><td colSpan="4" className="empty-state">No history records</td></tr>
-            )}
+            {history.length === 0 && (<tr><td colSpan="4" className="empty-state">No history records</td></tr>)}
           </tbody>
         </table>
       </div>
     )
   }
 
-  // Main render
+  // ========== MAIN RENDER ==========
   return (
     <div>
       <div className="page-header">
@@ -542,31 +554,26 @@ export default function Employees() {
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>business</span> Department</label>
             <select className="form-control" value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
-              <option value="ALL">All Departments</option>
-              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              <option value="ALL">All Departments</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>work</span> Designation</label>
             <select className="form-control" value={filterDesignation} onChange={e => setFilterDesignation(e.target.value)}>
-              <option value="ALL">All Designations</option>
-              {designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+              <option value="ALL">All Designations</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>info</span> Status</label>
             <select className="form-control" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="ALL">All Status</option>
-              <option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option>
+              <option value="ALL">All Status</option><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option>
             </select>
           </div>
           <div className="form-group">
             <label><span className="material-icons" style={{ fontSize: 14 }}>sort</span> Sort By</label>
             <select className="form-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
-              <option value="name-asc">Name (A-Z)</option>
-              <option value="name-desc">Name (Z-A)</option>
-              <option value="hire-date-asc">Hire Date (Oldest)</option>
-              <option value="hire-date-desc">Hire Date (Newest)</option>
+              <option value="name-asc">Name (A-Z)</option><option value="name-desc">Name (Z-A)</option>
+              <option value="hire-date-asc">Hire Date (Oldest)</option><option value="hire-date-desc">Hire Date (Newest)</option>
             </select>
           </div>
         </div>
@@ -574,49 +581,30 @@ export default function Employees() {
 
       {/* Employee Cards */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-        {hrLoading ? (
-          <div>Loading…</div>
-        ) : filteredEmployees.length === 0 ? (
-          <div className="empty-state">No employees match your filters</div>
-        ) : (
-          filteredEmployees.map(emp => {
-            const weeklyStats = getWeeklyHours(emp.id)
-            return (
-              <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>
-                      {emp.name?.charAt(0).toUpperCase() || '?'}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div>
-                      <div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span>
-                    <div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div>
-                  </div>
+        {hrLoading ? (<div>Loading…</div>) : filteredEmployees.length === 0 ? (<div className="empty-state">No employees match your filters</div>) : filteredEmployees.map(emp => {
+          const weeklyStats = getWeeklyHours(emp.id)
+          return (
+            <div key={emp.id} className="card" style={{ padding: 16, cursor: 'pointer' }} onClick={() => openViewModal(emp)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: '#0b0f1a' }}>{emp.name?.charAt(0).toUpperCase() || '?'}</div>
+                  <div><div style={{ fontSize: 16, fontWeight: 700 }}>{emp.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{emp.employee_number || '—'}</div><div style={{ fontSize: 12, marginTop: 2 }}>{getDesignationTitle(emp.designation_id)}</div></div>
                 </div>
-                <div style={{ marginTop: 12 }}>
-                  {emp.department_id && <div><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
-                  {emp.phone && <div><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
-                  {emp.email && <div><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
-                  {emp.system_username && <div><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
-                </div>
-                <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{weeklyStats.totalHours.toFixed(1)}h</strong> (OT: {weeklyStats.totalOvertime.toFixed(1)}h)</span>
-                  {canEdit && (
-                    <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}>
-                      <span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span>
-                    </button>
-                  )}
-                </div>
+                <div><span className={`badge ${statusColors[emp.status] || 'bg-green'}`}>{emp.status || 'Active'}</span><div style={{ fontSize: 10, marginTop: 4, color: 'var(--text-dim)' }}>{emp.employment_type || 'Full-time'}</div></div>
               </div>
-            )
-          })
-        )}
+              <div style={{ marginTop: 12 }}>
+                {emp.department_id && <div><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
+                {emp.phone && <div><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
+                {emp.email && <div><span className="material-icons" style={{ fontSize: 12 }}>email</span> {emp.email}</div>}
+                {emp.system_username && <div><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span><span className="material-icons" style={{ fontSize: 12 }}>schedule</span> This week: <strong>{weeklyStats.totalHours.toFixed(1)}h</strong> (OT: {weeklyStats.totalOvertime.toFixed(1)}h)</span>
+                {canEdit && (<button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); handleStatusChange(emp, emp.status === 'Active' ? 'On Leave' : 'Active') }}><span className="material-icons" style={{ fontSize: 14 }}>swap_horiz</span></button>)}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Detail View Modal */}
@@ -625,24 +613,10 @@ export default function Employees() {
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Employee Details: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div>
-                {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>}
-                {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
-              </div>
+              <div>{canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>}{canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}</div>
             </div>
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-              {['profile', 'attendance', 'performance', 'history'].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                  padding: '8px 16px', background: 'transparent', border: 'none',
-                  borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent',
-                  color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)',
-                  cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize'
-                }}>
-                  <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>
-                    {tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}
-                  </span>{tab}
-                </button>
-              ))}
+              {['profile', 'attendance', 'performance', 'history'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}><span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>{tab === 'profile' ? 'person' : tab === 'attendance' ? 'schedule' : tab === 'performance' ? 'trending_up' : 'history'}</span>{tab}</button>))}
             </div>
             <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 8 }}>
               {activeTab === 'profile' && <ProfileTab employee={selectedEmployee} />}
@@ -650,9 +624,7 @@ export default function Employees() {
               {activeTab === 'performance' && <PerformanceTab employee={selectedEmployee} />}
               {activeTab === 'history' && <HistoryTab employee={selectedEmployee} />}
             </div>
-            <div className="modal-actions" style={{ marginTop: 20 }}>
-              <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
-            </div>
+            <div className="modal-actions" style={{ marginTop: 20 }}><button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button></div>
           </div>
         </div>
       )}
@@ -671,11 +643,12 @@ export default function Employees() {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Employee Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Employee</span></div>
+
             {accountInfo && (
               <div className="info-box" style={{ marginBottom: 16, background: 'rgba(52,211,153,.1)', borderColor: 'rgba(52,211,153,.3)' }}>
                 <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle' }}>check_circle</span> Account created!<br />
@@ -684,32 +657,65 @@ export default function Employees() {
                 <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(`Username: ${accountInfo.username}\nPassword: ${accountInfo.password}`)}>Copy Credentials</button>
               </div>
             )}
+
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group"><label>Full Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || 'Auto-generated'} /></div>
+                <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || (manualEmployeeId ? 'Enter manually' : 'Auto-generated')} /></div>
               </div>
+
+              {/* ✅ Manual/Auto Employee ID Toggle */}
+              {!editing && (
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={manualEmployeeId} onChange={e => setManualEmployeeId(e.target.checked)} />
+                    <span>Manually enter existing BRA number</span>
+                  </label>
+                  {manualEmployeeId ? (
+                    <div style={{ marginTop: 8 }}>
+                      <input
+                        className="form-control"
+                        value={form.employee_number}
+                        onChange={e => setForm({ ...form, employee_number: e.target.value.toUpperCase() })}
+                        placeholder="BRA185"
+                      />
+                      <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Must start with BRA followed by digits, must be unique</small>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8, background: 'var(--surface2)', padding: 8, borderRadius: 8, fontSize: 12 }}>
+                      Auto‑generate next BRA number (e.g., BRA185)
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="form-row">
                 <div className="form-group"><label>Designation *</label><select className="form-control" required value={form.designation_id} onChange={e => setForm({ ...form, designation_id: e.target.value })}><option value="">Select Designation</option>{designations.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></div>
                 <div className="form-group"><label>Department *</label><select className="form-control" required value={form.department_id} onChange={e => setForm({ ...form, department_id: e.target.value })}><option value="">Select Department</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
               </div>
+
               <div className="form-row">
                 <div className="form-group"><label>Employment Type</label><select className="form-control" value={form.employment_type} onChange={e => setForm({ ...form, employment_type: e.target.value })}><option>Full-time</option><option>Contract</option><option>Casual</option></select></div>
                 <div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option>Active</option><option>On Leave</option><option>Suspended</option><option>Terminated</option></select></div>
               </div>
+
               <div className="form-row">
                 <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
               </div>
+
               <div className="form-row">
                 <div className="form-group"><label>Hire Date *</label><input type="date" className="form-control" required value={form.hire_date} onChange={e => setForm({ ...form, hire_date: e.target.value })} /></div>
                 <div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} /></div>
               </div>
+
               <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({ ...form, residential_address: e.target.value })} /></div>
+
               <div className="form-row">
                 <div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({ ...form, emergency_name: e.target.value })} /></div>
                 <div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({ ...form, emergency_phone: e.target.value })} /></div>
               </div>
+
               {!editing && (
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -731,11 +737,10 @@ export default function Employees() {
                   )}
                 </div>
               )}
+
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">
-                  {editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}
-                </button>
+                <button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button>
               </div>
             </form>
           </div>
