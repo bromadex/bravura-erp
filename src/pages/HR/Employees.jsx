@@ -403,7 +403,7 @@ export default function Employees() {
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && (<td><td colSpan="7" className="empty-state">No attendance records</td></tr>)}
+              {empAttendance.length === 0 && (<td><td colSpan="7" className="empty-state">No attendance records</td></td>)}
             </tbody>
           </table>
         </div>
