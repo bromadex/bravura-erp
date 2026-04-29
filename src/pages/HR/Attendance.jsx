@@ -94,7 +94,7 @@ export default function Attendance() {
     )
   }
 
-  // Quick clock in/out (unchanged)
+  // Quick clock in/out
   const today = new Date().toISOString().split('T')[0]
   const activeEmployeesList = employees.filter(e => e.status === 'Active')
   const todayAttendance = attendance.filter(a => a.date === today)
@@ -256,7 +256,7 @@ export default function Attendance() {
         </div>
       </div>
 
-      {/* Quick Clock In/Out for Approvers (same as before) */}
+      {/* Quick Clock In/Out for Approvers */}
       {canApprove && (
         <div className="card" style={{ padding: 16, marginBottom: 20 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Quick Clock In / Out – Today</h3>
@@ -313,7 +313,15 @@ export default function Attendance() {
                     <td>{record.total_hours?.toFixed(1) || '—'}</td>
                     <td>{record.overtime_hours?.toFixed(1) || '—'}</td>
                     <td>{getStatusBadge(record.status)}</td>
-                    <td style={{ fontSize: 12 }}>{record.approved_by || '—'}{record.approved_at ? <br/><small>{new Date(record.approved_at).toLocaleDateString()}</small> : ''}</td>
+                    <td style={{ fontSize: 12 }}>
+                      {record.approved_by || '—'}
+                      {record.approved_at && (
+                        <>
+                          <br />
+                          <small>{new Date(record.approved_at).toLocaleDateString()}</small>
+                        </>
+                      )}
+                    </td>
                     <td style={{ color: 'var(--text-dim)', maxWidth: 150 }}>{record.notes || '—'}</td>
                     {canApprove && (
                       <td>
