@@ -55,6 +55,9 @@ import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
 import Attendance from './pages/HR/Attendance'
 
+// ── Leave Management (placeholder – will be replaced in Stage 10.2) ──
+import Leave from './pages/HR/Leave'
+
 // ───────────────────────────────────────────────────────────────
 // Helpers
 // ───────────────────────────────────────────────────────────────
@@ -65,7 +68,6 @@ function ProtectedRoute({ children }) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>Loading…</div>
   }
   if (!user) return <Navigate to="/login" replace />
-  // 🔐 Force password change if required
   if (user.must_change_password === true && window.location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />
   }
@@ -119,7 +121,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* ── INVENTORY ───────────────────────────────────── */}
+      {/* INVENTORY */}
       <Route path="/module/inventory" element={
         <ProtectedRoute>
           <PermissionRoute module="inventory" page="stock-balance">
@@ -138,7 +140,7 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
       </Route>
 
-      {/* ── PROCUREMENT ─────────────────────────────────── */}
+      {/* PROCUREMENT */}
       <Route path="/module/procurement" element={
         <ProtectedRoute>
           <PermissionRoute module="procurement" page="suppliers">
@@ -156,11 +158,10 @@ function AppRoutes() {
         <Route path="goods-received" element={<GoodsReceived />} />
       </Route>
 
-      {/* ── FUEL ─────────────────────────────────────────── */}
+      {/* FUEL */}
       <Route path="/module/fuel" element={
         <ProtectedRoute>
           <PermissionRoute module="fuel" page="tanks">
-            {/* 🔥 Both providers must be present for FuelReports to use useProcurement */}
             <ProcurementProvider>
               <FuelProvider>
                 <Layout module="fuel" />
@@ -177,7 +178,7 @@ function AppRoutes() {
         <Route path="reports" element={<FuelReports />} />
       </Route>
 
-      {/* ── FLEET ────────────────────────────────────────── */}
+      {/* FLEET */}
       <Route path="/module/fleet" element={
         <ProtectedRoute>
           <PermissionRoute module="fleet" page="dashboard">
@@ -196,7 +197,7 @@ function AppRoutes() {
         <Route path="asset-issues" element={<AssetIssues />} />
       </Route>
 
-      {/* ── HR ───────────────────────────────────────────── */}
+      {/* HR */}
       <Route path="/module/hr" element={
         <ProtectedRoute>
           <PermissionRoute module="hr" page="dashboard">
@@ -213,11 +214,12 @@ function AppRoutes() {
         <Route path="designations" element={<Designations />} />
         <Route path="permissions" element={<UserPermissions />} />
         <Route path="attendance" element={<Attendance />} />
-        <Route path="leave" element={<ModulePlaceholder module="hr" page="leave" />} />
+        {/* Leave Management (placeholder – full UI in Stage 10.2) */}
+        <Route path="leave" element={<Leave />} />
         <Route path="travel" element={<ModulePlaceholder module="hr" page="travel" />} />
       </Route>
 
-      {/* ── OTHER MODULES (placeholders) ─────────────────── */}
+      {/* OTHER MODULES (placeholders) */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
