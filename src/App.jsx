@@ -17,7 +17,7 @@ import PermissionRoute from './components/PermissionRoute'
 import AccessDenied from './pages/Errors/AccessDenied'
 import ChangePassword from './pages/ChangePassword'
 
-// Inventory Pages
+// ── Inventory Pages ───────────────────────────────────────────
 import StockBalance from './pages/Inventory/StockBalance'
 import StockIn from './pages/Inventory/StockIn'
 import StockOut from './pages/Inventory/StockOut'
@@ -25,21 +25,21 @@ import Transactions from './pages/Inventory/Transactions'
 import StockTaking from './pages/Inventory/StockTaking'
 import Categories from './pages/Inventory/Categories'
 
-// Procurement Pages
+// ── Procurement Pages ─────────────────────────────────────────
 import Suppliers from './pages/Procurement/Suppliers'
 import StoreRequisitions from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
 import PurchaseOrders from './pages/Procurement/PurchaseOrders'
 import GoodsReceived from './pages/Procurement/GoodsReceived'
 
-// Fuel Pages
+// ── Fuel Pages ────────────────────────────────────────────────
 import FuelTanks from './pages/Fuel/FuelTanks'
 import FuelIssuance from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
 import DipstickLog from './pages/Fuel/DipstickLog'
 import FuelReports from './pages/Fuel/FuelReports'
 
-// Fleet Pages
+// ── Fleet Pages ───────────────────────────────────────────────
 import FleetDashboard from './pages/Fleet/FleetDashboard'
 import Vehicles from './pages/Fleet/Vehicles'
 import Generators from './pages/Fleet/Generators'
@@ -47,7 +47,7 @@ import HeavyEquipment from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues from './pages/Fleet/AssetIssues'
 
-// HR Pages
+// ── HR Pages ──────────────────────────────────────────────────
 import HRDashboard from './pages/HR/HRDashboard'
 import Employees from './pages/HR/Employees'
 import Departments from './pages/HR/Departments'
@@ -55,54 +55,32 @@ import Designations from './pages/HR/Designations'
 import UserPermissions from './pages/HR/UserPermissions'
 import Attendance from './pages/HR/Attendance'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ProtectedRoute with password change enforcement
-// ─────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────────
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-
   if (loading) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', color: 'var(--text-dim)',
-      }}>
-        Loading…
-      </div>
-    )
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>Loading…</div>
   }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  // ✅ Force password change if required
+  if (!user) return <Navigate to="/login" replace />
+  // 🔐 Force password change if required
   if (user.must_change_password === true && window.location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />
   }
-
   return children
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Placeholder for modules not yet built
-// ─────────────────────────────────────────────────────────────────────────────
 function ModulePlaceholder({ module, page }) {
   const navigate = useNavigate()
   const label = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   const modLabel = module?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 16,
-    }}>
-      <span className="material-icons" style={{ fontSize: 72, opacity: .3, color: 'var(--gold)' }}>
-        construction
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 16 }}>
+      <span className="material-icons" style={{ fontSize: 72, opacity: .3, color: 'var(--gold)' }}>construction</span>
       <div>
-        <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 6 }}>
-          {modLabel}
-        </div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 6 }}>{modLabel}</div>
         <h2 style={{ fontSize: 22, fontWeight: 800 }}>{label}</h2>
         <p style={{ color: 'var(--text-dim)', marginTop: 8, fontSize: 13 }}>Under development</p>
       </div>
@@ -114,25 +92,25 @@ function ModulePlaceholder({ module, page }) {
 }
 
 const OTHER_MODULES = [
-  { id: 'logistics', pages: ['goods-received', 'batch-plant', 'campsite'] },
+  { id: 'logistics',  pages: ['goods-received', 'batch-plant', 'campsite'] },
   { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
-  { id: 'reports', pages: ['overview', 'audit-log', 'drafts'] },
+  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts'] },
 ]
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // Routes
-// ─────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+
 function AppRoutes() {
   const { user } = useAuth()
   return (
     <Routes>
-      {/* Auth routes */}
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/access-denied" element={<AccessDenied />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/" element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Dashboard placeholder */}
+      {/* Dashboard */}
       <Route path="/module/dashboard" element={
         <ProtectedRoute>
           <PermissionRoute module="dashboard" page="overview">
@@ -141,7 +119,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* INVENTORY */}
+      {/* ── INVENTORY ───────────────────────────────────── */}
       <Route path="/module/inventory" element={
         <ProtectedRoute>
           <PermissionRoute module="inventory" page="stock-balance">
@@ -160,7 +138,7 @@ function AppRoutes() {
         <Route path="categories" element={<Categories />} />
       </Route>
 
-      {/* PROCUREMENT */}
+      {/* ── PROCUREMENT ─────────────────────────────────── */}
       <Route path="/module/procurement" element={
         <ProtectedRoute>
           <PermissionRoute module="procurement" page="suppliers">
@@ -178,13 +156,16 @@ function AppRoutes() {
         <Route path="goods-received" element={<GoodsReceived />} />
       </Route>
 
-      {/* FUEL */}
+      {/* ── FUEL ─────────────────────────────────────────── */}
       <Route path="/module/fuel" element={
         <ProtectedRoute>
           <PermissionRoute module="fuel" page="tanks">
-            <FuelProvider>
-              <Layout module="fuel" />
-            </FuelProvider>
+            {/* 🔥 Both providers must be present for FuelReports to use useProcurement */}
+            <ProcurementProvider>
+              <FuelProvider>
+                <Layout module="fuel" />
+              </FuelProvider>
+            </ProcurementProvider>
           </PermissionRoute>
         </ProtectedRoute>
       }>
@@ -196,7 +177,7 @@ function AppRoutes() {
         <Route path="reports" element={<FuelReports />} />
       </Route>
 
-      {/* FLEET */}
+      {/* ── FLEET ────────────────────────────────────────── */}
       <Route path="/module/fleet" element={
         <ProtectedRoute>
           <PermissionRoute module="fleet" page="dashboard">
@@ -215,7 +196,7 @@ function AppRoutes() {
         <Route path="asset-issues" element={<AssetIssues />} />
       </Route>
 
-      {/* HUMAN RESOURCES */}
+      {/* ── HR ───────────────────────────────────────────── */}
       <Route path="/module/hr" element={
         <ProtectedRoute>
           <PermissionRoute module="hr" page="dashboard">
@@ -236,7 +217,7 @@ function AppRoutes() {
         <Route path="travel" element={<ModulePlaceholder module="hr" page="travel" />} />
       </Route>
 
-      {/* OTHER MODULES – placeholders */}
+      {/* ── OTHER MODULES (placeholders) ─────────────────── */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
@@ -252,33 +233,26 @@ function AppRoutes() {
         </Route>
       ))}
 
-      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// App root
-// ─────────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// Root App
+// ───────────────────────────────────────────────────────────────
+
 export default function App() {
   return (
     <AuthProvider>
       <PermissionProvider>
         <BrowserRouter>
           <AppRoutes />
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                border: '1px solid var(--border2)',
-              },
-              success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
-              error: { iconTheme: { primary: 'var(--red)', secondary: 'var(--surface)' } },
-            }}
-          />
+          <Toaster position="top-right" toastOptions={{
+            style: { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border2)' },
+            success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
+            error: { iconTheme: { primary: 'var(--red)', secondary: 'var(--surface)' } },
+          }} />
         </BrowserRouter>
       </PermissionProvider>
     </AuthProvider>
