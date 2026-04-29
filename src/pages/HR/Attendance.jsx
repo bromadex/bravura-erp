@@ -266,6 +266,16 @@ export default function Attendance() {
     }
   }
 
+  // Helper to format approved date safely
+  const formatApprovedDate = (date) => {
+    if (!date) return null
+    try {
+      return new Date(date).toLocaleDateString()
+    } catch {
+      return null
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -383,6 +393,7 @@ export default function Attendance() {
                 const isPending = record.status === 'pending'
                 const isApproved = record.status === 'approved'
                 const isSelected = selectedRecords.includes(record.id)
+                const approvedDate = formatApprovedDate(record.approved_at)
                 return (
                   <tr key={record.id} style={{ background: isPending ? 'rgba(251,191,36,.05)' : 'transparent' }}>
                     <td style={{ textAlign: 'center' }}>
@@ -398,9 +409,13 @@ export default function Attendance() {
                     <td>{record.total_hours?.toFixed(1) || '—'}</td>
                     <td>{record.overtime_hours?.toFixed(1) || '—'}</td>
                     <td>{getStatusBadge(record.status)}</td>
-                    <td style={{ fontSize: 12 }}>{record.approved_by || '—'}{record.approved_at ? <br/><small>{new Date(record.approved_at).toLocaleDateString()}</small> : ''}</td>
+                    <td style={{ fontSize: 12 }}>
+                      {record.approved_by || '—'}
+                      {approvedDate && <br />}
+                      {approvedDate && <small>{approvedDate}</small>}
+                    </td>
                     <td style={{ color: 'var(--text-dim)', maxWidth: 150 }}>{record.notes || '—'}</td>
-                    <td style={{ display: 'flex', gap: 4 }}>
+                    <td style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {isPending ? (
                         canApprove ? (
                           <>
