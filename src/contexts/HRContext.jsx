@@ -7,9 +7,7 @@ import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtil
 const HRContext = createContext(null)
 
 export function HRProvider({ children }) {
-  // ─────────────────────────────────────────────────────────────
-  // Existing state
-  // ─────────────────────────────────────────────────────────────
+  // ========== Existing State ==========
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
@@ -19,18 +17,14 @@ export function HRProvider({ children }) {
   const [auditLogs, setAuditLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // ─────────────────────────────────────────────────────────────
-  // Leave Management state (Stage 10)
-  // ─────────────────────────────────────────────────────────────
+  // ========== Leave Management State (Stage 10) ==========
   const [leaveTypes, setLeaveTypes] = useState([])
   const [leaveBalances, setLeaveBalances] = useState([])
   const [leaveRequests, setLeaveRequests] = useState([])
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
-  // ─────────────────────────────────────────────────────────────
-  // Helper: Generate employee number (BRA###)
-  // ─────────────────────────────────────────────────────────────
+  // ========== Helper: Generate Employee Number (BRAxxx) ==========
   const generateEmployeeNumber = async () => {
     const { data, error } = await supabase
       .from('employees')
@@ -39,24 +33,20 @@ export function HRProvider({ children }) {
 
     if (error) {
       console.error('Error fetching employee numbers:', error)
-      return 'BRA001'
+      return 'BRA164'
     }
 
-    let maxNum = 0
+    let maxNum = 160
     data?.forEach(emp => {
       if (emp.employee_number) {
         const num = parseInt(emp.employee_number.replace(/^BRA/i, ''), 10)
         if (!isNaN(num) && num > maxNum) maxNum = num
       }
     })
-
-    if (maxNum === 0) return 'BRA001'
     return `BRA${maxNum + 1}`
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helper: Log HR actions
-  // ─────────────────────────────────────────────────────────────
+  // ========== Audit Log Helper ==========
   const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
     try {
       const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
@@ -74,15 +64,15 @@ export function HRProvider({ children }) {
     } catch (err) { console.warn('Audit log failed:', err) }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helper: Create system account (with unique username)
-  // ─────────────────────────────────────────────────────────────
+  // ========== Create System Account ==========
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {
     let baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
     if (!baseUsername) baseUsername = 'user'
+
     let username = baseUsername
     let counter = 1
     let exists = true
+
     while (exists) {
       const { data, error } = await supabase
         .from('app_users')
@@ -96,7 +86,9 @@ export function HRProvider({ children }) {
         username = `${baseUsername}${counter}`
       }
     }
+
     const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
+
     const { data, error } = await supabase.from('app_users').insert([{
       id: generateId(),
       username,
@@ -109,42 +101,23 @@ export function HRProvider({ children }) {
       employee_id: employeeId,
       created_at: new Date().toISOString()
     }]).select().single()
+
     if (error) throw error
     await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { roleId })
     return { username, password: rawPassword, userId: data.id }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helper: Auto‑create leave balances for a new employee
-  // ─────────────────────────────────────────────────────────────
-  const createLeaveBalancesForEmployee = async (employeeId) => {
-    const { data: leaveTypeList } = await supabase.from('leave_types').select('id')
-    if (!leaveTypeList?.length) return
-    const currentYear = new Date().getFullYear()
-    const balanceInserts = leaveTypeList.map(lt => ({
-      id: generateId(),
-      employee_id: employeeId,
-      leave_type_id: lt.id,
-      total_days: 0,
-      used_days: 0,
-      year: currentYear
-    }))
-    await supabase.from('leave_balances').insert(balanceInserts)
-    // also previous year (for history)
-    const lastYearInserts = leaveTypeList.map(lt => ({
-      id: generateId(),
-      employee_id: employeeId,
-      leave_type_id: lt.id,
-      total_days: 0,
-      used_days: 0,
-      year: currentYear - 1
-    }))
-    await supabase.from('leave_balances').insert(lastYearInserts)
+  // ========== Attendance Status Validation ==========
+  const canPerformAttendance = (employeeId) => {
+    const employee = employees.find(e => e.id === employeeId)
+    if (!employee) return { allowed: false, reason: 'Employee not found' }
+    if (employee.status === 'Terminated') return { allowed: false, reason: 'Terminated employees cannot clock in' }
+    if (employee.status === 'On Leave') return { allowed: false, reason: 'Employee is on leave' }
+    if (employee.status !== 'Active') return { allowed: false, reason: 'Employee status does not allow attendance' }
+    return { allowed: true, reason: null }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Fetch all data (employees, departments, leave, etc.)
-  // ─────────────────────────────────────────────────────────────
+  // ========== Main Fetch (includes leave data) ==========
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -160,7 +133,7 @@ export function HRProvider({ children }) {
         supabase.from('employee_certifications').select('*'),
         supabase.from('hr_audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('leave_types').select('*').order('name'),
-        supabase.from('leave_balances').select('*, leave_types(name)').order('year', { ascending: false }),
+        supabase.from('leave_balances').select('*, leave_types(name)'),
         supabase.from('leave_requests').select('*, leave_types(name), employees(name)').order('created_at', { ascending: false })
       ])
       if (empRes.data) setEmployees(empRes.data)
@@ -183,13 +156,12 @@ export function HRProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ─────────────────────────────────────────────────────────────
-  // Employees CRUD
-  // ─────────────────────────────────────────────────────────────
+  // ========== Employees CRUD ==========
   const addEmployee = async (employee, createAccount = false, accountRoleId = 'role_viewer') => {
     const id = generateId()
     const employeeNumber = await generateEmployeeNumber()
     const { employee_number: _discard, ...employeeData } = employee
+
     const newEmployee = {
       id,
       created_at: new Date().toISOString(),
@@ -197,18 +169,31 @@ export function HRProvider({ children }) {
       ...employeeData,
       employee_number: employeeNumber,
     }
+
     let accountInfo = null
     if (createAccount) {
       accountInfo = await createSystemAccount(id, employee.name, accountRoleId)
       newEmployee.system_username = accountInfo.username
       newEmployee.system_user_id = accountInfo.userId
     }
+
     const { error } = await supabase.from('employees').insert([newEmployee])
     if (error) {
       if (accountInfo?.userId) await supabase.from('app_users').delete().eq('id', accountInfo.userId)
       throw new Error(error.message)
     }
-    await createLeaveBalancesForEmployee(id)
+
+    // Auto-create leave balances for all leave types (current and previous year)
+    const { data: ltList } = await supabase.from('leave_types').select('id')
+    if (ltList?.length) {
+      const currentYear = new Date().getFullYear()
+      const inserts = ltList.flatMap(lt => [
+        { id: generateId(), employee_id: id, leave_type_id: lt.id, total_days: 0, used_days: 0, year: currentYear },
+        { id: generateId(), employee_id: id, leave_type_id: lt.id, total_days: 0, used_days: 0, year: currentYear - 1 }
+      ])
+      await supabase.from('leave_balances').insert(inserts)
+    }
+
     await logHRAction('CREATE_EMPLOYEE', 'employee', id, employee.name, null, employeeData)
     await fetchAll()
     return accountInfo
@@ -224,9 +209,7 @@ export function HRProvider({ children }) {
 
   const deleteEmployee = async (id) => {
     const emp = employees.find(e => e.id === id)
-    if (emp?.system_user_id) {
-      await supabase.from('app_users').delete().eq('id', emp.system_user_id)
-    }
+    if (emp?.system_user_id) await supabase.from('app_users').delete().eq('id', emp.system_user_id)
     const { error } = await supabase.from('employees').delete().eq('id', id)
     if (error) throw new Error(error.message)
     await logHRAction('DELETE_EMPLOYEE', 'employee', id, emp?.name, emp, null)
@@ -241,9 +224,7 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Departments CRUD
-  // ─────────────────────────────────────────────────────────────
+  // ========== Departments CRUD ==========
   const addDepartment = async (dept) => {
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
@@ -272,9 +253,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Designations CRUD
-  // ─────────────────────────────────────────────────────────────
+  // ========== Designations CRUD ==========
   const addDesignation = async (des) => {
     const id = generateId()
     const { error } = await supabase.from('designations').insert([{ id, ...des, created_at: new Date().toISOString() }])
@@ -294,18 +273,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Attendance Methods (with status checks)
-  // ─────────────────────────────────────────────────────────────
-  const canPerformAttendance = (employeeId) => {
-    const employee = employees.find(e => e.id === employeeId)
-    if (!employee) return { allowed: false, reason: 'Employee not found' }
-    if (employee.status === 'Terminated') return { allowed: false, reason: 'Terminated employees cannot clock in' }
-    if (employee.status === 'On Leave') return { allowed: false, reason: 'Employee is on leave' }
-    if (employee.status !== 'Active') return { allowed: false, reason: 'Employee status does not allow attendance' }
-    return { allowed: true, reason: null }
-  }
-
+  // ========== Attendance Methods ==========
   const clockIn = async (employeeId, date, shiftType = 'Day') => {
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) { toast.error(statusCheck.reason); return }
@@ -314,7 +282,7 @@ export function HRProvider({ children }) {
     const id = generateId()
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType, status: 'pending' }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType }])
     if (error) throw new Error(error.message)
     await fetchAll()
     await logHRAction('CLOCK_IN', 'attendance', id, `${employeeId} on ${date}`, null, { time })
@@ -324,7 +292,7 @@ export function HRProvider({ children }) {
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) { toast.error(statusCheck.reason); return }
     const record = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
-    if (!record) throw new Error('No open clock-in record found')
+    if (!record) throw new Error('No open clock‑in record found')
     const now = new Date()
     const clockOutTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
     const [inH, inM] = record.clock_in.split(':').map(Number)
@@ -343,57 +311,49 @@ export function HRProvider({ children }) {
 
   const addAttendanceRecord = async (record) => {
     const id = generateId()
-    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record, status: 'pending' }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record }])
     if (error) throw new Error(error.message)
     await fetchAll()
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Timesheet Approval Methods (Stage 9 extension)
-  // ─────────────────────────────────────────────────────────────
+  // Attendance approval methods (Stage 9 extension)
   const approveAttendance = async (recordId, approverName, canApprove) => {
-    if (!canApprove) throw new Error('Unauthorized: you do not have approval permission')
-    const { error } = await supabase
-      .from('employee_attendance')
+    if (!canApprove) throw new Error('Unauthorized')
+    const { error } = await supabase.from('employee_attendance')
       .update({ status: 'approved', approved_by: approverName, approved_at: new Date().toISOString(), rejection_reason: null })
-      .eq('id', recordId)
-      .eq('status', 'pending')
+      .eq('id', recordId).eq('status', 'pending')
     if (error) throw error
     await fetchAll()
-    await logHRAction('APPROVE_ATTENDANCE', 'attendance', recordId, '', null, { status: 'approved', approved_by: approverName })
+    await logHRAction('APPROVE_ATTENDANCE', 'attendance', recordId)
   }
 
   const rejectAttendance = async (recordId, approverName, reason, canApprove) => {
-    if (!canApprove) throw new Error('Unauthorized: you do not have approval permission')
-    if (!reason || reason.trim() === '') throw new Error('Rejection reason is required')
-    const { error } = await supabase
-      .from('employee_attendance')
+    if (!canApprove) throw new Error('Unauthorized')
+    if (!reason?.trim()) throw new Error('Rejection reason required')
+    const { error } = await supabase.from('employee_attendance')
       .update({ status: 'rejected', approved_by: approverName, approved_at: new Date().toISOString(), rejection_reason: reason })
-      .eq('id', recordId)
-      .eq('status', 'pending')
+      .eq('id', recordId).eq('status', 'pending')
     if (error) throw error
     await fetchAll()
-    await logHRAction('REJECT_ATTENDANCE', 'attendance', recordId, '', null, { status: 'rejected', reason })
+    await logHRAction('REJECT_ATTENDANCE', 'attendance', recordId)
   }
 
   const bulkApproveAttendance = async (recordIds, approverName, canApprove) => {
-    if (!canApprove) throw new Error('Unauthorized: you do not have approval permission')
-    if (!recordIds || recordIds.length === 0) throw new Error('No records selected')
-    const { error } = await supabase
-      .from('employee_attendance')
+    if (!canApprove) throw new Error('Unauthorized')
+    if (!recordIds.length) throw new Error('No records selected')
+    const { error } = await supabase.from('employee_attendance')
       .update({ status: 'approved', approved_by: approverName, approved_at: new Date().toISOString(), rejection_reason: null })
-      .in('id', recordIds)
-      .eq('status', 'pending')
+      .in('id', recordIds).eq('status', 'pending')
     if (error) throw error
     await fetchAll()
-    await logHRAction('BULK_APPROVE_ATTENDANCE', 'attendance', recordIds.join(','), '', null, { count: recordIds.length })
+    await logHRAction('BULK_APPROVE_ATTENDANCE', 'attendance', recordIds.join(','))
   }
 
   const updateAttendanceRecord = async (recordId, updates, currentStatus) => {
-    if (currentStatus === 'approved') throw new Error('Approved attendance records cannot be edited. Please contact HR.')
-    const willResetStatus = currentStatus === 'rejected'
+    if (currentStatus === 'approved') throw new Error('Approved attendance records cannot be edited')
+    const willReset = currentStatus === 'rejected'
     const updateData = { ...updates, updated_at: new Date().toISOString() }
-    if (willResetStatus) {
+    if (willReset) {
       updateData.status = 'pending'
       updateData.approved_by = null
       updateData.approved_at = null
@@ -402,19 +362,17 @@ export function HRProvider({ children }) {
     const { error } = await supabase.from('employee_attendance').update(updateData).eq('id', recordId)
     if (error) throw error
     await fetchAll()
-    return { reset: willResetStatus }
+    return { reset: willReset }
   }
 
   const deleteAttendanceRecord = async (recordId, currentStatus) => {
-    if (currentStatus === 'approved') throw new Error('Approved attendance records cannot be deleted. Please contact HR.')
+    if (currentStatus === 'approved') throw new Error('Approved attendance records cannot be deleted')
     const { error } = await supabase.from('employee_attendance').delete().eq('id', recordId)
     if (error) throw error
     await fetchAll()
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Skills & Certifications Methods
-  // ─────────────────────────────────────────────────────────────
+  // ========== Skills & Certifications ==========
   const addSkill = async (employeeId, skillName, proficiency = 'Intermediate') => {
     const id = generateId()
     const { error } = await supabase.from('employee_skills').insert([{ id, employee_id: employeeId, skill_name: skillName, proficiency }])
@@ -447,27 +405,21 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Document Storage Helpers
-  // ─────────────────────────────────────────────────────────────
+  // ========== Documents ==========
   const getEmployeeDocuments = async (employeeId) => {
     try {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
       if (error && error.message !== 'The resource was not found') return []
-      if (!data || !data.length) return []
+      if (!data?.length) return []
       return data.map(file => {
         const pathParts = file.name.split('/')
         const category = pathParts[pathParts.length - 2] || 'general'
         const { data: { publicUrl } } = supabase.storage.from('hr-documents').getPublicUrl(file.name)
         return {
-          name: file.name.split('/').pop(),
-          path: file.name,
-          category,
-          url: publicUrl,
-          size: file.metadata?.size,
-          created_at: file.created_at
+          name: file.name.split('/').pop(), path: file.name, category,
+          url: publicUrl, size: file.metadata?.size, created_at: file.created_at
         }
       })
     } catch { return [] }
@@ -496,42 +448,7 @@ export function HRProvider({ children }) {
     return { totalHours, totalOvertime, recordCount: weekRecords.length }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Leave Management Methods (Stage 10)
-  // ─────────────────────────────────────────────────────────────
-  const createLeaveRequest = async (requestData) => {
-    const id = generateId()
-    const { error } = await supabase
-      .from('leave_requests')
-      .insert([{
-        id,
-        ...requestData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }])
-    if (error) throw error
-    await fetchAll()
-    await logHRAction('CREATE_LEAVE_REQUEST', 'leave_request', id, requestData.employee_id, null, requestData)
-    return id
-  }
-
-  const updateLeaveRequest = async (id, updates) => {
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) throw error
-    await fetchAll()
-    await logHRAction('UPDATE_LEAVE_REQUEST', 'leave_request', id, '', null, updates)
-  }
-
-  const deleteLeaveRequest = async (id) => {
-    const { error } = await supabase.from('leave_requests').delete().eq('id', id)
-    if (error) throw error
-    await fetchAll()
-    await logHRAction('DELETE_LEAVE_REQUEST', 'leave_request', id, '', null, null)
-  }
-
+  // ========== Leave Management (Stage 10) ==========
   const getEmployeeLeaveBalance = (employeeId, leaveTypeId, year = new Date().getFullYear()) => {
     const balance = leaveBalances.find(b =>
       b.employee_id === employeeId &&
@@ -549,7 +466,7 @@ export function HRProvider({ children }) {
     return leaveRequests.some(req => {
       if (req.employee_id !== employeeId) return false
       if (excludeRequestId && req.id === excludeRequestId) return false
-      if (req.status === 'cancelled' || req.status === 'rejected') return false
+      if (['cancelled', 'rejected'].includes(req.status)) return false
       const reqStart = new Date(req.start_date)
       const reqEnd = new Date(req.end_date)
       const newStart = new Date(startDate)
@@ -558,22 +475,143 @@ export function HRProvider({ children }) {
     })
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Set user permissions (for Stage 9)
-  // ─────────────────────────────────────────────────────────────
+  const createLeaveRequest = async (requestData) => {
+    const id = generateId()
+    const { error } = await supabase.from('leave_requests').insert([{
+      id, ...requestData, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+    }])
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('CREATE_LEAVE_REQUEST', 'leave_request', id, requestData.employee_id, null, requestData)
+    return id
+  }
+
+  const updateLeaveRequest = async (id, updates) => {
+    const { error } = await supabase.from('leave_requests').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('UPDATE_LEAVE_REQUEST', 'leave_request', id, '', null, updates)
+  }
+
+  const deleteLeaveRequest = async (id) => {
+    const { error } = await supabase.from('leave_requests').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('DELETE_LEAVE_REQUEST', 'leave_request', id, '', null, null)
+  }
+
+  const getPendingForSupervisor = (supervisorEmployeeId) => {
+    const dept = departments.find(d => d.hod_id === supervisorEmployeeId)
+    if (!dept) return []
+    const deptEmployeeIds = employees.filter(e => e.department_id === dept.id).map(e => e.id)
+    return leaveRequests.filter(r =>
+      deptEmployeeIds.includes(r.employee_id) && r.status === 'pending_supervisor'
+    )
+  }
+
+  const getPendingForHR = () => leaveRequests.filter(r => r.status === 'pending_hr')
+
+  const approveLeaveRequest = async (requestId, approverEmployeeId, approverName, comment = null) => {
+    const request = leaveRequests.find(r => r.id === requestId)
+    if (!request) throw new Error('Request not found')
+    let newStatus = ''
+    if (request.status === 'pending_supervisor') newStatus = 'pending_hr'
+    else if (request.status === 'pending_hr') newStatus = 'approved'
+    else throw new Error(`Cannot approve request with status ${request.status}`)
+
+    if (newStatus === 'approved') {
+      const hasClockedIn = attendance.some(a =>
+        a.employee_id === request.employee_id &&
+        a.date === request.start_date &&
+        a.clock_in
+      )
+      if (hasClockedIn) throw new Error('Employee has clocked in on leave start date')
+      const { remaining } = getEmployeeLeaveBalance(request.employee_id, request.leave_type_id)
+      if (remaining < request.days_requested) throw new Error(`Insufficient balance. Available: ${remaining} days`)
+      const year = new Date(request.start_date).getFullYear()
+      const { data, error: fnError } = await supabase.rpc('deduct_leave_balance', {
+        p_employee_id: request.employee_id,
+        p_leave_type_id: request.leave_type_id,
+        p_days: request.days_requested,
+        p_year: year
+      })
+      if (fnError) throw new Error('Failed to deduct leave balance')
+      if (data === false) throw new Error('Balance insufficient after re-check')
+    }
+
+    const currentComments = request.approver_comments || []
+    const newComment = {
+      by: approverName, by_id: approverEmployeeId,
+      role: request.status === 'pending_supervisor' ? 'supervisor' : 'HR',
+      action: 'approved', comment: comment || '',
+      timestamp: new Date().toISOString()
+    }
+    const updatedComments = [...currentComments, newComment]
+
+    const { error } = await supabase.from('leave_requests').update({
+      status: newStatus,
+      approver_comments: updatedComments,
+      [`${request.status === 'pending_supervisor' ? 'assigned_supervisor_id' : 'assigned_hr_id'}`]: approverEmployeeId,
+      updated_at: new Date().toISOString(),
+      ...(newStatus === 'approved' ? { approved_at: new Date().toISOString() } : {})
+    }).eq('id', requestId)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('APPROVE_LEAVE', 'leave_request', requestId, request.employee_id, null, { newStatus, comment })
+  }
+
+  const rejectLeaveRequest = async (requestId, approverEmployeeId, approverName, reason) => {
+    const request = leaveRequests.find(r => r.id === requestId)
+    if (!request) throw new Error('Request not found')
+    if (!['pending_supervisor', 'pending_hr'].includes(request.status)) throw new Error(`Cannot reject request with status ${request.status}`)
+
+    const currentComments = request.approver_comments || []
+    const newComment = {
+      by: approverName, by_id: approverEmployeeId,
+      role: request.status === 'pending_supervisor' ? 'supervisor' : 'HR',
+      action: 'rejected', comment: reason,
+      timestamp: new Date().toISOString()
+    }
+    const updatedComments = [...currentComments, newComment]
+
+    const { error } = await supabase.from('leave_requests').update({
+      status: 'rejected',
+      approver_comments: updatedComments,
+      updated_at: new Date().toISOString()
+    }).eq('id', requestId)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('REJECT_LEAVE', 'leave_request', requestId, request.employee_id, null, { reason })
+  }
+
+  const addLeaveComment = async (requestId, approverEmployeeId, approverName, comment, role) => {
+    const request = leaveRequests.find(r => r.id === requestId)
+    if (!request) throw new Error('Request not found')
+    const currentComments = request.approver_comments || []
+    const newComment = {
+      by: approverName, by_id: approverEmployeeId, role,
+      action: 'commented', comment,
+      timestamp: new Date().toISOString()
+    }
+    const updatedComments = [...currentComments, newComment]
+    const { error } = await supabase.from('leave_requests').update({
+      approver_comments: updatedComments,
+      updated_at: new Date().toISOString()
+    }).eq('id', requestId)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ========== Permissions ==========
   const setUserPermissions = async (userId, permsList) => {
     await supabase.from('user_permissions').delete().eq('user_id', userId)
     const rows = permsList
       .filter(p => p.can_view || p.can_edit || p.can_delete || p.can_approve)
       .map(p => ({
-        id: generateId(),
-        user_id: userId,
-        module_name: p.module,
-        page_name: p.page,
-        can_view: p.can_view ?? false,
-        can_edit: p.can_edit ?? false,
-        can_delete: p.can_delete ?? false,
-        can_approve: p.can_approve ?? false,
+        id: generateId(), user_id: userId,
+        module_name: p.module, page_name: p.page,
+        can_view: p.can_view ?? false, can_edit: p.can_edit ?? false,
+        can_delete: p.can_delete ?? false, can_approve: p.can_approve ?? false,
         created_at: new Date().toISOString()
       }))
     if (rows.length > 0) {
@@ -583,35 +621,26 @@ export function HRProvider({ children }) {
     await logHRAction('SET_PERMISSIONS', 'user', userId, userId, null, { count: rows.length })
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Provider Value
-  // ─────────────────────────────────────────────────────────────
+  // ========== Provider Value ==========
   return (
     <HRContext.Provider value={{
-      // Core HR data
       employees, departments, designations, attendance, skills, certifications, auditLogs, loading,
-      // Leave data
       leaveTypes, leaveBalances, leaveRequests,
-      // Employee CRUD
       addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus,
-      // Department CRUD
       addDepartment, updateDepartment, deleteDepartment,
-      // Designation CRUD
       addDesignation, updateDesignation, deleteDesignation,
-      // Attendance
       clockIn, clockOut, addAttendanceRecord,
-      // Timesheet Approval
-      approveAttendance, rejectAttendance, bulkApproveAttendance, updateAttendanceRecord, deleteAttendanceRecord,
-      // Skills & Certifications
-      addSkill, deleteSkill, addCertification, updateCertification, deleteCertification,
-      // Documents & Helpers
-      getEmployeeDocuments, getExpiringCertifications, getWeeklyHours, canPerformAttendance,
-      // Leave Management
-      createLeaveRequest, updateLeaveRequest, deleteLeaveRequest, getEmployeeLeaveBalance, hasDateConflict,
-      // Permissions
+      approveAttendance, rejectAttendance, bulkApproveAttendance,
+      updateAttendanceRecord, deleteAttendanceRecord,
+      addSkill, deleteSkill,
+      addCertification, updateCertification, deleteCertification,
+      getExpiringCertifications, getEmployeeDocuments, getWeeklyHours, canPerformAttendance,
+      getEmployeeLeaveBalance, hasDateConflict,
+      createLeaveRequest, updateLeaveRequest, deleteLeaveRequest,
+      getPendingForSupervisor, getPendingForHR,
+      approveLeaveRequest, rejectLeaveRequest, addLeaveComment,
       setUserPermissions,
-      // Fetch
-      fetchAll, logHRAction
+      logHRAction, fetchAll
     }}>
       {children}
     </HRContext.Provider>
