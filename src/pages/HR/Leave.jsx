@@ -5,11 +5,16 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { getWorkingDays, formatDate } from '../../utils/dateUtils'
+import { useCanApprove, useCanView } from '../../hooks/usePermission'
 
 export default function Leave() {
   const { user } = useAuth()
+  const canApproveHR = useCanApprove('hr', 'leave')
+  const canViewAll = useCanView('hr', 'leave')
+
   const {
     employees,
+    departments,
     leaveTypes,
     leaveBalances,
     leaveRequests,
@@ -18,15 +23,21 @@ export default function Leave() {
     createLeaveRequest,
     updateLeaveRequest,
     deleteLeaveRequest,
+    getPendingForSupervisor,
+    getPendingForHR,
+    approveLeaveRequest,
+    rejectLeaveRequest,
+    addLeaveComment,
     fetchAll
   } = useHR()
 
+  // Current employee ID (the logged-in user)
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
+  const [approverEmployeeId, setApproverEmployeeId] = useState(null)
   const [loadingEmployee, setLoadingEmployee] = useState(true)
 
   // Form state
   const [form, setForm] = useState({
-    employee_id: '',
     leave_type_id: '',
     start_date: formatDate(new Date()),
     end_date: formatDate(new Date()),
@@ -34,9 +45,7 @@ export default function Leave() {
     half_day_type: 'morning',
     reason: '',
     attachment_url: '',
-    status: 'draft'
   })
-
   const [draftId, setDraftId] = useState(null)
   const [calculatedDays, setCalculatedDays] = useState(0)
   const [balance, setBalance] = useState({ total: 0, used: 0, remaining: 0 })
@@ -44,14 +53,22 @@ export default function Leave() {
   const [submitting, setSubmitting] = useState(false)
   const [myRequests, setMyRequests] = useState([])
 
-  // ✅ Resolve employee ID from logged-in user
+  // Approval data
+  const [pendingSupervisor, setPendingSupervisor] = useState([])
+  const [pendingHR, setPendingHR] = useState([])
+
+  // Modals
+  const [rejectModal, setRejectModal] = useState({ open: false, requestId: null, reason: '' })
+  const [commentModal, setCommentModal] = useState({ open: false, requestId: null, comment: '' })
+
+  // Resolve current employee ID (for submission) and approver ID (for approvals)
   useEffect(() => {
-    const resolveEmployeeId = async () => {
+    const resolveIds = async () => {
       setLoadingEmployee(true)
       try {
         if (user?.employee_id) {
           setCurrentEmployeeId(user.employee_id)
-          setForm(prev => ({ ...prev, employee_id: user.employee_id }))
+          setApproverEmployeeId(user.employee_id)
         } else if (user?.id) {
           const { data, error } = await supabase
             .from('app_users')
@@ -60,38 +77,31 @@ export default function Leave() {
             .single()
           if (!error && data?.employee_id) {
             setCurrentEmployeeId(data.employee_id)
-            setForm(prev => ({ ...prev, employee_id: data.employee_id }))
+            setApproverEmployeeId(data.employee_id)
           } else {
-            toast.error('Your user account is not linked to an employee record. Please contact HR.')
+            toast.error('Your user account is not linked to an employee record.')
           }
-        } else {
-          toast.error('User not authenticated')
         }
       } catch (err) {
-        console.error('Error resolving employee ID:', err)
+        console.error(err)
       } finally {
         setLoadingEmployee(false)
       }
     }
-    resolveEmployeeId()
+    resolveIds()
   }, [user])
 
-  // Fetch employee's leave balance when leave type changes
+  // Load pending requests for supervisor and HR
   useEffect(() => {
-    if (currentEmployeeId && form.leave_type_id) {
-      const bal = getEmployeeLeaveBalance(currentEmployeeId, form.leave_type_id)
-      setBalance(bal)
+    if (approverEmployeeId && departments.length) {
+      const supervisorReqs = getPendingForSupervisor(approverEmployeeId)
+      setPendingSupervisor(supervisorReqs)
     }
-  }, [currentEmployeeId, form.leave_type_id, leaveBalances])
-
-  // Calculate working days when dates change
-  useEffect(() => {
-    if (form.start_date && form.end_date) {
-      let days = getWorkingDays(form.start_date, form.end_date)
-      if (form.is_half_day) days = 0.5
-      setCalculatedDays(days)
+    if (canApproveHR) {
+      const hrReqs = getPendingForHR()
+      setPendingHR(hrReqs)
     }
-  }, [form.start_date, form.end_date, form.is_half_day])
+  }, [approverEmployeeId, departments, leaveRequests, getPendingForSupervisor, getPendingForHR, canApproveHR])
 
   // Load employee's own requests
   useEffect(() => {
@@ -101,9 +111,27 @@ export default function Leave() {
     }
   }, [leaveRequests, currentEmployeeId])
 
+  // Update balance when leave type changes
+  useEffect(() => {
+    if (currentEmployeeId && form.leave_type_id) {
+      const bal = getEmployeeLeaveBalance(currentEmployeeId, form.leave_type_id)
+      setBalance(bal)
+    }
+  }, [currentEmployeeId, form.leave_type_id, leaveBalances])
+
+  // Calculate days when dates change
+  useEffect(() => {
+    if (form.start_date && form.end_date) {
+      let days = getWorkingDays(form.start_date, form.end_date)
+      if (form.is_half_day) days = 0.5
+      setCalculatedDays(days)
+    }
+  }, [form.start_date, form.end_date, form.is_half_day])
+
   const selectedLeaveType = leaveTypes.find(lt => lt.id === form.leave_type_id)
   const requiresAttachment = selectedLeaveType?.requires_attachment === true
 
+  // File upload
   const handleFileUpload = async (file) => {
     if (!file) return
     setUploading(true)
@@ -126,13 +154,14 @@ export default function Leave() {
     }
   }
 
+  // Save as draft
   const handleSaveDraft = async () => {
     if (!currentEmployeeId) {
-      toast.error('Employee ID not found. Please log out and log in again.')
+      toast.error('Employee record not found')
       return
     }
     if (!form.leave_type_id || !form.start_date || !form.end_date) {
-      toast.error('Please fill required fields: leave type, start date, end date')
+      toast.error('Please fill leave type, start date and end date')
       return
     }
     if (requiresAttachment && !form.attachment_url) {
@@ -169,17 +198,14 @@ export default function Leave() {
     }
   }
 
+  // Submit for approval
   const handleSubmit = async () => {
     if (!currentEmployeeId) {
-      toast.error('Employee ID not found. Please log out and log in again.')
+      toast.error('Employee record not found')
       return
     }
     if (!form.leave_type_id) {
       toast.error('Select leave type')
-      return
-    }
-    if (!form.start_date || !form.end_date) {
-      toast.error('Select start and end dates')
       return
     }
     if (calculatedDays <= 0) {
@@ -225,8 +251,8 @@ export default function Leave() {
         await createLeaveRequest(requestData)
       }
       toast.success('Leave request submitted for approval')
+      // Reset form
       setForm({
-        employee_id: currentEmployeeId,
         leave_type_id: '',
         start_date: formatDate(new Date()),
         end_date: formatDate(new Date()),
@@ -234,7 +260,6 @@ export default function Leave() {
         half_day_type: 'morning',
         reason: '',
         attachment_url: '',
-        status: 'draft'
       })
       setDraftId(null)
       await fetchAll()
@@ -245,6 +270,7 @@ export default function Leave() {
     }
   }
 
+  // Cancel a pending/approved request
   const handleCancelRequest = async (requestId) => {
     if (window.confirm('Cancel this leave request?')) {
       try {
@@ -272,7 +298,6 @@ export default function Leave() {
 
   const editDraft = (request) => {
     setForm({
-      employee_id: request.employee_id,
       leave_type_id: request.leave_type_id,
       start_date: request.start_date,
       end_date: request.end_date,
@@ -280,10 +305,60 @@ export default function Leave() {
       half_day_type: request.half_day_type || 'morning',
       reason: request.reason || '',
       attachment_url: request.attachment_url || '',
-      status: 'draft'
     })
     setDraftId(request.id)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Approval handlers
+  const handleApprove = async (requestId, role) => {
+    try {
+      await approveLeaveRequest(requestId, approverEmployeeId, user?.full_name || user?.username, null)
+      toast.success(role === 'supervisor' ? 'Request sent to HR' : 'Request approved')
+      await fetchAll()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const openRejectModal = (requestId) => {
+    setRejectModal({ open: true, requestId, reason: '' })
+  }
+
+  const confirmReject = async () => {
+    if (!rejectModal.reason.trim()) {
+      toast.error('Rejection reason required')
+      return
+    }
+    try {
+      await rejectLeaveRequest(rejectModal.requestId, approverEmployeeId, user?.full_name || user?.username, rejectModal.reason)
+      toast.success('Request rejected')
+      setRejectModal({ open: false, requestId: null, reason: '' })
+      await fetchAll()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const openCommentModal = (requestId) => {
+    setCommentModal({ open: true, requestId, comment: '' })
+  }
+
+  const submitComment = async () => {
+    if (!commentModal.comment.trim()) {
+      toast.error('Comment cannot be empty')
+      return
+    }
+    try {
+      const isSupervisor = pendingSupervisor.some(r => r.id === commentModal.requestId)
+      const role = isSupervisor ? 'supervisor' : 'HR'
+      await addLeaveComment(commentModal.requestId, approverEmployeeId, user?.full_name || user?.username, commentModal.comment, role)
+      toast.success('Comment added')
+      setCommentModal({ open: false, requestId: null, comment: '' })
+      await fetchAll()
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const getLeaveTypeName = (id) => leaveTypes.find(lt => lt.id === id)?.name || '—'
@@ -307,11 +382,15 @@ export default function Leave() {
         <h1 className="page-title">Leave Management</h1>
       </div>
 
+      {/* Three‑column layout: Form, My Requests, Pending Approvals */}
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {/* New Request Form */}
+        {/* Column 1: New Request Form */}
         <div className="card" style={{ flex: 2, minWidth: 300, padding: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{draftId ? 'Edit Draft' : 'New Leave Request'}</h2>
-          
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+            {draftId ? 'Edit Draft' : 'New Leave Request'}
+          </h2>
+
+          {/* Leave Type */}
           <div className="form-group">
             <label>Leave Type *</label>
             <select
@@ -326,6 +405,7 @@ export default function Leave() {
             </select>
           </div>
 
+          {/* Balance display */}
           {form.leave_type_id && (
             <div className="info-box" style={{ marginBottom: 16, background: 'var(--surface2)', padding: 12, borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Your balance for {selectedLeaveType?.name}</div>
@@ -337,6 +417,7 @@ export default function Leave() {
             </div>
           )}
 
+          {/* Dates */}
           <div className="form-row">
             <div className="form-group">
               <label>Start Date *</label>
@@ -348,6 +429,7 @@ export default function Leave() {
             </div>
           </div>
 
+          {/* Half day */}
           <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" checked={form.is_half_day} onChange={e => setForm({ ...form, is_half_day: e.target.checked })} />
@@ -361,6 +443,7 @@ export default function Leave() {
             )}
           </div>
 
+          {/* Days requested */}
           <div className="form-group">
             <label>Days Requested</label>
             <div className="form-control" disabled style={{ background: 'var(--surface2)' }}>
@@ -368,11 +451,13 @@ export default function Leave() {
             </div>
           </div>
 
+          {/* Reason */}
           <div className="form-group">
             <label>Reason (Optional)</label>
             <textarea className="form-control" rows="3" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="Provide additional information" />
           </div>
 
+          {/* Attachment */}
           {requiresAttachment && (
             <div className="form-group">
               <label>Supporting Document *</label>
@@ -387,15 +472,23 @@ export default function Leave() {
             </div>
           )}
 
+          {/* Buttons */}
           <div className="modal-actions" style={{ justifyContent: 'flex-start', marginTop: 16 }}>
-            <button type="button" className="btn btn-secondary" onClick={handleSaveDraft} disabled={submitting}>Save Draft</button>
-            <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={submitting || (requiresAttachment && !form.attachment_url)}>
+            <button type="button" className="btn btn-secondary" onClick={handleSaveDraft} disabled={submitting}>
+              💾 Save Draft
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={submitting || (requiresAttachment && !form.attachment_url)}
+            >
               {submitting ? 'Submitting...' : 'Submit for Approval'}
             </button>
           </div>
         </div>
 
-        {/* My Leave Requests */}
+        {/* Column 2: My Leave Requests */}
         <div className="card" style={{ flex: 1.5, minWidth: 300, padding: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>My Leave Requests</h2>
           {myRequests.length === 0 ? (
@@ -418,10 +511,12 @@ export default function Leave() {
                       <div>
                         <div style={{ fontWeight: 700 }}>{leaveType}</div>
                         <div style={{ fontSize: 12 }}>{req.start_date} → {req.end_date} ({req.days_requested} days)</div>
-                        <div className="badge" style={{ marginTop: 4 }}><span className={statusColors[req.status] || 'bg-gray'}>{req.status.replace('_', ' ')}</span></div>
+                        <div className="badge" style={{ marginTop: 4 }}>
+                          <span className={statusColors[req.status] || 'bg-gray'}>{req.status.replace('_', ' ')}</span>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        {(req.status === 'draft' || req.status === 'pending_supervisor' || req.status === 'pending_hr') && (
+                        {['draft', 'pending_supervisor', 'pending_hr'].includes(req.status) && (
                           <button className="btn btn-secondary btn-sm" onClick={() => editDraft(req)}>Edit</button>
                         )}
                         {req.status === 'draft' && (
@@ -444,6 +539,91 @@ export default function Leave() {
             </div>
           )}
         </div>
+
+        {/* Column 3: Pending Approvals (Supervisor & HR) */}
+        {(pendingSupervisor.length > 0 || pendingHR.length > 0) && (
+          <div className="card" style={{ flex: 1.5, minWidth: 300, padding: 20 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Pending Approvals</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pendingSupervisor.map(req => (
+                <ApprovalCard
+                  key={req.id}
+                  request={req}
+                  employees={employees}
+                  leaveTypes={leaveTypes}
+                  role="Supervisor"
+                  onApprove={() => handleApprove(req.id, 'supervisor')}
+                  onReject={() => openRejectModal(req.id)}
+                  onComment={() => openCommentModal(req.id)}
+                />
+              ))}
+              {pendingHR.map(req => (
+                <ApprovalCard
+                  key={req.id}
+                  request={req}
+                  employees={employees}
+                  leaveTypes={leaveTypes}
+                  role="HR"
+                  onApprove={() => handleApprove(req.id, 'hr')}
+                  onReject={() => openRejectModal(req.id)}
+                  onComment={() => openCommentModal(req.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Reject Modal */}
+      {rejectModal.open && (
+        <div className="overlay" onClick={() => setRejectModal({ open: false, requestId: null, reason: '' })}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Reject Leave Request</div>
+            <div className="form-group">
+              <label>Reason for Rejection *</label>
+              <textarea className="form-control" rows="3" value={rejectModal.reason} onChange={e => setRejectModal({ ...rejectModal, reason: e.target.value })} placeholder="Explain why this leave request is being rejected..." />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setRejectModal({ open: false, requestId: null, reason: '' })}>Cancel</button>
+              <button className="btn btn-danger" onClick={confirmReject}>Confirm Rejection</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comment Modal */}
+      {commentModal.open && (
+        <div className="overlay" onClick={() => setCommentModal({ open: false, requestId: null, comment: '' })}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Add Comment</div>
+            <div className="form-group">
+              <label>Comment *</label>
+              <textarea className="form-control" rows="3" value={commentModal.comment} onChange={e => setCommentModal({ ...commentModal, comment: e.target.value })} placeholder="Add your comment..." />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setCommentModal({ open: false, requestId: null, comment: '' })}>Cancel</button>
+              <button className="btn btn-primary" onClick={submitComment}>Add Comment</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Approval Card Component
+const ApprovalCard = ({ request, employees, leaveTypes, role, onApprove, onReject, onComment }) => {
+  const employee = employees.find(e => e.id === request.employee_id)
+  const leaveType = leaveTypes.find(lt => lt.id === request.leave_type_id)
+  return (
+    <div style={{ padding: 12, background: 'var(--surface2)', borderRadius: 8 }}>
+      <div style={{ fontWeight: 700 }}>{employee?.name || 'Unknown'}</div>
+      <div style={{ fontSize: 12 }}>{leaveType?.name} • {request.start_date} → {request.end_date} ({request.days_requested} days)</div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{request.reason}</div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <button className="btn btn-green btn-sm" onClick={onApprove}>Approve</button>
+        <button className="btn btn-red btn-sm" onClick={onReject}>Reject</button>
+        <button className="btn btn-secondary btn-sm" onClick={onComment}>Comment</button>
       </div>
     </div>
   )
