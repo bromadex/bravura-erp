@@ -18,6 +18,7 @@ export function HRProvider({ children }) {
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
+  // ✅ Employee number generator (BRA prefix, finds actual max)
   const generateEmployeeNumber = async () => {
     const { data, error } = await supabase
       .from('employees')
@@ -26,7 +27,7 @@ export function HRProvider({ children }) {
 
     if (error) {
       console.error('Error fetching employee numbers:', error)
-      return `BRA${Date.now().toString().slice(-6)}`
+      return 'BRA164'
     }
 
     let maxNum = 160
@@ -40,6 +41,7 @@ export function HRProvider({ children }) {
     return `BRA${maxNum + 1}`
   }
 
+  // Audit log helper
   const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
     try {
       const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
@@ -57,6 +59,7 @@ export function HRProvider({ children }) {
     } catch (err) { console.warn('Audit log failed:', err) }
   }
 
+  // System account creation (with username collision handling)
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {
     let baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
     if (!baseUsername) baseUsername = 'user'
@@ -99,6 +102,7 @@ export function HRProvider({ children }) {
     return { username, password: rawPassword, userId: data.id }
   }
 
+  // Attendance status helper
   const canPerformAttendance = (employeeId) => {
     const employee = employees.find(e => e.id === employeeId)
     if (!employee) return { allowed: false, reason: 'Employee not found' }
@@ -108,6 +112,7 @@ export function HRProvider({ children }) {
     return { allowed: true, reason: null }
   }
 
+  // Fetch all data
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -137,44 +142,32 @@ export function HRProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ---- Employees CRUD ----
+  // ========== EMPLOYEES CRUD ==========
   const addEmployee = async (employee, createAccount = false, accountRoleId = 'role_viewer') => {
     const id = generateId()
     const employeeNumber = await generateEmployeeNumber()
-
-    // ✅ THE FIX: Remove employee_number from the form data before spreading.
-    // The form always passes employee_number: '' (the disabled field).
-    // In the OLD code:  { id, employee_number: employeeNumber, ...employee }
-    // ...employee spreads AFTER and its empty '' overwrites the generated number.
-    // Fix: destructure it out, then put employee_number LAST so it always wins.
     const { employee_number: _discard, ...employeeData } = employee
 
     const newEmployee = {
       id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      ...employeeData,                  // spread form data (no employee_number)
-      employee_number: employeeNumber,  // set LAST — can never be overwritten
+      ...employeeData,
+      employee_number: employeeNumber,
     }
 
-    // Create account BEFORE inserting the employee row so if it fails
-    // we don't leave an orphan employee record with no account.
     let accountInfo = null
     if (createAccount) {
       accountInfo = await createSystemAccount(id, employee.name, accountRoleId)
       newEmployee.system_username = accountInfo.username
-      newEmployee.system_user_id  = accountInfo.userId
+      newEmployee.system_user_id = accountInfo.userId
     }
 
     const { error } = await supabase.from('employees').insert([newEmployee])
     if (error) {
-      // Roll back the system account if employee insert failed
-      if (accountInfo?.userId) {
-        await supabase.from('app_users').delete().eq('id', accountInfo.userId)
-      }
+      if (accountInfo?.userId) await supabase.from('app_users').delete().eq('id', accountInfo.userId)
       throw new Error(error.message)
     }
-
     await logHRAction('CREATE_EMPLOYEE', 'employee', id, employee.name, null, employeeData)
     await fetchAll()
     return accountInfo
@@ -207,7 +200,7 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ---- Departments CRUD ----
+  // ========== DEPARTMENTS CRUD ==========
   const addDepartment = async (dept) => {
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
@@ -236,7 +229,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Designations CRUD ----
+  // ========== DESIGNATIONS CRUD ==========
   const addDesignation = async (des) => {
     const id = generateId()
     const { error } = await supabase.from('designations').insert([{ id, ...des, created_at: new Date().toISOString() }])
@@ -256,7 +249,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Attendance Methods ----
+  // ========== ATTENDANCE (Clock in/out) ==========
   const clockIn = async (employeeId, date, shiftType = 'Day') => {
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) { toast.error(statusCheck.reason); return }
@@ -265,7 +258,7 @@ export function HRProvider({ children }) {
     const id = generateId()
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType, status: 'pending' }])
     if (error) throw new Error(error.message)
     await fetchAll()
     await logHRAction('CLOCK_IN', 'attendance', id, `${employeeId} on ${date}`, null, { time })
@@ -275,7 +268,7 @@ export function HRProvider({ children }) {
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) { toast.error(statusCheck.reason); return }
     const record = attendance.find(a => a.employee_id === employeeId && a.date === date && !a.clock_out)
-    if (!record) throw new Error('No open clock-in record found')
+    if (!record) throw new Error('No open clock‑in record found')
     const now = new Date()
     const clockOutTime = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
     const [inH, inM] = record.clock_in.split(':').map(Number)
@@ -294,12 +287,81 @@ export function HRProvider({ children }) {
 
   const addAttendanceRecord = async (record) => {
     const id = generateId()
-    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record, status: record.status || 'pending' }])
     if (error) throw new Error(error.message)
     await fetchAll()
   }
 
-  // ---- Skills Methods ----
+  // ========== TIMESHEET APPROVAL METHODS ==========
+  const approveAttendance = async (recordId, approverName, canApprove) => {
+    if (!canApprove) throw new Error('You do not have approval permission')
+    const { error } = await supabase
+      .from('employee_attendance')
+      .update({
+        status: 'approved',
+        approved_by: approverName,
+        approved_at: new Date().toISOString(),
+        rejection_reason: null
+      })
+      .eq('id', recordId)
+      .eq('status', 'pending')
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('APPROVE_ATTENDANCE', 'attendance', recordId, '', null, { status: 'approved', approved_by: approverName })
+  }
+
+  const rejectAttendance = async (recordId, approverName, reason, canApprove) => {
+    if (!canApprove) throw new Error('You do not have approval permission')
+    if (!reason || reason.trim() === '') throw new Error('Rejection reason is required')
+    const { error } = await supabase
+      .from('employee_attendance')
+      .update({
+        status: 'rejected',
+        approved_by: approverName,
+        approved_at: new Date().toISOString(),
+        rejection_reason: reason
+      })
+      .eq('id', recordId)
+      .eq('status', 'pending')
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('REJECT_ATTENDANCE', 'attendance', recordId, '', null, { status: 'rejected', reason })
+  }
+
+  const bulkApproveAttendance = async (recordIds, approverName, canApprove) => {
+    if (!canApprove) throw new Error('You do not have approval permission')
+    if (!recordIds || recordIds.length === 0) throw new Error('No records selected')
+    const { error } = await supabase
+      .from('employee_attendance')
+      .update({
+        status: 'approved',
+        approved_by: approverName,
+        approved_at: new Date().toISOString(),
+        rejection_reason: null
+      })
+      .in('id', recordIds)
+      .eq('status', 'pending')
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('BULK_APPROVE_ATTENDANCE', 'attendance', recordIds.join(','), '', null, { count: recordIds.length })
+  }
+
+  const resetAttendanceStatus = async (recordId) => {
+    const { error } = await supabase
+      .from('employee_attendance')
+      .update({
+        status: 'pending',
+        approved_by: null,
+        approved_at: null,
+        rejection_reason: null
+      })
+      .eq('id', recordId)
+      .eq('status', 'rejected')
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ========== SKILLS METHODS ==========
   const addSkill = async (employeeId, skillName, proficiency = 'Intermediate') => {
     const id = generateId()
     const { error } = await supabase.from('employee_skills').insert([{ id, employee_id: employeeId, skill_name: skillName, proficiency }])
@@ -313,7 +375,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Certifications Methods ----
+  // ========== CERTIFICATIONS METHODS ==========
   const addCertification = async (cert) => {
     const id = generateId()
     const { error } = await supabase.from('employee_certifications').insert([{ id, ...cert, created_at: new Date().toISOString() }])
@@ -333,7 +395,7 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Document Storage Helpers ----
+  // ========== DOCUMENT STORAGE HELPERS ==========
   const getEmployeeDocuments = async (employeeId) => {
     try {
       const { data, error } = await supabase.storage
@@ -386,21 +448,21 @@ export function HRProvider({ children }) {
     return { totalHours, totalOvertime, recordCount: weekRecords.length }
   }
 
-  // ---- Permissions ----
+  // ========== PERMISSIONS ==========
   const setUserPermissions = async (userId, permsList) => {
     await supabase.from('user_permissions').delete().eq('user_id', userId)
     const rows = permsList
       .filter(p => p.can_view || p.can_edit || p.can_delete || p.can_approve)
       .map(p => ({
-        id:          generateId(),
-        user_id:     userId,
+        id: generateId(),
+        user_id: userId,
         module_name: p.module,
-        page_name:   p.page,
-        can_view:    p.can_view    ?? false,
-        can_edit:    p.can_edit    ?? false,
-        can_delete:  p.can_delete  ?? false,
+        page_name: p.page,
+        can_view: p.can_view ?? false,
+        can_edit: p.can_edit ?? false,
+        can_delete: p.can_delete ?? false,
         can_approve: p.can_approve ?? false,
-        created_at:  new Date().toISOString(),
+        created_at: new Date().toISOString(),
       }))
     if (rows.length > 0) {
       const { error } = await supabase.from('user_permissions').insert(rows)
@@ -409,6 +471,7 @@ export function HRProvider({ children }) {
     await logHRAction('SET_PERMISSIONS', 'user', userId, userId, null, { count: rows.length })
   }
 
+  // ========== PROVIDER VALUE ==========
   return (
     <HRContext.Provider value={{
       employees, departments, designations, attendance, skills, certifications, auditLogs, loading,
@@ -416,6 +479,7 @@ export function HRProvider({ children }) {
       addDepartment, updateDepartment, deleteDepartment,
       addDesignation, updateDesignation, deleteDesignation,
       clockIn, clockOut, addAttendanceRecord,
+      approveAttendance, rejectAttendance, bulkApproveAttendance, resetAttendanceStatus,
       addSkill, deleteSkill,
       addCertification, updateCertification, deleteCertification,
       getExpiringCertifications,
