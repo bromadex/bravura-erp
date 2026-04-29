@@ -7,7 +7,9 @@ import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtil
 const HRContext = createContext(null)
 
 export function HRProvider({ children }) {
-  // ========== Core State ==========
+  // ─────────────────────────────────────────────────────────────
+  // Existing state
+  // ─────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
@@ -17,14 +19,18 @@ export function HRProvider({ children }) {
   const [auditLogs, setAuditLogs] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // ========== Leave Management State (Stage 10.1) ==========
+  // ─────────────────────────────────────────────────────────────
+  // Leave Management state (Stage 10)
+  // ─────────────────────────────────────────────────────────────
   const [leaveTypes, setLeaveTypes] = useState([])
   const [leaveBalances, setLeaveBalances] = useState([])
   const [leaveRequests, setLeaveRequests] = useState([])
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
-  // ========== Employee Number Generation ==========
+  // ─────────────────────────────────────────────────────────────
+  // Helper: Generate employee number (BRA###)
+  // ─────────────────────────────────────────────────────────────
   const generateEmployeeNumber = async () => {
     const { data, error } = await supabase
       .from('employees')
@@ -33,10 +39,10 @@ export function HRProvider({ children }) {
 
     if (error) {
       console.error('Error fetching employee numbers:', error)
-      return `BRA${Date.now().toString().slice(-6)}`
+      return 'BRA001'
     }
 
-    let maxNum = 160
+    let maxNum = 0
     data?.forEach(emp => {
       if (emp.employee_number) {
         const num = parseInt(emp.employee_number.replace(/^BRA/i, ''), 10)
@@ -44,10 +50,13 @@ export function HRProvider({ children }) {
       }
     })
 
+    if (maxNum === 0) return 'BRA001'
     return `BRA${maxNum + 1}`
   }
 
-  // ========== Audit Log Helper ==========
+  // ─────────────────────────────────────────────────────────────
+  // Helper: Log HR actions
+  // ─────────────────────────────────────────────────────────────
   const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
     try {
       const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
@@ -65,15 +74,15 @@ export function HRProvider({ children }) {
     } catch (err) { console.warn('Audit log failed:', err) }
   }
 
-  // ========== Create System Account ==========
+  // ─────────────────────────────────────────────────────────────
+  // Helper: Create system account (with unique username)
+  // ─────────────────────────────────────────────────────────────
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {
     let baseUsername = fullName.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/, '')
     if (!baseUsername) baseUsername = 'user'
-
     let username = baseUsername
     let counter = 1
     let exists = true
-
     while (exists) {
       const { data, error } = await supabase
         .from('app_users')
@@ -87,9 +96,7 @@ export function HRProvider({ children }) {
         username = `${baseUsername}${counter}`
       }
     }
-
     const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
-
     const { data, error } = await supabase.from('app_users').insert([{
       id: generateId(),
       username,
@@ -102,23 +109,42 @@ export function HRProvider({ children }) {
       employee_id: employeeId,
       created_at: new Date().toISOString()
     }]).select().single()
-
     if (error) throw error
     await logHRAction('CREATE_ACCOUNT', 'user', data.id, username, null, { roleId })
     return { username, password: rawPassword, userId: data.id }
   }
 
-  // ========== Attendance Status Validation ==========
-  const canPerformAttendance = (employeeId) => {
-    const employee = employees.find(e => e.id === employeeId)
-    if (!employee) return { allowed: false, reason: 'Employee not found' }
-    if (employee.status === 'Terminated') return { allowed: false, reason: 'Terminated employees cannot clock in' }
-    if (employee.status === 'On Leave') return { allowed: false, reason: 'Employee is on leave' }
-    if (employee.status !== 'Active') return { allowed: false, reason: 'Employee status does not allow attendance' }
-    return { allowed: true, reason: null }
+  // ─────────────────────────────────────────────────────────────
+  // Helper: Auto‑create leave balances for a new employee
+  // ─────────────────────────────────────────────────────────────
+  const createLeaveBalancesForEmployee = async (employeeId) => {
+    const { data: leaveTypeList } = await supabase.from('leave_types').select('id')
+    if (!leaveTypeList?.length) return
+    const currentYear = new Date().getFullYear()
+    const balanceInserts = leaveTypeList.map(lt => ({
+      id: generateId(),
+      employee_id: employeeId,
+      leave_type_id: lt.id,
+      total_days: 0,
+      used_days: 0,
+      year: currentYear
+    }))
+    await supabase.from('leave_balances').insert(balanceInserts)
+    // also previous year (for history)
+    const lastYearInserts = leaveTypeList.map(lt => ({
+      id: generateId(),
+      employee_id: employeeId,
+      leave_type_id: lt.id,
+      total_days: 0,
+      used_days: 0,
+      year: currentYear - 1
+    }))
+    await supabase.from('leave_balances').insert(lastYearInserts)
   }
 
-  // ========== Fetch All Data (including leave) ==========
+  // ─────────────────────────────────────────────────────────────
+  // Fetch all data (employees, departments, leave, etc.)
+  // ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -134,10 +160,9 @@ export function HRProvider({ children }) {
         supabase.from('employee_certifications').select('*'),
         supabase.from('hr_audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('leave_types').select('*').order('name'),
-        supabase.from('leave_balances').select('*, leave_types(name)'),
+        supabase.from('leave_balances').select('*, leave_types(name)').order('year', { ascending: false }),
         supabase.from('leave_requests').select('*, leave_types(name), employees(name)').order('created_at', { ascending: false })
       ])
-
       if (empRes.data) setEmployees(empRes.data)
       if (deptRes.data) setDepartments(deptRes.data)
       if (desRes.data) setDesignations(desRes.data)
@@ -158,43 +183,13 @@ export function HRProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ========== Auto‑create leave balances for new employee ==========
-  const createLeaveBalancesForEmployee = async (employeeId) => {
-    const { data: leaveTypeList } = await supabase.from('leave_types').select('id')
-    if (!leaveTypeList?.length) return
-
-    const currentYear = new Date().getFullYear()
-    const balanceInserts = []
-    for (const lt of leaveTypeList) {
-      balanceInserts.push({
-        id: generateId(),
-        employee_id: employeeId,
-        leave_type_id: lt.id,
-        total_days: 0,
-        used_days: 0,
-        year: currentYear
-      })
-      balanceInserts.push({
-        id: generateId(),
-        employee_id: employeeId,
-        leave_type_id: lt.id,
-        total_days: 0,
-        used_days: 0,
-        year: currentYear - 1
-      })
-    }
-    if (balanceInserts.length) {
-      await supabase.from('leave_balances').insert(balanceInserts)
-    }
-  }
-
-  // ========== Employees CRUD ==========
+  // ─────────────────────────────────────────────────────────────
+  // Employees CRUD
+  // ─────────────────────────────────────────────────────────────
   const addEmployee = async (employee, createAccount = false, accountRoleId = 'role_viewer') => {
     const id = generateId()
     const employeeNumber = await generateEmployeeNumber()
-
     const { employee_number: _discard, ...employeeData } = employee
-
     const newEmployee = {
       id,
       created_at: new Date().toISOString(),
@@ -202,25 +197,18 @@ export function HRProvider({ children }) {
       ...employeeData,
       employee_number: employeeNumber,
     }
-
     let accountInfo = null
     if (createAccount) {
       accountInfo = await createSystemAccount(id, employee.name, accountRoleId)
       newEmployee.system_username = accountInfo.username
       newEmployee.system_user_id = accountInfo.userId
     }
-
     const { error } = await supabase.from('employees').insert([newEmployee])
     if (error) {
-      if (accountInfo?.userId) {
-        await supabase.from('app_users').delete().eq('id', accountInfo.userId)
-      }
+      if (accountInfo?.userId) await supabase.from('app_users').delete().eq('id', accountInfo.userId)
       throw new Error(error.message)
     }
-
-    // ✅ Create leave balances for this new employee
     await createLeaveBalancesForEmployee(id)
-
     await logHRAction('CREATE_EMPLOYEE', 'employee', id, employee.name, null, employeeData)
     await fetchAll()
     return accountInfo
@@ -253,7 +241,9 @@ export function HRProvider({ children }) {
     await logHRAction('STATUS_CHANGE', 'employee', id, emp?.name, { status: oldStatus }, { status: newStatus })
   }
 
-  // ========== Departments CRUD ==========
+  // ─────────────────────────────────────────────────────────────
+  // Departments CRUD
+  // ─────────────────────────────────────────────────────────────
   const addDepartment = async (dept) => {
     const id = generateId()
     const { error } = await supabase.from('departments').insert([{ id, ...dept, created_at: new Date().toISOString() }])
@@ -282,7 +272,9 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ========== Designations CRUD ==========
+  // ─────────────────────────────────────────────────────────────
+  // Designations CRUD
+  // ─────────────────────────────────────────────────────────────
   const addDesignation = async (des) => {
     const id = generateId()
     const { error } = await supabase.from('designations').insert([{ id, ...des, created_at: new Date().toISOString() }])
@@ -302,7 +294,18 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ========== Attendance Methods ==========
+  // ─────────────────────────────────────────────────────────────
+  // Attendance Methods (with status checks)
+  // ─────────────────────────────────────────────────────────────
+  const canPerformAttendance = (employeeId) => {
+    const employee = employees.find(e => e.id === employeeId)
+    if (!employee) return { allowed: false, reason: 'Employee not found' }
+    if (employee.status === 'Terminated') return { allowed: false, reason: 'Terminated employees cannot clock in' }
+    if (employee.status === 'On Leave') return { allowed: false, reason: 'Employee is on leave' }
+    if (employee.status !== 'Active') return { allowed: false, reason: 'Employee status does not allow attendance' }
+    return { allowed: true, reason: null }
+  }
+
   const clockIn = async (employeeId, date, shiftType = 'Day') => {
     const statusCheck = canPerformAttendance(employeeId)
     if (!statusCheck.allowed) { toast.error(statusCheck.reason); return }
@@ -311,7 +314,7 @@ export function HRProvider({ children }) {
     const id = generateId()
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
-    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, employee_id: employeeId, date, clock_in: time, shift_type: shiftType, status: 'pending' }])
     if (error) throw new Error(error.message)
     await fetchAll()
     await logHRAction('CLOCK_IN', 'attendance', id, `${employeeId} on ${date}`, null, { time })
@@ -340,46 +343,14 @@ export function HRProvider({ children }) {
 
   const addAttendanceRecord = async (record) => {
     const id = generateId()
-    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record }])
+    const { error } = await supabase.from('employee_attendance').insert([{ id, ...record, status: 'pending' }])
     if (error) throw new Error(error.message)
     await fetchAll()
   }
 
-  // ========== Skills Methods ==========
-  const addSkill = async (employeeId, skillName, proficiency = 'Intermediate') => {
-    const id = generateId()
-    const { error } = await supabase.from('employee_skills').insert([{ id, employee_id: employeeId, skill_name: skillName, proficiency }])
-    if (error) throw new Error(error.message)
-    await fetchAll()
-  }
-
-  const deleteSkill = async (id) => {
-    const { error } = await supabase.from('employee_skills').delete().eq('id', id)
-    if (error) throw new Error(error.message)
-    await fetchAll()
-  }
-
-  // ========== Certifications Methods ==========
-  const addCertification = async (cert) => {
-    const id = generateId()
-    const { error } = await supabase.from('employee_certifications').insert([{ id, ...cert, created_at: new Date().toISOString() }])
-    if (error) throw new Error(error.message)
-    await fetchAll()
-  }
-
-  const updateCertification = async (id, updates) => {
-    const { error } = await supabase.from('employee_certifications').update(updates).eq('id', id)
-    if (error) throw new Error(error.message)
-    await fetchAll()
-  }
-
-  const deleteCertification = async (id) => {
-    const { error } = await supabase.from('employee_certifications').delete().eq('id', id)
-    if (error) throw new Error(error.message)
-    await fetchAll()
-  }
-
-  // ========== Timesheet Approval Methods ==========
+  // ─────────────────────────────────────────────────────────────
+  // Timesheet Approval Methods (Stage 9 extension)
+  // ─────────────────────────────────────────────────────────────
   const approveAttendance = async (recordId, approverName, canApprove) => {
     if (!canApprove) throw new Error('Unauthorized: you do not have approval permission')
     const { error } = await supabase
@@ -389,7 +360,7 @@ export function HRProvider({ children }) {
       .eq('status', 'pending')
     if (error) throw error
     await fetchAll()
-    await logHRAction('APPROVE_ATTENDANCE', 'attendance', recordId)
+    await logHRAction('APPROVE_ATTENDANCE', 'attendance', recordId, '', null, { status: 'approved', approved_by: approverName })
   }
 
   const rejectAttendance = async (recordId, approverName, reason, canApprove) => {
@@ -402,7 +373,7 @@ export function HRProvider({ children }) {
       .eq('status', 'pending')
     if (error) throw error
     await fetchAll()
-    await logHRAction('REJECT_ATTENDANCE', 'attendance', recordId)
+    await logHRAction('REJECT_ATTENDANCE', 'attendance', recordId, '', null, { status: 'rejected', reason })
   }
 
   const bulkApproveAttendance = async (recordIds, approverName, canApprove) => {
@@ -415,6 +386,7 @@ export function HRProvider({ children }) {
       .eq('status', 'pending')
     if (error) throw error
     await fetchAll()
+    await logHRAction('BULK_APPROVE_ATTENDANCE', 'attendance', recordIds.join(','), '', null, { count: recordIds.length })
   }
 
   const updateAttendanceRecord = async (recordId, updates, currentStatus) => {
@@ -440,16 +412,50 @@ export function HRProvider({ children }) {
     await fetchAll()
   }
 
-  // ========== Document Storage Helpers ==========
+  // ─────────────────────────────────────────────────────────────
+  // Skills & Certifications Methods
+  // ─────────────────────────────────────────────────────────────
+  const addSkill = async (employeeId, skillName, proficiency = 'Intermediate') => {
+    const id = generateId()
+    const { error } = await supabase.from('employee_skills').insert([{ id, employee_id: employeeId, skill_name: skillName, proficiency }])
+    if (error) throw new Error(error.message)
+    await fetchAll()
+  }
+
+  const deleteSkill = async (id) => {
+    const { error } = await supabase.from('employee_skills').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    await fetchAll()
+  }
+
+  const addCertification = async (cert) => {
+    const id = generateId()
+    const { error } = await supabase.from('employee_certifications').insert([{ id, ...cert, created_at: new Date().toISOString() }])
+    if (error) throw new Error(error.message)
+    await fetchAll()
+  }
+
+  const updateCertification = async (id, updates) => {
+    const { error } = await supabase.from('employee_certifications').update(updates).eq('id', id)
+    if (error) throw new Error(error.message)
+    await fetchAll()
+  }
+
+  const deleteCertification = async (id) => {
+    const { error } = await supabase.from('employee_certifications').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    await fetchAll()
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Document Storage Helpers
+  // ─────────────────────────────────────────────────────────────
   const getEmployeeDocuments = async (employeeId) => {
     try {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
-      if (error && error.message !== 'The resource was not found') {
-        console.error('Error fetching documents:', error)
-        return []
-      }
+      if (error && error.message !== 'The resource was not found') return []
       if (!data || !data.length) return []
       return data.map(file => {
         const pathParts = file.name.split('/')
@@ -464,10 +470,7 @@ export function HRProvider({ children }) {
           created_at: file.created_at
         }
       })
-    } catch (err) {
-      console.error('Error:', err)
-      return []
-    }
+    } catch { return [] }
   }
 
   const getExpiringCertifications = () => {
@@ -493,7 +496,71 @@ export function HRProvider({ children }) {
     return { totalHours, totalOvertime, recordCount: weekRecords.length }
   }
 
-  // ========== Permissions Helper ==========
+  // ─────────────────────────────────────────────────────────────
+  // Leave Management Methods (Stage 10)
+  // ─────────────────────────────────────────────────────────────
+  const createLeaveRequest = async (requestData) => {
+    const id = generateId()
+    const { error } = await supabase
+      .from('leave_requests')
+      .insert([{
+        id,
+        ...requestData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('CREATE_LEAVE_REQUEST', 'leave_request', id, requestData.employee_id, null, requestData)
+    return id
+  }
+
+  const updateLeaveRequest = async (id, updates) => {
+    const { error } = await supabase
+      .from('leave_requests')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('UPDATE_LEAVE_REQUEST', 'leave_request', id, '', null, updates)
+  }
+
+  const deleteLeaveRequest = async (id) => {
+    const { error } = await supabase.from('leave_requests').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+    await logHRAction('DELETE_LEAVE_REQUEST', 'leave_request', id, '', null, null)
+  }
+
+  const getEmployeeLeaveBalance = (employeeId, leaveTypeId, year = new Date().getFullYear()) => {
+    const balance = leaveBalances.find(b =>
+      b.employee_id === employeeId &&
+      b.leave_type_id === leaveTypeId &&
+      b.year === year
+    )
+    return {
+      total: balance?.total_days || 0,
+      used: balance?.used_days || 0,
+      remaining: balance?.remaining_days || 0
+    }
+  }
+
+  const hasDateConflict = (employeeId, startDate, endDate, excludeRequestId = null) => {
+    return leaveRequests.some(req => {
+      if (req.employee_id !== employeeId) return false
+      if (excludeRequestId && req.id === excludeRequestId) return false
+      if (req.status === 'cancelled' || req.status === 'rejected') return false
+      const reqStart = new Date(req.start_date)
+      const reqEnd = new Date(req.end_date)
+      const newStart = new Date(startDate)
+      const newEnd = new Date(endDate)
+      return (newStart <= reqEnd && newEnd >= reqStart)
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Set user permissions (for Stage 9)
+  // ─────────────────────────────────────────────────────────────
   const setUserPermissions = async (userId, permsList) => {
     await supabase.from('user_permissions').delete().eq('user_id', userId)
     const rows = permsList
@@ -507,7 +574,7 @@ export function HRProvider({ children }) {
         can_edit: p.can_edit ?? false,
         can_delete: p.can_delete ?? false,
         can_approve: p.can_approve ?? false,
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       }))
     if (rows.length > 0) {
       const { error } = await supabase.from('user_permissions').insert(rows)
@@ -516,40 +583,35 @@ export function HRProvider({ children }) {
     await logHRAction('SET_PERMISSIONS', 'user', userId, userId, null, { count: rows.length })
   }
 
-  // ========== Leave Management Helper (balance for a specific employee) ==========
-  const getEmployeeLeaveBalance = (employeeId, leaveTypeId, year = new Date().getFullYear()) => {
-    return leaveBalances.find(b => b.employee_id === employeeId && b.leave_type_id === leaveTypeId && b.year === year)
-  }
-
-  // ========== Provider Value ==========
+  // ─────────────────────────────────────────────────────────────
+  // Provider Value
+  // ─────────────────────────────────────────────────────────────
   return (
     <HRContext.Provider value={{
-      // Core
+      // Core HR data
       employees, departments, designations, attendance, skills, certifications, auditLogs, loading,
-      // Leave
+      // Leave data
       leaveTypes, leaveBalances, leaveRequests,
-      getEmployeeLeaveBalance,
-      // Employees
+      // Employee CRUD
       addEmployee, updateEmployee, deleteEmployee, setEmployeeStatus,
-      // Departments
+      // Department CRUD
       addDepartment, updateDepartment, deleteDepartment,
-      // Designations
+      // Designation CRUD
       addDesignation, updateDesignation, deleteDesignation,
       // Attendance
       clockIn, clockOut, addAttendanceRecord,
-      approveAttendance, rejectAttendance, bulkApproveAttendance,
-      updateAttendanceRecord, deleteAttendanceRecord,
+      // Timesheet Approval
+      approveAttendance, rejectAttendance, bulkApproveAttendance, updateAttendanceRecord, deleteAttendanceRecord,
       // Skills & Certifications
-      addSkill, deleteSkill,
-      addCertification, updateCertification, deleteCertification,
-      // Helpers
-      getExpiringCertifications,
-      getEmployeeDocuments,
-      getWeeklyHours,
-      canPerformAttendance,
+      addSkill, deleteSkill, addCertification, updateCertification, deleteCertification,
+      // Documents & Helpers
+      getEmployeeDocuments, getExpiringCertifications, getWeeklyHours, canPerformAttendance,
+      // Leave Management
+      createLeaveRequest, updateLeaveRequest, deleteLeaveRequest, getEmployeeLeaveBalance, hasDateConflict,
+      // Permissions
       setUserPermissions,
-      logHRAction,
-      fetchAll,
+      // Fetch
+      fetchAll, logHRAction
     }}>
       {children}
     </HRContext.Provider>
