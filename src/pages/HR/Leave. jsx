@@ -1,9 +1,9 @@
-import { usePermission } from '../../contexts/PermissionContext'
+// src/pages/HR/Leave.jsx
 import { useCanView } from '../../hooks/usePermission'
 
 export default function Leave() {
   const canView = useCanView('hr', 'leave')
-
+  
   if (!canView) {
     return (
       <div className="empty-state" style={{ padding: 40, textAlign: 'center' }}>
@@ -12,7 +12,7 @@ export default function Leave() {
       </div>
     )
   }
-
+  
   return (
     <div>
       <div className="page-header">
@@ -22,7 +22,7 @@ export default function Leave() {
         <span className="material-icons" style={{ fontSize: 64, opacity: 0.3, marginBottom: 16 }}>event_busy</span>
         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Leave Management</h3>
         <p style={{ color: 'var(--text-dim)' }}>This module is currently under development.</p>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>Features coming soon: leave types, requests, balances, approvals.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>Sub‑Stage 10.2 – Leave Request Submission – coming soon.</p>
       </div>
     </div>
   )
