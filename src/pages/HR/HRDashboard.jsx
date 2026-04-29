@@ -1,3 +1,4 @@
+// src/pages/HR/HRDashboard.jsx
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useNavigate } from 'react-router-dom'
@@ -8,7 +9,7 @@ export default function HRDashboard() {
   const { employees, departments, attendance, certifications, fetchAll } = useHR()
   const canViewEmployees = useCanView('hr', 'employees')
   const canViewAttendance = useCanView('hr', 'attendance')
-  
+
   const [dashboardData, setDashboardData] = useState({
     totalEmployees: 0,
     activeEmployees: 0,
@@ -20,9 +21,7 @@ export default function HRDashboard() {
     alerts: []
   })
 
-  useEffect(() => {
-    fetchAll()
-  }, [])
+  useEffect(() => { fetchAll() }, [])
 
   useEffect(() => {
     if (!employees.length) return
@@ -53,34 +52,19 @@ export default function HRDashboard() {
         deptMap.get(e.department_id).count++
       }
     })
-    const departmentHeadcounts = Array.from(deptMap.values()).sort((a,b) => b.count - a.count)
+    const departmentHeadcounts = Array.from(deptMap.values()).sort((a, b) => b.count - a.count)
 
     const alerts = []
-
     const activeEmployees = employees.filter(e => e.status === 'Active')
     const attendedIds = new Set(todayAttendance.map(a => a.employee_id))
     const missingAttendance = activeEmployees.filter(e => !attendedIds.has(e.id))
     if (missingAttendance.length > 0) {
-      alerts.push({
-        type: 'warning',
-        icon: 'schedule',
-        message: `${missingAttendance.length} employee(s) have not clocked in today`,
-        action: () => navigate('/module/hr/attendance'),
-        color: 'var(--yellow)'
-      })
+      alerts.push({ type: 'warning', icon: 'schedule', message: `${missingAttendance.length} employee(s) have not clocked in today`, action: () => navigate('/module/hr/attendance'), color: 'var(--yellow)' })
     }
-
     const noDept = employees.filter(e => !e.department_id)
     if (noDept.length > 0) {
-      alerts.push({
-        type: 'warning',
-        icon: 'business',
-        message: `${noDept.length} employee(s) have no department assigned`,
-        action: () => navigate('/module/hr/employees'),
-        color: 'var(--yellow)'
-      })
+      alerts.push({ type: 'warning', icon: 'business', message: `${noDept.length} employee(s) have no department assigned`, action: () => navigate('/module/hr/employees'), color: 'var(--yellow)' })
     }
-
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
     const expiringCerts = certifications.filter(c => {
@@ -89,45 +73,18 @@ export default function HRDashboard() {
       return expiry <= thirtyDaysFromNow && expiry >= new Date()
     })
     if (expiringCerts.length > 0) {
-      alerts.push({
-        type: 'warning',
-        icon: 'verified',
-        message: `${expiringCerts.length} certification(s) expiring within 30 days`,
-        action: () => navigate('/module/hr/employees'),
-        color: 'var(--yellow)'
-      })
+      alerts.push({ type: 'warning', icon: 'verified', message: `${expiringCerts.length} certification(s) expiring within 30 days`, action: () => navigate('/module/hr/employees'), color: 'var(--yellow)' })
     }
-
     const missingContact = employees.filter(e => !e.phone || !e.email)
     if (missingContact.length > 0) {
-      alerts.push({
-        type: 'info',
-        icon: 'contact_phone',
-        message: `${missingContact.length} employee(s) missing phone or email`,
-        action: () => navigate('/module/hr/employees'),
-        color: 'var(--blue)'
-      })
+      alerts.push({ type: 'info', icon: 'contact_phone', message: `${missingContact.length} employee(s) missing phone or email`, action: () => navigate('/module/hr/employees'), color: 'var(--blue)' })
     }
-
     const incompleteProfile = employees.filter(e => !e.hire_date || !e.designation_id)
     if (incompleteProfile.length > 0) {
-      alerts.push({
-        type: 'info',
-        icon: 'person',
-        message: `${incompleteProfile.length} employee(s) have incomplete profiles`,
-        action: () => navigate('/module/hr/employees'),
-        color: 'var(--blue)'
-      })
+      alerts.push({ type: 'info', icon: 'person', message: `${incompleteProfile.length} employee(s) have incomplete profiles`, action: () => navigate('/module/hr/employees'), color: 'var(--blue)' })
     }
-
     if (overtimeAlerts > 0) {
-      alerts.push({
-        type: 'warning',
-        icon: 'warning',
-        message: `${overtimeAlerts} employee(s) exceeded 10 hours overtime this week`,
-        action: () => navigate('/module/hr/attendance'),
-        color: 'var(--red)'
-      })
+      alerts.push({ type: 'warning', icon: 'warning', message: `${overtimeAlerts} employee(s) exceeded 10 hours overtime this week`, action: () => navigate('/module/hr/attendance'), color: 'var(--red)' })
     }
 
     setDashboardData({
@@ -174,12 +131,12 @@ export default function HRDashboard() {
         <div className="kpi-card">
           <div className="kpi-label">Overtime Alerts</div>
           <div className="kpi-val" style={{ color: dashboardData.overtimeAlerts > 0 ? 'var(--red)' : 'var(--green)' }}>{dashboardData.overtimeAlerts}</div>
-          <div className="kpi-sub">>10hrs this week</div>
+          <div className="kpi-sub">Over 10hrs this week</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Departments</div>
           <div className="kpi-val">{departments.length}</div>
-          <div className="kpi-sub">Avg {dashboardData.totalEmployees / (departments.length || 1)} per dept</div>
+          <div className="kpi-sub">Avg {(dashboardData.totalEmployees / (departments.length || 1)).toFixed(1)} per dept</div>
         </div>
       </div>
 
@@ -187,24 +144,16 @@ export default function HRDashboard() {
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Department Headcounts</h3>
         <div className="table-wrap">
           <table className="stock-table">
-            <thead>
-              <tr>
-                <th>Department</th><th>Employees</th><th>% of Total</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Department</th><th>Employees</th><th>% of Total</th></tr></thead>
             <tbody>
               {dashboardData.departmentHeadcounts.map(dept => (
                 <tr key={dept.name}>
-                  <td>{dept.name}</td>
+                  <td style={{ fontWeight: 600 }}>{dept.name}</td>
                   <td style={{ fontWeight: 700 }}>{dept.count}</td>
                   <td>{((dept.count / dashboardData.totalEmployees) * 100).toFixed(1)}%</td>
                 </tr>
               ))}
-              {dashboardData.departmentHeadcounts.length === 0 && (
-                <tr>
-                  <td colSpan="3" className="empty-state">No departments</td>
-                </tr>
-              )}
+              {dashboardData.departmentHeadcounts.length === 0 && (<tr><td colSpan="3" className="empty-state">No departments</td></tr>)}
             </tbody>
           </table>
         </div>
@@ -220,20 +169,7 @@ export default function HRDashboard() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {dashboardData.alerts.map((alert, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: 12,
-                  background: 'var(--surface2)',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  borderLeft: `3px solid ${alert.color}`
-                }}
-                onClick={alert.action}
-              >
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--surface2)', borderRadius: 8, cursor: 'pointer', borderLeft: `3px solid ${alert.color}` }} onClick={alert.action}>
                 <span className="material-icons" style={{ color: alert.color }}>{alert.icon}</span>
                 <span style={{ flex: 1 }}>{alert.message}</span>
                 <span className="material-icons" style={{ fontSize: 16, color: 'var(--text-dim)' }}>chevron_right</span>
