@@ -1,5 +1,5 @@
 // src/pages/HR/Employees.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -27,6 +27,10 @@ export default function Employees() {
   const [activeDocCategory, setActiveDocCategory] = useState('general')
   const [manualEmployeeId, setManualEmployeeId] = useState(false)
 
+  // ── Leave balances for new employee ─────────────────────────────
+  const [leaveTypesList, setLeaveTypesList] = useState([])
+  const [initialBalances, setInitialBalances] = useState([])
+
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDepartment, setFilterDepartment] = useState('ALL')
   const [filterDesignation, setFilterDesignation] = useState('ALL')
@@ -50,6 +54,15 @@ export default function Employees() {
   const [createAccount, setCreateAccount] = useState(false)
   const [accountRoleId, setAccountRoleId] = useState('role_viewer')
 
+  // Fetch leave types for the initial balances UI
+  useEffect(() => {
+    const fetchLeaveTypes = async () => {
+      const { data } = await supabase.from('leave_types').select('id, name').order('name')
+      if (data) setLeaveTypesList(data)
+    }
+    fetchLeaveTypes()
+  }, [])
+
   const docCategories = [
     { id: 'passport', label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
     { id: 'identification', label: 'Identification', icon: 'badge', accept: 'image/*,application/pdf' },
@@ -62,12 +75,10 @@ export default function Employees() {
       const { data, error } = await supabase.storage
         .from('hr-documents')
         .list(`employees/${employeeId}/`, { recursive: true })
-
       if (error && error.message !== 'The resource was not found') {
         console.error('Error fetching documents:', error)
         return
       }
-
       if (data && data.length) {
         const docsWithUrls = data.map(file => {
           const pathParts = file.name.split('/')
@@ -179,6 +190,7 @@ export default function Employees() {
   const openModal = (employee = null) => {
     setAccountInfo(null)
     setManualEmployeeId(false)
+    setInitialBalances([])  // reset balances when opening modal
     if (employee) {
       setEditing(employee)
       setForm({
@@ -214,7 +226,6 @@ export default function Employees() {
   }
 
   const editFromView = () => { setViewModalOpen(false); openModal(selectedEmployee) }
-  
   const deleteFromView = async () => {
     if (!window.confirm(`Delete employee "${selectedEmployee.name}"? System account will also be removed.`)) return
     await deleteEmployee(selectedEmployee.id)
@@ -232,53 +243,21 @@ export default function Employees() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Required field validations
-    if (!form.name || form.name.trim() === '') {
-      toast.error('Full Name is required')
-      return
-    }
-    if (!form.department_id) {
-      toast.error('Please select a Department')
-      return
-    }
-    if (!form.designation_id) {
-      toast.error('Please select a Designation')
-      return
-    }
-    if (!form.hire_date) {
-      toast.error('Hire Date is required')
-      return
-    }
+    if (!form.name || form.name.trim() === '') return toast.error('Full Name is required')
+    if (!form.department_id) return toast.error('Please select a Department')
+    if (!form.designation_id) return toast.error('Please select a Designation')
+    if (!form.hire_date) return toast.error('Hire Date is required')
+    if (form.phone && !/^[0-9+\-\s()]{9,15}$/.test(form.phone)) return toast.error('Invalid phone number format')
+    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) return toast.error('Invalid email format')
 
-    // Phone format validation (optional)
-    if (form.phone && !/^[0-9+\-\s()]{9,15}$/.test(form.phone)) {
-      toast.error('Invalid phone number format')
-      return
-    }
-    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) {
-      toast.error('Invalid email format')
-      return
-    }
-
-    // Manual Employee ID validation
     if (!editing && manualEmployeeId) {
-      if (!form.employee_number?.match(/^BRA\d+$/)) {
-        toast.error('Employee number must start with BRA followed by digits (e.g., BRA185)')
-        return
-      }
+      if (!form.employee_number?.match(/^BRA\d+$/)) return toast.error('Employee number must start with BRA followed by digits')
       const exists = employees.some(e => e.employee_number === form.employee_number && e.id !== editing?.id)
-      if (exists) {
-        toast.error('Employee number already exists')
-        return
-      }
+      if (exists) return toast.error('Employee number already exists')
     }
 
-    // Prepare data for submission – if manual ID, use it; otherwise leave empty for auto-generation
     const submitData = { ...form }
-    if (!editing && !manualEmployeeId) {
-      submitData.employee_number = '' // HRContext will auto-generate
-    }
+    if (!editing && !manualEmployeeId) submitData.employee_number = ''
 
     try {
       if (editing) {
@@ -287,12 +266,12 @@ export default function Employees() {
         setModalOpen(false)
       } else {
         if (createAccount) {
-          const accountResult = await addEmployee(submitData, true, accountRoleId)
+          const accountResult = await addEmployee(submitData, true, accountRoleId, initialBalances)
           setAccountInfo(accountResult)
           toast.success(`Employee added! Username: ${accountResult.username}, Password: ${accountResult.password}`)
           // Keep modal open to show credentials
         } else {
-          await addEmployee(submitData, false)
+          await addEmployee(submitData, false, accountRoleId, initialBalances)
           toast.success('Employee added')
           setModalOpen(false)
         }
@@ -330,8 +309,6 @@ export default function Employees() {
   const statusColors = {
     Active: 'bg-green', 'On Leave': 'bg-yellow', Suspended: 'bg-orange', Terminated: 'bg-red'
   }
-
-  // ========== TAB COMPONENTS ==========
 
   const ProfileTab = ({ employee }) => {
     const filteredDocs = documents.filter(doc => doc.category === activeDocCategory)
@@ -426,7 +403,7 @@ export default function Employees() {
                   <td style={{ color: 'var(--text-dim)' }}>{att.notes || '—'}</td>
                 </tr>
               ))}
-              {empAttendance.length === 0 && (<tr><td colSpan="7" className="empty-state">No attendance records</td></tr>)}
+              {empAttendance.length === 0 && (<td><td colSpan="7" className="empty-state">No attendance records</td></tr>)}
             </tbody>
           </table>
         </div>
@@ -476,9 +453,7 @@ export default function Employees() {
           </div>
           <div className="table-wrap">
             <table className="stock-table">
-              <thead>
-                <tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr>
-              </thead>
+              <thead><tr><th>Certification</th><th>Issuing Body</th><th>Issue Date</th><th>Expiry Date</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {empCerts.map(cert => {
                   const expiring = isExpiring(cert.expiry_date)
@@ -497,11 +472,7 @@ export default function Employees() {
                     </tr>
                   )
                 })}
-                {empCerts.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="empty-state">No certifications</td>
-                  </tr>
-                )}
+                {empCerts.length === 0 && (<tr><td colSpan="6" className="empty-state">No certifications</td></tr>)}
               </tbody>
             </table>
           </div>
@@ -538,7 +509,6 @@ export default function Employees() {
     )
   }
 
-  // ========== MAIN RENDER ==========
   return (
     <div>
       <div className="page-header">
@@ -550,7 +520,6 @@ export default function Employees() {
         )}
       </div>
 
-      {/* Filter Bar */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <div className="form-row">
           <div className="form-group">
@@ -585,7 +554,6 @@ export default function Employees() {
         </div>
       </div>
 
-      {/* Employee Cards */}
       <div className="emp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
         {hrLoading ? (<div>Loading…</div>) : filteredEmployees.length === 0 ? (<div className="empty-state">No employees match your filters</div>) : filteredEmployees.map(emp => {
           const weeklyStats = getWeeklyHours(emp.id)
@@ -613,7 +581,6 @@ export default function Employees() {
         })}
       </div>
 
-      {/* Detail View Modal */}
       {viewModalOpen && selectedEmployee && (
         <div className="overlay" onClick={() => setViewModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
@@ -635,7 +602,6 @@ export default function Employees() {
         </div>
       )}
 
-      {/* Cert Modal */}
       {showCertModal && (
         <div className="overlay" onClick={() => setShowCertModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -649,7 +615,6 @@ export default function Employees() {
         </div>
       )}
 
-      {/* Add/Edit Employee Modal */}
       {modalOpen && (
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -670,7 +635,6 @@ export default function Employees() {
                 <div className="form-group"><label>Employee Number</label><input className="form-control" disabled value={form.employee_number || (manualEmployeeId ? 'Enter manually' : 'Auto-generated')} /></div>
               </div>
 
-              {/* Manual/Auto Employee ID Toggle */}
               {!editing && (
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -679,12 +643,7 @@ export default function Employees() {
                   </label>
                   {manualEmployeeId ? (
                     <div style={{ marginTop: 8 }}>
-                      <input
-                        className="form-control"
-                        value={form.employee_number}
-                        onChange={e => setForm({ ...form, employee_number: e.target.value.toUpperCase() })}
-                        placeholder="BRA185"
-                      />
+                      <input className="form-control" value={form.employee_number} onChange={e => setForm({ ...form, employee_number: e.target.value.toUpperCase() })} placeholder="BRA185" />
                       <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Must start with BRA followed by digits, must be unique</small>
                     </div>
                   ) : (
@@ -721,6 +680,44 @@ export default function Employees() {
                 <div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({ ...form, emergency_name: e.target.value })} /></div>
                 <div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({ ...form, emergency_phone: e.target.value })} /></div>
               </div>
+
+              {/* ✅ INITIAL LEAVE BALANCES SECTION */}
+              {!editing && leaveTypesList.length > 0 && (
+                <div className="card" style={{ marginTop: 16, padding: 16, background: 'var(--surface2)' }}>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Leave Balances (Initial)</h4>
+                  <p style={{ fontSize: 11, marginBottom: 12, color: 'var(--text-dim)' }}>
+                    Enter the starting leave days for this employee. Leave zero if none.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                    {leaveTypesList.map(lt => {
+                      const current = initialBalances.find(b => b.leave_type_id === lt.id)
+                      return (
+                        <div key={lt.id} className="form-group">
+                          <label>{lt.name}</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            className="form-control"
+                            value={current?.total_days ?? 0}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0
+                              setInitialBalances(prev => {
+                                const existing = prev.find(b => b.leave_type_id === lt.id)
+                                if (existing) {
+                                  return prev.map(b => b.leave_type_id === lt.id ? { ...b, total_days: val } : b)
+                                } else {
+                                  return [...prev, { leave_type_id: lt.id, total_days: val }]
+                                }
+                              })
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {!editing && (
                 <div className="form-group">
