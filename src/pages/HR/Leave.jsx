@@ -20,16 +20,14 @@ export default function Leave() {
     createLeaveRequest,
     updateLeaveRequest,
     deleteLeaveRequest,
-    getPendingForSupervisor,
-    getPendingForHR,
     approveLeaveRequest,
     rejectLeaveRequest,
     addLeaveComment,
     fetchAll
   } = useHR()
 
-  const canApproveHR = useCanApprove('hr', 'leave')   // HR can approve final stage
-  const canViewAll = useCanView('hr', 'leave')        // HR can see all requests (not used here yet)
+  const canApproveHR = useCanApprove('hr', 'leave')
+  const canViewAll = useCanView('hr', 'leave')
 
   // ── Employee ID resolution ─────────────────────────────────
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
@@ -93,17 +91,68 @@ export default function Leave() {
     resolveIds()
   }, [user])
 
-  // ── Fetch pending approvals when employee/departments change ──
+  // ── Fetch pending approvals directly from DB ───────────────
+  const fetchPendingSupervisor = async () => {
+    if (!approverEmployeeId) return
+    try {
+      // Get department where this employee is HOD
+      const { data: dept, error: deptError } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('hod_id', approverEmployeeId)
+        .maybeSingle()
+      if (deptError || !dept) {
+        setPendingSupervisor([])
+        return
+      }
+      // Get employees in that department
+      const { data: employeesInDept, error: empError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('department_id', dept.id)
+      if (empError || !employeesInDept?.length) {
+        setPendingSupervisor([])
+        return
+      }
+      const employeeIds = employeesInDept.map(e => e.id)
+      // Fetch pending_supervisor requests for those employees
+      const { data: pending, error: reqError } = await supabase
+        .from('leave_requests')
+        .select('*, leave_types(name), employees(name)')
+        .in('employee_id', employeeIds)
+        .eq('status', 'pending_supervisor')
+        .order('created_at', { ascending: false })
+      if (!reqError) setPendingSupervisor(pending || [])
+    } catch (err) {
+      console.error('Error fetching supervisor pending:', err)
+      setPendingSupervisor([])
+    }
+  }
+
+  const fetchPendingHR = async () => {
+    if (!canApproveHR) return
+    try {
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .select('*, leave_types(name), employees(name)')
+        .eq('status', 'pending_hr')
+        .order('created_at', { ascending: false })
+      if (!error) setPendingHR(data || [])
+    } catch (err) {
+      console.error('Error fetching HR pending:', err)
+      setPendingHR([])
+    }
+  }
+
+  // Refresh pending lists when leaveRequests changes or approver ID changes
   useEffect(() => {
-    if (approverEmployeeId && departments.length) {
-      const supervisorReqs = getPendingForSupervisor(approverEmployeeId)
-      setPendingSupervisor(supervisorReqs)
+    if (approverEmployeeId) {
+      fetchPendingSupervisor()
     }
     if (canApproveHR) {
-      const hrReqs = getPendingForHR()
-      setPendingHR(hrReqs)
+      fetchPendingHR()
     }
-  }, [approverEmployeeId, departments, leaveRequests, getPendingForSupervisor, getPendingForHR, canApproveHR])
+  }, [approverEmployeeId, leaveRequests, canApproveHR])
 
   // ── Balance calculation ──────────────────────────────────────
   useEffect(() => {
