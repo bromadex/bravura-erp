@@ -1,10 +1,22 @@
+// src/pages/Inventory/StockOut.jsx
+//
+// STAGE 10.6 ENFORCEMENT:
+// The free-text "Issued To" input is replaced with an employee dropdown.
+// On-leave employees appear in the list but are disabled and labelled
+// "(On Leave)". If somehow selected, submission is blocked with a toast.
+// All lookups use the LeaveContext in-memory cache — zero extra DB calls.
+
 import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
+import { useHR } from '../../contexts/HRContext'
+import { useLeave } from '../../contexts/LeaveContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 export default function StockOut() {
   const { items, transactions, stockOut: doStockOut, loading } = useInventory()
+  const { employees } = useHR()
+  const { isOnLeave } = useLeave()
   const canEdit = useCanEdit('inventory', 'stock-out')
   const [showModal, setShowModal] = useState(false)
 
@@ -22,27 +34,18 @@ export default function StockOut() {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="stock-table">
           <thead>
             <tr>
               <th>#</th><th>Date</th><th>Item</th><th>Category</th>
               <th>Qty</th><th>Issued To</th><th>Authorized By</th><th>Purpose</th>
             </tr>
           </thead>
-
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>
-                  Loading...
-                </td>
-              </tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>Loading...</td></tr>
             ) : stockOutTransactions.length === 0 ? (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>
-                  No stock out records
-                </td>
-              </tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>No stock out records</td></tr>
             ) : (
               stockOutTransactions.map((tx, idx) => (
                 <tr key={tx.id}>
@@ -50,10 +53,10 @@ export default function StockOut() {
                   <td>{new Date(tx.date).toLocaleDateString()}</td>
                   <td style={{ fontWeight: 600 }}>{tx.item_name}</td>
                   <td>{tx.category}</td>
-                  <td style={{ color: 'var(--red)' }}>-{tx.qty}</td>
-                  <td>{tx.issued_to || '-'}</td>
-                  <td>{tx.authorized_by || '-'}</td>
-                  <td style={{ color: 'var(--text-dim)' }}>{tx.notes || '-'}</td>
+                  <td style={{ color: 'var(--red)', fontFamily: 'var(--mono)' }}>-{tx.qty}</td>
+                  <td>{tx.issued_to || '—'}</td>
+                  <td>{tx.authorized_by || '—'}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{tx.notes || '—'}</td>
                 </tr>
               ))
             )}
@@ -64,6 +67,8 @@ export default function StockOut() {
       {showModal && (
         <StockOutModal
           items={items}
+          employees={employees}
+          isOnLeave={isOnLeave}
           onClose={() => setShowModal(false)}
           onSave={doStockOut}
         />
@@ -72,36 +77,51 @@ export default function StockOut() {
   )
 }
 
-function StockOutModal({ items, onClose, onSave }) {
+function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
   const [form, setForm] = useState({
     itemId: '',
     quantity: 1,
     date: new Date().toISOString().split('T')[0],
-    issuedTo: '',
+    issuedToId: '',      // employee ID
     authorizedBy: '',
     purpose: ''
   })
-
   const [loading, setLoading] = useState(false)
 
   const selectedItem = items.find(i => i.id === form.itemId)
   const isValid = selectedItem && form.quantity <= selectedItem.balance
+
+  const selectedEmployee = employees.find(e => e.id === form.issuedToId)
+  const recipientOnLeave = form.issuedToId && isOnLeave(form.issuedToId)
+
+  // Active employees (not terminated), sorted by name
+  const activeEmployees = [...employees]
+    .filter(e => e.status !== 'Terminated')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (!form.itemId) return toast.error('Select an item')
     if (!form.quantity || form.quantity <= 0) return toast.error('Enter a valid quantity')
-    if (!isValid) return toast.error(`Insufficient stock. Available: ${selectedItem.balance} ${selectedItem?.unit || 'pcs'}`)
+    if (!isValid) return toast.error(`Insufficient stock. Available: ${selectedItem?.balance} ${selectedItem?.unit || 'pcs'}`)
+
+    // ✅ 10.6 enforcement: block if recipient is on leave
+    if (recipientOnLeave) {
+      toast.error(`${selectedEmployee?.name} is currently on approved leave. Stock cannot be issued to them.`)
+      return
+    }
 
     setLoading(true)
-
     try {
+      // Resolve name: use employee name if linked, otherwise use raw text
+      const issuedToName = selectedEmployee?.name || form.issuedToId || ''
+
       await onSave(
         form.itemId,
         form.quantity,
         form.date,
-        form.issuedTo,
+        issuedToName,
         form.authorizedBy || 'System',
         form.purpose
       )
@@ -123,14 +143,11 @@ function StockOutModal({ items, onClose, onSave }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {/* Item selector */}
           <div className="form-group">
             <label>Item *</label>
-            <select
-              className="form-control"
-              required
-              value={form.itemId}
-              onChange={e => setForm({ ...form, itemId: e.target.value })}
-            >
+            <select className="form-control" required value={form.itemId}
+              onChange={e => setForm({ ...form, itemId: e.target.value })}>
               <option value="">Select item</option>
               {items.map(i => (
                 <option key={i.id} value={i.id}>
@@ -141,18 +158,12 @@ function StockOutModal({ items, onClose, onSave }) {
           </div>
 
           {selectedItem && (
-            <div
-              style={{
-                background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)',
-                padding: 8,
-                borderRadius: 8,
-                marginBottom: 12,
-                fontSize: 12,
-                display: 'flex',
-                gap: 16,
-                color: !isValid ? 'var(--red)' : 'var(--green)'
-              }}
-            >
+            <div style={{
+              background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)',
+              padding: 8, borderRadius: 8, marginBottom: 12, fontSize: 12,
+              display: 'flex', gap: 16,
+              color: !isValid ? 'var(--red)' : 'var(--green)'
+            }}>
               <span>Available: <strong>{selectedItem.balance} {selectedItem.unit || 'pcs'}</strong></span>
               <span>Threshold: <strong>{selectedItem.threshold}</strong></span>
             </div>
@@ -161,64 +172,66 @@ function StockOutModal({ items, onClose, onSave }) {
           <div className="form-row">
             <div className="form-group">
               <label>Quantity *</label>
-              <input
-                type="number"
-                className="form-control"
-                required
-                min="1"
-                max={selectedItem?.balance || 0}
-                value={form.quantity}
-                onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })}
-              />
+              <input type="number" className="form-control" required min="1"
+                max={selectedItem?.balance || 0} value={form.quantity}
+                onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 0 })} />
             </div>
-
             <div className="form-group">
               <label>Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
-              />
+              <input type="date" className="form-control" value={form.date}
+                onChange={e => setForm({ ...form, date: e.target.value })} />
             </div>
           </div>
 
           <div className="form-row">
+            {/* ✅ 10.6: Employee dropdown replacing free-text "Issued To" */}
             <div className="form-group">
               <label>Issued To</label>
-              <input
-                className="form-control"
-                value={form.issuedTo}
-                onChange={e => setForm({ ...form, issuedTo: e.target.value })}
-              />
+              <select className="form-control" value={form.issuedToId}
+                onChange={e => setForm({ ...form, issuedToId: e.target.value })}>
+                <option value="">— Select employee —</option>
+                {activeEmployees.map(emp => {
+                  const onLeave = isOnLeave(emp.id)
+                  return (
+                    <option key={emp.id} value={emp.id} disabled={onLeave}>
+                      {emp.name}{onLeave ? ' (On Leave)' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+              {recipientOnLeave && (
+                <div style={{
+                  marginTop: 6, padding: '6px 10px', borderRadius: 6,
+                  background: 'rgba(248,113,113,.12)',
+                  border: '1px solid rgba(248,113,113,.3)',
+                  fontSize: 12, color: 'var(--red)',
+                  display: 'flex', alignItems: 'center', gap: 6
+                }}>
+                  <span className="material-icons" style={{ fontSize: 14 }}>event_busy</span>
+                  {selectedEmployee?.name} is on approved leave — cannot receive stock.
+                </div>
+              )}
             </div>
 
             <div className="form-group">
               <label>Authorized By</label>
-              <input
-                className="form-control"
-                value={form.authorizedBy}
-                onChange={e => setForm({ ...form, authorizedBy: e.target.value })}
-              />
+              <input className="form-control" value={form.authorizedBy}
+                onChange={e => setForm({ ...form, authorizedBy: e.target.value })} />
             </div>
           </div>
 
           <div className="form-group">
             <label>Purpose / Notes</label>
-            <textarea
-              className="form-control"
-              rows="2"
-              value={form.purpose}
-              onChange={e => setForm({ ...form, purpose: e.target.value })}
-            />
+            <textarea className="form-control" rows="2" value={form.purpose}
+              onChange={e => setForm({ ...form, purpose: e.target.value })} />
           </div>
 
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
-
-            <button type="submit" className="btn btn-danger" disabled={loading || !isValid}>
+            <button type="submit" className="btn btn-danger"
+              disabled={loading || !isValid || recipientOnLeave}>
               {loading ? 'Processing...' : 'Confirm Stock Out'}
             </button>
           </div>
