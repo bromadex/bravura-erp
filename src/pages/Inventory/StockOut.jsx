@@ -1,25 +1,34 @@
 // src/pages/Inventory/StockOut.jsx
 //
-// STAGE 10.6 ENFORCEMENT:
-// The free-text "Issued To" input is replaced with an employee dropdown.
-// On-leave employees appear in the list but are disabled and labelled
-// "(On Leave)". If somehow selected, submission is blocked with a toast.
-// All lookups use the LeaveContext in-memory cache — zero extra DB calls.
+// FIX: Removed useHR() — HRProvider is not mounted in the Inventory
+// module route. Now fetches employees directly from Supabase with a
+// local useEffect. Lightweight — only name, id, status columns.
+// On-leave guard still works via LeaveContext cache.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
-import { useHR } from '../../contexts/HRContext'
 import { useLeave } from '../../contexts/LeaveContext'
 import { useCanEdit } from '../../hooks/usePermission'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function StockOut() {
   const { items, transactions, stockOut: doStockOut, loading } = useInventory()
-  const { employees } = useHR()
   const { isOnLeave } = useLeave()
   const canEdit = useCanEdit('inventory', 'stock-out')
-  const [showModal, setShowModal] = useState(false)
 
+  // ✅ FIX: fetch employees directly — no HRProvider needed
+  const [employees, setEmployees] = useState([])
+  useEffect(() => {
+    supabase
+      .from('employees')
+      .select('id, name, status')
+      .neq('status', 'Terminated')
+      .order('name')
+      .then(({ data }) => { if (data) setEmployees(data) })
+  }, [])
+
+  const [showModal, setShowModal] = useState(false)
   const stockOutTransactions = transactions.filter(t => t.type === 'OUT')
 
   return (
@@ -82,57 +91,34 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
     itemId: '',
     quantity: 1,
     date: new Date().toISOString().split('T')[0],
-    issuedToId: '',      // employee ID
+    issuedToId: '',
     authorizedBy: '',
     purpose: ''
   })
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const selectedItem = items.find(i => i.id === form.itemId)
-  const isValid = selectedItem && form.quantity <= selectedItem.balance
-
+  const selectedItem     = items.find(i => i.id === form.itemId)
+  const isValid          = selectedItem && form.quantity <= selectedItem.balance
   const selectedEmployee = employees.find(e => e.id === form.issuedToId)
   const recipientOnLeave = form.issuedToId && isOnLeave(form.issuedToId)
 
-  // Active employees (not terminated), sorted by name
-  const activeEmployees = [...employees]
-    .filter(e => e.status !== 'Terminated')
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    if (!form.itemId) return toast.error('Select an item')
+    if (!form.itemId)   return toast.error('Select an item')
     if (!form.quantity || form.quantity <= 0) return toast.error('Enter a valid quantity')
     if (!isValid) return toast.error(`Insufficient stock. Available: ${selectedItem?.balance} ${selectedItem?.unit || 'pcs'}`)
-
-    // ✅ 10.6 enforcement: block if recipient is on leave
     if (recipientOnLeave) {
       toast.error(`${selectedEmployee?.name} is currently on approved leave. Stock cannot be issued to them.`)
       return
     }
-
-    setLoading(true)
+    setSubmitting(true)
     try {
-      // Resolve name: use employee name if linked, otherwise use raw text
       const issuedToName = selectedEmployee?.name || form.issuedToId || ''
-
-      await onSave(
-        form.itemId,
-        form.quantity,
-        form.date,
-        issuedToName,
-        form.authorizedBy || 'System',
-        form.purpose
-      )
-
+      await onSave(form.itemId, form.quantity, form.date, issuedToName, form.authorizedBy || 'System', form.purpose)
       toast.success(`-${form.quantity} ${selectedItem?.unit || 'units'} issued`)
       onClose()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { toast.error(err.message) }
+    finally { setSubmitting(false) }
   }
 
   return (
@@ -141,9 +127,7 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
         <div className="modal-title">
           <span className="material-icons">assignment_return</span> Stock <span>Out</span>
         </div>
-
         <form onSubmit={handleSubmit}>
-          {/* Item selector */}
           <div className="form-group">
             <label>Item *</label>
             <select className="form-control" required value={form.itemId}
@@ -158,12 +142,7 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
           </div>
 
           {selectedItem && (
-            <div style={{
-              background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)',
-              padding: 8, borderRadius: 8, marginBottom: 12, fontSize: 12,
-              display: 'flex', gap: 16,
-              color: !isValid ? 'var(--red)' : 'var(--green)'
-            }}>
+            <div style={{ background: !isValid ? 'rgba(248,113,113,.1)' : 'rgba(52,211,153,.1)', padding: 8, borderRadius: 8, marginBottom: 12, fontSize: 12, display: 'flex', gap: 16, color: !isValid ? 'var(--red)' : 'var(--green)' }}>
               <span>Available: <strong>{selectedItem.balance} {selectedItem.unit || 'pcs'}</strong></span>
               <span>Threshold: <strong>{selectedItem.threshold}</strong></span>
             </div>
@@ -184,13 +163,12 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
           </div>
 
           <div className="form-row">
-            {/* ✅ 10.6: Employee dropdown replacing free-text "Issued To" */}
             <div className="form-group">
               <label>Issued To</label>
               <select className="form-control" value={form.issuedToId}
                 onChange={e => setForm({ ...form, issuedToId: e.target.value })}>
                 <option value="">— Select employee —</option>
-                {activeEmployees.map(emp => {
+                {employees.map(emp => {
                   const onLeave = isOnLeave(emp.id)
                   return (
                     <option key={emp.id} value={emp.id} disabled={onLeave}>
@@ -200,19 +178,12 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
                 })}
               </select>
               {recipientOnLeave && (
-                <div style={{
-                  marginTop: 6, padding: '6px 10px', borderRadius: 6,
-                  background: 'rgba(248,113,113,.12)',
-                  border: '1px solid rgba(248,113,113,.3)',
-                  fontSize: 12, color: 'var(--red)',
-                  display: 'flex', alignItems: 'center', gap: 6
-                }}>
+                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.3)', fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="material-icons" style={{ fontSize: 14 }}>event_busy</span>
                   {selectedEmployee?.name} is on approved leave — cannot receive stock.
                 </div>
               )}
             </div>
-
             <div className="form-group">
               <label>Authorized By</label>
               <input className="form-control" value={form.authorizedBy}
@@ -227,12 +198,10 @@ function StockOutModal({ items, employees, isOnLeave, onClose, onSave }) {
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-danger"
-              disabled={loading || !isValid || recipientOnLeave}>
-              {loading ? 'Processing...' : 'Confirm Stock Out'}
+              disabled={submitting || !isValid || recipientOnLeave}>
+              {submitting ? 'Processing...' : 'Confirm Stock Out'}
             </button>
           </div>
         </form>
