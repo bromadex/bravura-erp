@@ -21,7 +21,7 @@ import ChangePassword  from './pages/ChangePassword'
 // ── Dashboard ─────────────────────────────────────────────────
 import DashboardOverview from './pages/Dashboard/DashboardOverview'
 
-// ── Inventory Pages ───────────────────────────────────────────
+// ── Inventory ─────────────────────────────────────────────────
 import StockBalance  from './pages/Inventory/StockBalance'
 import StockIn       from './pages/Inventory/StockIn'
 import StockOut      from './pages/Inventory/StockOut'
@@ -29,21 +29,21 @@ import Transactions  from './pages/Inventory/Transactions'
 import StockTaking   from './pages/Inventory/StockTaking'
 import Categories    from './pages/Inventory/Categories'
 
-// ── Procurement Pages ─────────────────────────────────────────
+// ── Procurement ───────────────────────────────────────────────
 import Suppliers            from './pages/Procurement/Suppliers'
 import StoreRequisitions    from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
 import PurchaseOrders       from './pages/Procurement/PurchaseOrders'
 import GoodsReceived        from './pages/Procurement/GoodsReceived'
 
-// ── Fuel Pages ────────────────────────────────────────────────
+// ── Fuel ──────────────────────────────────────────────────────
 import FuelTanks      from './pages/Fuel/FuelTanks'
 import FuelIssuance   from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
 import DipstickLog    from './pages/Fuel/DipstickLog'
 import FuelReports    from './pages/Fuel/FuelReports'
 
-// ── Fleet Pages ───────────────────────────────────────────────
+// ── Fleet ─────────────────────────────────────────────────────
 import FleetDashboard    from './pages/Fleet/FleetDashboard'
 import Vehicles          from './pages/Fleet/Vehicles'
 import Generators        from './pages/Fleet/Generators'
@@ -51,7 +51,7 @@ import HeavyEquipment    from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues       from './pages/Fleet/AssetIssues'
 
-// ── HR Pages ──────────────────────────────────────────────────
+// ── HR ────────────────────────────────────────────────────────
 import HRDashboard     from './pages/HR/HRDashboard'
 import Employees       from './pages/HR/Employees'
 import Departments     from './pages/HR/Departments'
@@ -105,9 +105,9 @@ function ModulePlaceholder({ module, page }) {
 }
 
 const OTHER_MODULES = [
-  { id: 'logistics',  pages: ['goods-received', 'batch-plant', 'campsite']           },
-  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports']     },
-  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                     },
+  { id: 'logistics',  pages: ['goods-received', 'batch-plant', 'campsite']       },
+  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
+  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                 },
 ]
 
 // ───────────────────────────────────────────────────────────────
@@ -124,6 +124,7 @@ function AppRoutes() {
       <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
       {/* ── DASHBOARD ─────────────────────────────────────── */}
+      {/* DashboardOverview renders its own full-page layout  */}
       <Route path="/module/dashboard" element={
         <ProtectedRoute>
           <PermissionRoute module="dashboard" page="overview">
@@ -262,8 +263,7 @@ function AppRoutes() {
 
 // ───────────────────────────────────────────────────────────────
 // Root App
-// LeaveProvider wraps at root so the active-leaves cache is shared
-// across HR, Inventory (StockOut) and Fuel (FuelIssuance) modules.
+// LeaveProvider at root — one shared cache for all modules.
 // ───────────────────────────────────────────────────────────────
 
 export default function App() {
