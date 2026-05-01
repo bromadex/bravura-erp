@@ -2,23 +2,26 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
-import { AuthProvider, useAuth }      from './contexts/AuthContext'
-import { PermissionProvider }         from './contexts/PermissionContext'
-import { LeaveProvider }              from './contexts/LeaveContext'
-import { InventoryProvider }          from './contexts/InventoryContext'
-import { ProcurementProvider }        from './contexts/ProcurementContext'
-import { FuelProvider }               from './contexts/FuelContext'
-import { FleetProvider }              from './contexts/FleetContext'
-import { HRProvider }                 from './contexts/HRContext'
+import { AuthProvider, useAuth }   from './contexts/AuthContext'
+import { PermissionProvider }      from './contexts/PermissionContext'
+import { LeaveProvider }           from './contexts/LeaveContext'
+import { InventoryProvider }       from './contexts/InventoryContext'
+import { ProcurementProvider }     from './contexts/ProcurementContext'
+import { FuelProvider }            from './contexts/FuelContext'
+import { FleetProvider }           from './contexts/FleetContext'
+import { HRProvider }              from './contexts/HRContext'
 
-import Login          from './pages/Login'
-import HomeGrid       from './pages/HomeGrid'
-import Layout         from './components/layout/Layout'
+import Login           from './pages/Login'
+import HomeGrid        from './pages/HomeGrid'
+import Layout          from './components/layout/Layout'
 import PermissionRoute from './components/PermissionRoute'
-import AccessDenied   from './pages/Errors/AccessDenied'
-import ChangePassword from './pages/ChangePassword'
+import AccessDenied    from './pages/Errors/AccessDenied'
+import ChangePassword  from './pages/ChangePassword'
 
-// ── Inventory ─────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────
+import DashboardOverview from './pages/Dashboard/DashboardOverview'
+
+// ── Inventory Pages ───────────────────────────────────────────
 import StockBalance  from './pages/Inventory/StockBalance'
 import StockIn       from './pages/Inventory/StockIn'
 import StockOut      from './pages/Inventory/StockOut'
@@ -26,21 +29,21 @@ import Transactions  from './pages/Inventory/Transactions'
 import StockTaking   from './pages/Inventory/StockTaking'
 import Categories    from './pages/Inventory/Categories'
 
-// ── Procurement ───────────────────────────────────────────────
+// ── Procurement Pages ─────────────────────────────────────────
 import Suppliers            from './pages/Procurement/Suppliers'
 import StoreRequisitions    from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
 import PurchaseOrders       from './pages/Procurement/PurchaseOrders'
 import GoodsReceived        from './pages/Procurement/GoodsReceived'
 
-// ── Fuel ──────────────────────────────────────────────────────
+// ── Fuel Pages ────────────────────────────────────────────────
 import FuelTanks      from './pages/Fuel/FuelTanks'
 import FuelIssuance   from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
 import DipstickLog    from './pages/Fuel/DipstickLog'
 import FuelReports    from './pages/Fuel/FuelReports'
 
-// ── Fleet ─────────────────────────────────────────────────────
+// ── Fleet Pages ───────────────────────────────────────────────
 import FleetDashboard    from './pages/Fleet/FleetDashboard'
 import Vehicles          from './pages/Fleet/Vehicles'
 import Generators        from './pages/Fleet/Generators'
@@ -48,7 +51,7 @@ import HeavyEquipment    from './pages/Fleet/HeavyEquipment'
 import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues       from './pages/Fleet/AssetIssues'
 
-// ── HR ────────────────────────────────────────────────────────
+// ── HR Pages ──────────────────────────────────────────────────
 import HRDashboard     from './pages/HR/HRDashboard'
 import Employees       from './pages/HR/Employees'
 import Departments     from './pages/HR/Departments'
@@ -62,7 +65,10 @@ import LeaveReports    from './pages/HR/LeaveReports'
 import Travel          from './pages/HR/Travel'
 import Payroll         from './pages/HR/Payroll'
 
-// ─────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────────
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) {
@@ -80,9 +86,9 @@ function ProtectedRoute({ children }) {
 }
 
 function ModulePlaceholder({ module, page }) {
-  const navigate  = useNavigate()
-  const label     = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  const modLabel  = module?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const navigate = useNavigate()
+  const label    = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const modLabel = module?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 16 }}>
       <span className="material-icons" style={{ fontSize: 72, opacity: .3, color: 'var(--gold)' }}>construction</span>
@@ -99,10 +105,14 @@ function ModulePlaceholder({ module, page }) {
 }
 
 const OTHER_MODULES = [
-  { id: 'logistics',  pages: ['goods-received','batch-plant','campsite'] },
-  { id: 'accounting', pages: ['chart-of-accounts','journal-entries','reports'] },
-  { id: 'reports',    pages: ['overview','audit-log','drafts'] },
+  { id: 'logistics',  pages: ['goods-received', 'batch-plant', 'campsite']           },
+  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports']     },
+  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                     },
 ]
+
+// ───────────────────────────────────────────────────────────────
+// Routes
+// ───────────────────────────────────────────────────────────────
 
 function AppRoutes() {
   const { user } = useAuth()
@@ -113,7 +123,16 @@ function AppRoutes() {
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* ── INVENTORY ─────────────────────────────────────── */}
+      {/* ── DASHBOARD ─────────────────────────────────────── */}
+      <Route path="/module/dashboard" element={
+        <ProtectedRoute>
+          <PermissionRoute module="dashboard" page="overview">
+            <DashboardOverview />
+          </PermissionRoute>
+        </ProtectedRoute>
+      } />
+
+      {/* ── INVENTORY ───────────────────────────────────── */}
       <Route path="/module/inventory" element={
         <ProtectedRoute>
           <PermissionRoute module="inventory" page="stock-balance">
@@ -125,16 +144,16 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index               element={<StockBalance />} />
+        <Route index                element={<StockBalance />} />
         <Route path="stock-balance" element={<StockBalance />} />
-        <Route path="stock-in"     element={<StockIn />} />
-        <Route path="stock-out"    element={<StockOut />} />
-        <Route path="transactions" element={<Transactions />} />
-        <Route path="stock-taking" element={<StockTaking />} />
-        <Route path="categories"   element={<Categories />} />
+        <Route path="stock-in"      element={<StockIn />} />
+        <Route path="stock-out"     element={<StockOut />} />
+        <Route path="transactions"  element={<Transactions />} />
+        <Route path="stock-taking"  element={<StockTaking />} />
+        <Route path="categories"    element={<Categories />} />
       </Route>
 
-      {/* ── PROCUREMENT ───────────────────────────────────── */}
+      {/* ── PROCUREMENT ─────────────────────────────────── */}
       <Route path="/module/procurement" element={
         <ProtectedRoute>
           <PermissionRoute module="procurement" page="suppliers">
@@ -152,7 +171,7 @@ function AppRoutes() {
         <Route path="goods-received"        element={<GoodsReceived />} />
       </Route>
 
-      {/* ── FUEL ──────────────────────────────────────────── */}
+      {/* ── FUEL ─────────────────────────────────────────── */}
       <Route path="/module/fuel" element={
         <ProtectedRoute>
           <PermissionRoute module="fuel" page="tanks">
@@ -166,15 +185,15 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index             element={<FuelTanks />} />
-        <Route path="tanks"      element={<FuelTanks />} />
-        <Route path="issuance"   element={<FuelIssuance />} />
-        <Route path="deliveries" element={<FuelDeliveries />} />
-        <Route path="dipstick"   element={<DipstickLog />} />
-        <Route path="reports"    element={<FuelReports />} />
+        <Route index              element={<FuelTanks />} />
+        <Route path="tanks"       element={<FuelTanks />} />
+        <Route path="issuance"    element={<FuelIssuance />} />
+        <Route path="deliveries"  element={<FuelDeliveries />} />
+        <Route path="dipstick"    element={<DipstickLog />} />
+        <Route path="reports"     element={<FuelReports />} />
       </Route>
 
-      {/* ── FLEET ─────────────────────────────────────────── */}
+      {/* ── FLEET ────────────────────────────────────────── */}
       <Route path="/module/fleet" element={
         <ProtectedRoute>
           <PermissionRoute module="fleet" page="dashboard">
@@ -193,7 +212,7 @@ function AppRoutes() {
         <Route path="asset-issues"       element={<AssetIssues />} />
       </Route>
 
-      {/* ── HR ────────────────────────────────────────────── */}
+      {/* ── HR ───────────────────────────────────────────── */}
       <Route path="/module/hr" element={
         <ProtectedRoute>
           <PermissionRoute module="hr" page="dashboard">
@@ -205,22 +224,22 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index                element={<HRDashboard />} />
-        <Route path="dashboard"     element={<HRDashboard />} />
-        <Route path="employees"     element={<Employees />} />
-        <Route path="departments"   element={<Departments />} />
-        <Route path="designations"  element={<Designations />} />
-        <Route path="permissions"   element={<UserPermissions />} />
-        <Route path="attendance"    element={<Attendance />} />
-        <Route path="leave"         element={<Leave />} />
-        <Route path="leave-balance" element={<LeaveBalance />} />
+        <Route index                 element={<HRDashboard />} />
+        <Route path="dashboard"      element={<HRDashboard />} />
+        <Route path="employees"      element={<Employees />} />
+        <Route path="departments"    element={<Departments />} />
+        <Route path="designations"   element={<Designations />} />
+        <Route path="permissions"    element={<UserPermissions />} />
+        <Route path="attendance"     element={<Attendance />} />
+        <Route path="leave"          element={<Leave />} />
+        <Route path="leave-balance"  element={<LeaveBalance />} />
         <Route path="leave-calendar" element={<LeaveCalendar />} />
         <Route path="leave-reports"  element={<LeaveReports />} />
-        <Route path="travel"        element={<Travel />} />
-        <Route path="payroll"       element={<Payroll />} />
+        <Route path="travel"         element={<Travel />} />
+        <Route path="payroll"        element={<Payroll />} />
       </Route>
 
-      {/* ── OTHER MODULES (placeholders) ──────────────────── */}
+      {/* ── OTHER MODULES (placeholders) ─────────────────── */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
@@ -241,11 +260,12 @@ function AppRoutes() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// LeaveProvider is at root so all modules share one cache instance.
-// Inventory (StockOut) and Fuel (FuelIssuance) also wrap with
-// LeaveProvider within their routes above for the same reason.
-// ─────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+// Root App
+// LeaveProvider wraps at root so the active-leaves cache is shared
+// across HR, Inventory (StockOut) and Fuel (FuelIssuance) modules.
+// ───────────────────────────────────────────────────────────────
+
 export default function App() {
   return (
     <AuthProvider>
