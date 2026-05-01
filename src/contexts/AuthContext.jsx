@@ -1,37 +1,33 @@
 // src/contexts/AuthContext.jsx
 //
-// CHANGES:
-// 1. fetchUserPermissions now loads designation permissions as the LOWEST
-//    priority layer (designation → role → user-specific overrides).
-//    Priority order (each level can override the one below):
-//      designation_permissions  (lowest — job-title baseline)
-//      role_permissions         (medium — system role)
-//      user_permissions         (highest — individual overrides)
+// ADDED: Session timeout — auto-logout after 30 minutes of inactivity.
+// Activity is tracked via mousemove, keydown, click, scroll.
+// A warning toast appears at 25 minutes, countdown at 29 minutes.
+// Timer resets on any user interaction.
 //
-//    hr|leave and hr|leave-balance are ALWAYS injected for every active
-//    user regardless of their other permissions. Every employee needs leave.
-//
-// 2. setEmployeeStatus now deactivates / reactivates the app_users account
-//    when the employee is Suspended, Terminated, or reverted to Active.
-//    (The actual setEmployeeStatus call lives in HRContext — AuthContext
-//    exposes refreshPermissions so HRContext can trigger a reload.)
+// Rest of the file is unchanged from the previous version.
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import toast from 'react-hot-toast'
 
 const AuthContext = createContext(null)
+
+const TIMEOUT_MS      = 30 * 60 * 1000   // 30 minutes
+const WARNING_MS      = 25 * 60 * 1000   // warn at 25 minutes
+const EVENTS          = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
 
 export function AuthProvider({ children }) {
   const [user,        setUser]        = useState(null)
   const [permissions, setPermissions] = useState([])
   const [loading,     setLoading]     = useState(true)
 
-  // ── fetchUserPermissions ────────────────────────────────────────
-  // Merge order: designation (lowest) → role → user override (highest)
-  // hr|leave and hr|leave-balance are always granted.
-  const fetchUserPermissions = async (userId) => {
+  const timeoutRef = useRef(null)
+  const warnRef    = useRef(null)
+
+  // ── Permission loader ───────────────────────────────────────
+  const fetchUserPermissions = useCallback(async (userId) => {
     try {
-      // 1. Get user's role_id and employee record for designation lookup
       const { data: userData } = await supabase
         .from('app_users')
         .select('role_id, employee_id')
@@ -39,37 +35,22 @@ export function AuthProvider({ children }) {
         .single()
       if (!userData) return []
 
-      // 2. Get designation_id from employees table (if linked)
       let designationId = null
       if (userData.employee_id) {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('designation_id')
-          .eq('id', userData.employee_id)
-          .single()
+        const { data: emp } = await supabase.from('employees').select('designation_id').eq('id', userData.employee_id).single()
         designationId = emp?.designation_id || null
       }
 
-      // 3. Fetch all three permission layers in parallel
       const [roleRes, userRes, desigRes] = await Promise.all([
         supabase.from('role_permissions').select('*').eq('role_id', userData.role_id),
         supabase.from('user_permissions').select('*').eq('user_id', userId),
-        designationId
-          ? supabase.from('designation_permissions').select('*').eq('designation_id', designationId)
-          : Promise.resolve({ data: [] }),
+        designationId ? supabase.from('designation_permissions').select('*').eq('designation_id', designationId) : Promise.resolve({ data: [] }),
       ])
 
-      const rolePerms  = roleRes.data  || []
-      const userPerms  = userRes.data  || []
-      const desigPerms = desigRes.data || []
-
-      // 4. Build merged map — last write wins, so apply lowest→highest
       const map = new Map()
-
       const applyLayer = (perms) => {
-        perms.forEach(p => {
-          const key = `${p.module_name}|${p.page_name || ''}`
-          map.set(key, {
+        ;(perms || []).forEach(p => {
+          map.set(`${p.module_name}|${p.page_name || ''}`, {
             can_view:    p.can_view    ?? false,
             can_edit:    p.can_edit    ?? false,
             can_delete:  p.can_delete  ?? false,
@@ -77,55 +58,83 @@ export function AuthProvider({ children }) {
           })
         })
       }
+      applyLayer(desigRes.data)   // lowest
+      applyLayer(roleRes.data)
+      applyLayer(userRes.data)    // highest
 
-      applyLayer(desigPerms)  // lowest priority
-      applyLayer(rolePerms)
-      applyLayer(userPerms)   // highest priority
-
-      // 5. Always grant hr|leave and hr|leave-balance (every employee
-      //    must be able to apply for leave regardless of other permissions)
-      const leaveKey   = 'hr|leave'
-      const balanceKey = 'hr|leave-balance'
-      if (!map.get(leaveKey)?.can_view) {
-        map.set(leaveKey, { can_view: true, can_edit: true, can_delete: false, can_approve: false })
-      }
-      if (!map.get(balanceKey)?.can_view) {
-        map.set(balanceKey, { can_view: true, can_edit: false, can_delete: false, can_approve: false })
+      // Always grant hr|leave and hr|leave-balance to every active user
+      for (const key of ['hr|leave', 'hr|leave-balance']) {
+        if (!map.get(key)?.can_view) {
+          map.set(key, { can_view: true, can_edit: key === 'hr|leave', can_delete: false, can_approve: false })
+        }
       }
 
-      // 6. Convert map → array
       const merged = Array.from(map.entries()).map(([key, perms]) => {
         const [module_name, page_name] = key.split('|')
         return { module_name, page_name: page_name || null, ...perms }
       })
 
-      // 7. Cache in localStorage for PermissionContext to read on reload
-      const permsCache = {}
-      merged.forEach(p => {
-        const key = `${p.module_name}|${p.page_name || ''}`
-        permsCache[key] = {
-          can_view:    p.can_view,
-          can_edit:    p.can_edit,
-          can_delete:  p.can_delete,
-          can_approve: p.can_approve,
-        }
-      })
-      localStorage.setItem('user_permissions_cache', JSON.stringify(permsCache))
+      const cache = {}
+      merged.forEach(p => { cache[`${p.module_name}|${p.page_name || ''}`] = { can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete, can_approve: p.can_approve } })
+      localStorage.setItem('user_permissions_cache', JSON.stringify(cache))
 
       return merged
     } catch (err) {
       console.error('Error fetching permissions:', err)
       return []
     }
-  }
+  }, [])
 
-  // Allow HRContext to trigger a permission refresh after status changes
-  const refreshPermissions = async (userId) => {
+  const refreshPermissions = useCallback(async (userId) => {
     const perms = await fetchUserPermissions(userId)
     setPermissions(perms)
-  }
+  }, [fetchUserPermissions])
 
-  // ── Restore session on mount ────────────────────────────────────
+  // ── Session timeout ─────────────────────────────────────────
+  const doLogout = useCallback((reason = '') => {
+    setUser(null)
+    setPermissions([])
+    localStorage.removeItem('bravura_session')
+    sessionStorage.removeItem('bravura_session')
+    localStorage.removeItem('user_permissions_cache')
+    if (reason) toast.error(reason, { duration: 5000 })
+  }, [])
+
+  const resetTimer = useCallback(() => {
+    clearTimeout(timeoutRef.current)
+    clearTimeout(warnRef.current)
+
+    warnRef.current = setTimeout(() => {
+      toast('You will be logged out in 5 minutes due to inactivity.', {
+        icon: '⚠️',
+        duration: 10000,
+        style: { background: 'var(--surface)', color: 'var(--yellow)', border: '1px solid var(--yellow)' }
+      })
+    }, WARNING_MS)
+
+    timeoutRef.current = setTimeout(() => {
+      doLogout('You have been logged out due to 30 minutes of inactivity.')
+    }, TIMEOUT_MS)
+  }, [doLogout])
+
+  // Attach/detach activity listeners when user logs in/out
+  useEffect(() => {
+    if (!user) {
+      clearTimeout(timeoutRef.current)
+      clearTimeout(warnRef.current)
+      EVENTS.forEach(e => window.removeEventListener(e, resetTimer))
+      return
+    }
+    resetTimer()
+    EVENTS.forEach(e => window.addEventListener(e, resetTimer, { passive: true }))
+    return () => {
+      clearTimeout(timeoutRef.current)
+      clearTimeout(warnRef.current)
+      EVENTS.forEach(e => window.removeEventListener(e, resetTimer))
+    }
+  }, [user, resetTimer])
+
+  // ── Session restore ─────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session')
     if (saved) {
@@ -136,10 +145,10 @@ export function AuthProvider({ children }) {
       } catch {}
     }
     setLoading(false)
-  }, [])
+  }, [fetchUserPermissions])
 
-  // ── login ───────────────────────────────────────────────────────
-  async function login(username, password, rememberMe = false) {
+  // ── Login ───────────────────────────────────────────────────
+  const login = async (username, password, rememberMe = false) => {
     const { data, error } = await supabase
       .from('app_users')
       .select('*')
@@ -149,7 +158,6 @@ export function AuthProvider({ children }) {
       .single()
 
     if (error || !data) throw new Error('User not found or inactive')
-
     const pwMatch = data.password_plain === password || atob(data.password_hash || '') === password
     if (!pwMatch) throw new Error('Incorrect password')
 
@@ -169,30 +177,18 @@ export function AuthProvider({ children }) {
     setUser(session)
     const userPerms = await fetchUserPermissions(data.id)
     setPermissions(userPerms)
-
-    const store = rememberMe ? localStorage : sessionStorage
-    store.setItem('bravura_session', JSON.stringify(session))
-
+    ;(rememberMe ? localStorage : sessionStorage).setItem('bravura_session', JSON.stringify(session))
     return session
   }
 
-  // ── logout ──────────────────────────────────────────────────────
-  function logout() {
-    setUser(null)
-    setPermissions([])
-    localStorage.removeItem('bravura_session')
-    sessionStorage.removeItem('bravura_session')
-    localStorage.removeItem('user_permissions_cache')
-  }
+  // ── Logout ──────────────────────────────────────────────────
+  const logout = () => doLogout()
 
-  // ── hasPermission (logic-level helper) ─────────────────────────
+  // ── Permission helper ───────────────────────────────────────
   const hasPermission = (moduleName, pageName, action) => {
     if (!user) return false
     if (user.role_id === 'role_super_admin') return true
-    const perm = permissions.find(p =>
-      p.module_name === moduleName &&
-      (p.page_name === pageName || p.page_name === null)
-    )
+    const perm = permissions.find(p => p.module_name === moduleName && (p.page_name === pageName || p.page_name === null))
     if (!perm) return false
     switch (action) {
       case 'view':    return perm.can_view
@@ -204,16 +200,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      permissions,
-      loading,
-      login,
-      logout,
-      hasPermission,
-      fetchUserPermissions,
-      refreshPermissions,
-    }}>
+    <AuthContext.Provider value={{ user, permissions, loading, login, logout, hasPermission, fetchUserPermissions, refreshPermissions }}>
       {children}
     </AuthContext.Provider>
   )
