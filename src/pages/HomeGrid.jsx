@@ -18,29 +18,35 @@ import { usePermission } from '../contexts/PermissionContext'
 import { supabase } from '../lib/supabase'
 
 // All pages per module — must match Sidebar manifest
+// null means the module has no sub-pages; navigate directly to its root route
 const MODULE_PAGES = {
-  dashboard:   ['overview'],
+  dashboard:   null,
   procurement: ['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'],
-  inventory:   ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories'],
-  logistics:   ['goods-received','batch-plant','campsite'],
+  inventory:   ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories','locations'],
+  logistics:   ['dashboard','camp','batch-plant','deliveries'],
   fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
   fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues'],
-  hr:          ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','travel'],
+  hr:          ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet'],
+  campsite:    ['overview','blocks','rooms','assignments'],
+  connect:     ['feed','chats','announcements'],
+  governance:  ['announcements','policies','ethics'],
   accounting:  ['chart-of-accounts','journal-entries','reports'],
   reports:     ['overview','audit-log','drafts'],
 }
 
 const ALL_MODULES = [
   { id: 'dashboard',   icon: 'dashboard',          label: 'Dashboard',          color: '#f4a261', desc: 'KPIs & overview',         route: '/module/dashboard',   moduleName: 'dashboard'   },
+  { id: 'hr',          icon: 'badge',               label: 'Human Resources',    color: '#f87171', desc: 'Employees & payroll',     route: '/module/hr',          moduleName: 'hr'          },
   { id: 'procurement', icon: 'shopping_cart',       label: 'Procurement',        color: '#a78bfa', desc: 'Suppliers & orders',      route: '/module/procurement', moduleName: 'procurement' },
   { id: 'inventory',   icon: 'inventory',           label: 'Inventory',          color: '#2dd4bf', desc: 'Stock & warehouse',       route: '/module/inventory',   moduleName: 'inventory'   },
-  { id: 'logistics',   icon: 'local_shipping',      label: 'Logistics',          color: '#60a5fa', desc: 'GRN, Batch Plant',        route: '/module/logistics',   moduleName: 'logistics'   },
   { id: 'fuel',        icon: 'local_gas_station',   label: 'Fuel Management',    color: '#fbbf24', desc: 'Tanks & issuance',        route: '/module/fuel',        moduleName: 'fuel'        },
   { id: 'fleet',       icon: 'directions_car',      label: 'Fleet & Assets',     color: '#34d399', desc: 'Vehicles & generators',   route: '/module/fleet',       moduleName: 'fleet'       },
-  { id: 'hr',          icon: 'badge',               label: 'Human Resources',    color: '#f87171', desc: 'Employees & payroll',     route: '/module/hr',          moduleName: 'hr'          },
+  { id: 'logistics',   icon: 'local_shipping',      label: 'Logistics',          color: '#60a5fa', desc: 'Batch Plant & deliveries', route: '/module/logistics',  moduleName: 'logistics'   },
+  { id: 'campsite',    icon: 'cabin',               label: 'Campsite',           color: '#86efac', desc: 'Rooms & occupancy',       route: '/module/campsite',    moduleName: 'campsite'    },
+  { id: 'connect',     icon: 'forum',               label: 'Connect',            color: '#67e8f9', desc: 'Chat & announcements',    route: '/module/connect',     moduleName: 'connect'     },
+  { id: 'governance',  icon: 'policy',              label: 'Governance',         color: '#fcd34d', desc: 'Policies & ethics',       route: '/module/governance',  moduleName: 'governance'  },
   { id: 'accounting',  icon: 'receipt',             label: 'Accounting',         color: '#818cf8', desc: 'Journals & reports',      route: '/module/accounting',  moduleName: 'accounting'  },
   { id: 'reports',     icon: 'bar_chart',           label: 'Reports',            color: '#38bdf8', desc: 'Analytics & exports',     route: '/module/reports',     moduleName: 'reports'     },
-  { id: 'project',     icon: 'construction',        label: 'Project Management', color: '#94a3b8', desc: 'Coming soon',             route: null,                  moduleName: 'project'     },
 ]
 
 export default function HomeGrid() {
@@ -67,22 +73,20 @@ export default function HomeGrid() {
     return () => clearInterval(interval)
   }, [user?.id])
 
-  // ── ✅ FIX: show module if user can view ANY page in it ─────────
-  // Previously only checked the defaultPage, so users with hr|leave
-  // but not hr|dashboard couldn't see the HR tile at all.
+  // Show module if user can view ANY page in it (or if module has no sub-pages)
   const visibleModules = ALL_MODULES.filter(mod => {
-    if (mod.id === 'project') return true   // always show "coming soon"
+    if (!mod.route) return true  // "coming soon" tiles always visible
     const pages = MODULE_PAGES[mod.moduleName]
-    if (!pages) return false
+    if (!pages) return true      // null = no sub-pages, always accessible
     return pages.some(page => canView(mod.moduleName, page))
   })
 
-  // ── Navigate to first accessible page within a module ──────────
+  // Navigate to first accessible page within a module
   const navigateToModule = (mod) => {
     if (!mod.route) { alert(`${mod.label} – coming soon`); return }
     const pages = MODULE_PAGES[mod.moduleName]
+    // null means no sub-pages — go directly to the module root
     if (!pages) { navigate(mod.route); return }
-    // Find the first page the user actually has access to
     const firstPage = pages.find(page => canView(mod.moduleName, page))
     if (firstPage) {
       navigate(`/module/${mod.moduleName}/${firstPage}`)

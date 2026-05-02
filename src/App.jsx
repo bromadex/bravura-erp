@@ -11,6 +11,7 @@ import { FuelProvider }            from './contexts/FuelContext'
 import { FleetProvider }           from './contexts/FleetContext'
 import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
+import { CampsiteProvider }        from './contexts/CampsiteContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
@@ -18,6 +19,20 @@ import Layout          from './components/layout/Layout'
 import PermissionRoute from './components/PermissionRoute'
 import AccessDenied    from './pages/Errors/AccessDenied'
 import ChangePassword  from './pages/ChangePassword'
+
+// ── Governance (public routes — no module layout needed) ──────
+import EthicsGate    from './pages/Governance/EthicsGate'
+import Announcements from './pages/Governance/Announcements'
+import Policies      from './pages/Governance/Policies'
+
+// ── Campsite ──────────────────────────────────────────────────
+import CampOverview    from './pages/Campsite/CampOverview'
+import CampBlocks      from './pages/Campsite/CampBlocks'
+import CampRooms       from './pages/Campsite/CampRooms'
+import CampAssignments from './pages/Campsite/CampAssignments'
+
+// ── Notifications ─────────────────────────────────────────────
+import NotificationCenter from './pages/Notifications/NotificationCenter'
 
 // ── Dashboard ─────────────────────────────────────────────────
 import DashboardOverview from './pages/Dashboard/DashboardOverview'
@@ -88,8 +103,12 @@ function ProtectedRoute({ children }) {
     )
   }
   if (!user) return <Navigate to="/login" replace />
-  if (user.must_change_password === true && window.location.pathname !== '/change-password') {
+  const path = window.location.pathname
+  if (user.must_change_password === true && path !== '/change-password') {
     return <Navigate to="/change-password" replace />
+  }
+  if (user.has_signed_code_of_ethics === false && path !== '/governance/ethics-gate' && path !== '/change-password') {
+    return <Navigate to="/governance/ethics-gate" replace />
   }
   return children
 }
@@ -267,7 +286,43 @@ function AppRoutes() {
         <Route path="deliveries"  element={<LogisticsDeliveries />} />
       </Route>
 
-      {/* ── PLACEHOLDER MODULES ──────────────────────────── */}
+      {/* ── CAMPSITE ─────────────────────────────────────── */}
+      <Route path="/module/campsite" element={
+        <ProtectedRoute>
+          <PermissionRoute module="campsite" page="overview">
+            <CampsiteProvider>
+              <Layout module="campsite" />
+            </CampsiteProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index            element={<CampOverview />}    />
+        <Route path="overview"  element={<CampOverview />}    />
+        <Route path="blocks"    element={<CampBlocks />}      />
+        <Route path="rooms"     element={<CampRooms />}       />
+        <Route path="assignments" element={<CampAssignments />} />
+      </Route>
+
+      {/* ── GOVERNANCE ─────────────────��─────────────────── */}
+      <Route path="/module/governance" element={
+        <ProtectedRoute>
+          <PermissionRoute module="governance" page="announcements">
+            <Layout module="governance" />
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                  element={<Announcements />} />
+        <Route path="announcements"   element={<Announcements />} />
+        <Route path="policies"        element={<Policies />}      />
+      </Route>
+
+      {/* Ethics gate — outside normal module layout */}
+      <Route path="/governance/ethics-gate" element={<ProtectedRoute><EthicsGate /></ProtectedRoute>} />
+
+      {/* ── NOTIFICATIONS PAGE ───────────────────────────── */}
+      <Route path="/module/notifications" element={<ProtectedRoute><NotificationCenter /></ProtectedRoute>} />
+
+      {/* ── PLACEHOLDER MODULES ──────────────���───────────── */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
@@ -282,6 +337,18 @@ function AppRoutes() {
           ))}
         </Route>
       ))}
+
+      {/* ── CONNECT (placeholder) ────────────────────────── */}
+      <Route path="/module/connect" element={
+        <ProtectedRoute>
+          <Layout module="connect" />
+        </ProtectedRoute>
+      }>
+        <Route index        element={<ModulePlaceholder module="connect" page="feed"          />} />
+        <Route path="feed"  element={<ModulePlaceholder module="connect" page="feed"          />} />
+        <Route path="chats" element={<ModulePlaceholder module="connect" page="chats"         />} />
+        <Route path="announcements" element={<ModulePlaceholder module="connect" page="announcements" />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
