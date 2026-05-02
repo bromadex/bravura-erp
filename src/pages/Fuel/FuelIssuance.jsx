@@ -16,6 +16,8 @@ import { useLeave } from '../../contexts/LeaveContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
+import { generateTxnCode } from '../../utils/txnCode'
+import TxnCodeBadge from '../../components/TxnCodeBadge'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
@@ -93,8 +95,9 @@ export default function FuelIssuance() {
         toast.success('Record updated')
         await fetchAll()
       } else {
-        await addIssuance(payload)
-        toast.success(`Issued ${form.amount} L`)
+        const txnCode = await generateTxnCode('FI')
+        await addIssuance({ ...payload, txn_code: txnCode })
+        toast.success(`Issued ${form.amount} L — ${txnCode}`)
       }
       setShowModal(false)
       setForm(BLANK)
@@ -225,7 +228,7 @@ export default function FuelIssuance() {
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Date</th><th>Time</th><th>Type</th><th>Vehicle / Equipment</th>
+                <th>Code</th><th>Date</th><th>Time</th><th>Type</th><th>Vehicle / Equipment</th>
                 <th>Amount (L)</th><th>Driver</th><th>Odometer</th><th>Purpose</th>
                 <th>Authorised By</th>
                 {(canEdit || canDelete) && <th>Actions</th>}
@@ -238,6 +241,7 @@ export default function FuelIssuance() {
                 <tr><td colSpan="10" className="empty-state">No records match your filters</td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id}>
+                  <td>{r.txn_code ? <TxnCodeBadge code={r.txn_code} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
                   <td style={{ color: 'var(--text-dim)' }}>{r.time || '—'}</td>
                   <td><span className={`badge ${FUEL_COLORS[r.fuel_type] || 'badge-gold'}`}>{r.fuel_type}</span></td>

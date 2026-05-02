@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
 import { useCanDelete } from '../../hooks/usePermission'
+import TxnCodeBadge from '../../components/TxnCodeBadge'
+import { TXN_CODE_REGEX } from '../../utils/txnCode'
 import toast from 'react-hot-toast'
+
+const isTxnCode = (str) => str && new RegExp(`^${TXN_CODE_REGEX.source.replace('\\b', '')}$`).test(str.trim())
 
 export default function Transactions() {
   const { transactions, loading, deleteTransaction, fetchAll } = useInventory()
@@ -144,8 +148,14 @@ export default function Transactions() {
                     {tx.type === 'OUT' ? '-' : '+'}{tx.qty}
                   </td>
 
-                  <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                    {tx.delivered_by || tx.issued_to || tx.done_by || '-'}
+                  <td style={{ fontSize: 12 }}>
+                    {(() => {
+                      const ref = tx.reference || tx.delivered_by || tx.issued_to || tx.done_by
+                      if (!ref) return <span style={{ color: 'var(--text-dim)' }}>—</span>
+                      return isTxnCode(ref)
+                        ? <TxnCodeBadge code={ref.trim()} />
+                        : <span style={{ color: 'var(--text-dim)' }}>{ref}</span>
+                    })()}
                   </td>
 
                   <td style={{ fontSize: 12 }}>
