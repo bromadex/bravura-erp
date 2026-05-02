@@ -1,4 +1,4 @@
-// src/components/layout/Sidebar.jsx
+// clement src/components/layout/Sidebar.jsx
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { usePermission } from '../../contexts/PermissionContext'
