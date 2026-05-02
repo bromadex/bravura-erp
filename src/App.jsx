@@ -107,7 +107,10 @@ function ProtectedRoute({ children }) {
   if (user.must_change_password === true && path !== '/change-password') {
     return <Navigate to="/change-password" replace />
   }
-  if (user.has_signed_code_of_ethics === false && path !== '/governance/ethics-gate' && path !== '/change-password') {
+  // Ethics gate: only redirect when explicitly false.
+  // null or undefined = column not yet populated for this user = treat as signed.
+  const needsEthicsSign = user.has_signed_code_of_ethics === false
+  if (needsEthicsSign && path !== '/governance/ethics-gate' && path !== '/change-password') {
     return <Navigate to="/governance/ethics-gate" replace />
   }
   return children
