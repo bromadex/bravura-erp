@@ -47,7 +47,7 @@ export default function RoomDetailPanel({ roomId, onClose }) {
 
   const handleVacate = async (assignmentId) => {
     try {
-      const code = await vacateRoom({ assignmentId, checkOutNotes: vacateNotes, processedBy: user?.full_name })
+      const code = await vacateRoom({ assignmentId, checkOutNotes: vacateNotes, processedBy: user?.name })
       toast.success(`Vacated — ${code}`)
       setVacating(null)
       setVacateNotes('')
@@ -93,11 +93,11 @@ export default function RoomDetailPanel({ roomId, onClose }) {
               <div key={a.id} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#0b0f1a', flexShrink: 0 }}>
-                    {(a.employees?.full_name || '?').charAt(0)}
+                    {(a.employees?.name || '?').charAt(0)}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{a.employees?.full_name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.employees?.bra_number} · Since {a.start_date}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{a.employees?.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.employees?.employee_number} · Since {a.start_date}</div>
                   </div>
                   {a.txn_code && <TxnCodeBadge code={a.txn_code} />}
                   <span style={{ fontSize: 10, color: a.status === 'on_leave' ? 'var(--yellow)' : 'var(--green)', background: a.status === 'on_leave' ? 'rgba(251,191,36,.1)' : 'rgba(52,211,153,.1)', padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>
@@ -166,7 +166,7 @@ export default function RoomDetailPanel({ roomId, onClose }) {
                 <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
                   <span className="material-icons" style={{ fontSize: 15, color: 'var(--text-dim)' }}>person</span>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 600 }}>{a.employees?.full_name}</span>
+                    <span style={{ fontWeight: 600 }}>{a.employees?.name}</span>
                     <span style={{ color: 'var(--text-dim)' }}> · {a.start_date} → {a.end_date || '—'}</span>
                   </div>
                   {a.txn_code && <TxnCodeBadge code={a.txn_code} />}
