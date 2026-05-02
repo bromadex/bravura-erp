@@ -207,7 +207,6 @@ export function ProcurementProvider({ children }) {
     }
 
     // Notify storekeepers that a requisition is ready to fulfil
-    const req = storeRequisitions.find(r => r.id === id)
     const srNum = req?.sr_number || req?.req_number || id
     await notifyStorekeepers({
       type:    'requisition_approved',
