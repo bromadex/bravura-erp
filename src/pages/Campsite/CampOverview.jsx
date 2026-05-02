@@ -27,7 +27,7 @@ export default function CampOverview() {
         const q = search.toLowerCase()
         const occupants = assignments
           .filter(a => a.room_id === room.id && a.status !== 'checked_out' && a.status !== 'transferred')
-          .map(a => a.employees?.full_name?.toLowerCase() || '')
+          .map(a => a.employees?.name?.toLowerCase() || '')
         const matchesRoom = room.code.toLowerCase().includes(q)
         const matchesOccupant = occupants.some(n => n.includes(q))
         if (!matchesRoom && !matchesOccupant) return false
@@ -163,7 +163,7 @@ export default function CampOverview() {
                   <button
                     key={room.id}
                     onClick={() => setSelectedRoomId(room.id)}
-                    title={`${room.code} — ${STATUS_LABEL[status]}\n${occupants.map(a => a.employees?.full_name).join(', ')}`}
+                    title={`${room.code} — ${STATUS_LABEL[status]}\n${occupants.map(a => a.employees?.name).join(', ')}`}
                     style={{ background: `${color}15`, border: `2px solid ${color}55`, borderRadius: 8, padding: '8px 4px', cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minHeight: 64 }}
                     onMouseOver={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.background = `${color}25` }}
                     onMouseOut={e  => { e.currentTarget.style.borderColor = `${color}55`; e.currentTarget.style.background = `${color}15` }}
@@ -173,7 +173,7 @@ export default function CampOverview() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
                       {occupants.slice(0, 4).map((a, i) => (
                         <div key={i} style={{ width: 16, height: 16, borderRadius: '50%', background: color, color: '#0b0f1a', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {(a.employees?.full_name || '?').charAt(0)}
+                          {(a.employees?.name || '?').charAt(0)}
                         </div>
                       ))}
                       {occupants.length > 4 && (
