@@ -23,8 +23,8 @@ export default function CampAssignments() {
     return assignments.filter(a => {
       if (fStatus !== 'all' && a.status !== fStatus) return false
       if (q) {
-        const name = a.employees?.full_name?.toLowerCase() || ''
-        const bra  = a.employees?.bra_number?.toLowerCase() || ''
+        const name = a.employees?.name?.toLowerCase() || ''
+        const bra  = a.employees?.employee_number?.toLowerCase() || ''
         const code = a.txn_code?.toLowerCase() || ''
         const room = rooms.find(r => r.id === a.room_id)
         const rCode= room?.code?.toLowerCase() || ''
@@ -45,7 +45,7 @@ export default function CampAssignments() {
     if (!vacating) return
     setSaving(true)
     try {
-      const code = await vacateRoom({ assignmentId: vacating.id, checkOutNotes: vacNotes, processedBy: user?.full_name })
+      const code = await vacateRoom({ assignmentId: vacating.id, checkOutNotes: vacNotes, processedBy: user?.name })
       toast.success(`Vacated — ${code}`)
       setVacating(null)
       setVacNotes('')
@@ -108,8 +108,8 @@ export default function CampAssignments() {
                 <tr key={a.id}>
                   <td>{a.txn_code ? <TxnCodeBadge code={a.txn_code} /> : '—'}</td>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{a.employees?.full_name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.employees?.bra_number}</div>
+                    <div style={{ fontWeight: 600 }}>{a.employees?.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.employees?.employee_number}</div>
                   </td>
                   <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{getRoomCode(a.room_id)}</td>
                   <td>{getBlockName(a.room_id)}</td>
@@ -154,7 +154,7 @@ export default function CampAssignments() {
           <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 400, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 401, padding: 20 }}>
             <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Confirm Vacate</div>
             <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-              Checking out <strong style={{ color: 'var(--text)' }}>{vacating.employees?.full_name}</strong> from room <strong style={{ color: 'var(--gold)' }}>{getRoomCode(vacating.room_id)}</strong>.
+              Checking out <strong style={{ color: 'var(--text)' }}>{vacating.employees?.name}</strong> from room <strong style={{ color: 'var(--gold)' }}>{getRoomCode(vacating.room_id)}</strong>.
             </p>
             <textarea value={vacNotes} onChange={e => setVacNotes(e.target.value)} placeholder="Check-out notes (optional)" rows={2}
               style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', marginBottom: 12, boxSizing: 'border-box' }} />
