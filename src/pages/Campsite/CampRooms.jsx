@@ -117,7 +117,7 @@ export default function CampRooms() {
                     {occupants.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>—</span> : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {occupants.map(a => (
-                          <span key={a.id} style={{ fontSize: 11, color: 'var(--text-mid)' }}>{a.employees?.full_name}</span>
+                          <span key={a.id} style={{ fontSize: 11, color: 'var(--text-mid)' }}>{a.employees?.name}</span>
                         ))}
                       </div>
                     )}
