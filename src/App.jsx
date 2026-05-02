@@ -23,12 +23,13 @@ import ChangePassword  from './pages/ChangePassword'
 import DashboardOverview from './pages/Dashboard/DashboardOverview'
 
 // ── Inventory ─────────────────────────────────────────────────
-import StockBalance  from './pages/Inventory/StockBalance'
-import StockIn       from './pages/Inventory/StockIn'
-import StockOut      from './pages/Inventory/StockOut'
-import Transactions  from './pages/Inventory/Transactions'
-import StockTaking   from './pages/Inventory/StockTaking'
-import Categories    from './pages/Inventory/Categories'
+import StockBalance     from './pages/Inventory/StockBalance'
+import StockIn          from './pages/Inventory/StockIn'
+import StockOut         from './pages/Inventory/StockOut'
+import Transactions     from './pages/Inventory/Transactions'
+import StockTaking      from './pages/Inventory/StockTaking'
+import Categories       from './pages/Inventory/Categories'
+import StorageLocations from './pages/Inventory/StorageLocations'
 
 // ── Procurement ───────────────────────────────────────────────
 import Suppliers            from './pages/Procurement/Suppliers'
@@ -53,32 +54,42 @@ import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
 import AssetIssues       from './pages/Fleet/AssetIssues'
 
 // ── HR ────────────────────────────────────────────────────────
-import HRDashboard      from './pages/HR/HRDashboard'
-import Employees        from './pages/HR/Employees'
-import Departments      from './pages/HR/Departments'
-import Designations     from './pages/HR/Designations'
-import UserPermissions  from './pages/HR/UserPermissions'
-import Attendance       from './pages/HR/Attendance'
-import Leave            from './pages/HR/Leave'
-import LeaveBalance     from './pages/HR/LeaveBalance'
-import LeaveCalendar    from './pages/HR/LeaveCalendar'
-import LeaveReports     from './pages/HR/LeaveReports'
-import Travel           from './pages/HR/Travel'
-import Payroll          from './pages/HR/Payroll'
-import TimesheetSummary from './pages/HR/TimesheetSummary'
+import HRDashboard     from './pages/HR/HRDashboard'
+import Employees       from './pages/HR/Employees'
+import Departments     from './pages/HR/Departments'
+import Designations    from './pages/HR/Designations'
+import UserPermissions from './pages/HR/UserPermissions'
+import Attendance      from './pages/HR/Attendance'
+import Leave           from './pages/HR/Leave'
+import LeaveBalance    from './pages/HR/LeaveBalance'
+import LeaveCalendar   from './pages/HR/LeaveCalendar'
+import LeaveReports    from './pages/HR/LeaveReports'
+import Travel          from './pages/HR/Travel'
+import Payroll         from './pages/HR/Payroll'
 
 // ── Logistics ─────────────────────────────────────────────────
-import LogisticsDashboard   from './pages/Logistics/LogisticsDashboard'
-import CampManagement       from './pages/Logistics/CampManagement'
-import BatchPlant           from './pages/Logistics/BatchPlant'
-import LogisticsDeliveries  from './pages/Logistics/LogisticsDeliveries'
+import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
+import CampManagement      from './pages/Logistics/CampManagement'
+import BatchPlant          from './pages/Logistics/BatchPlant'
+import LogisticsDeliveries from './pages/Logistics/LogisticsDeliveries'
 
 // ───────────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────────
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>Loading…</div>
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>
+        Loading…
+      </div>
+    )
+  }
   if (!user) return <Navigate to="/login" replace />
-  if (user.must_change_password === true && window.location.pathname !== '/change-password') return <Navigate to="/change-password" replace />
+  if (user.must_change_password === true && window.location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
+  }
   return children
 }
 
@@ -94,15 +105,22 @@ function ModulePlaceholder({ module, page }) {
         <h2 style={{ fontSize: 22, fontWeight: 800 }}>{label}</h2>
         <p style={{ color: 'var(--text-dim)', marginTop: 8, fontSize: 13 }}>Under development</p>
       </div>
-      <button className="btn btn-secondary" onClick={() => navigate('/')}><span className="material-icons" style={{ fontSize: 16 }}>home</span> Back to Home</button>
+      <button className="btn btn-secondary" onClick={() => navigate('/')}>
+        <span className="material-icons" style={{ fontSize: 16 }}>home</span> Back to Home
+      </button>
     </div>
   )
 }
 
-const PLACEHOLDER_MODULES = [
+// Only true placeholder modules (Logistics is now real)
+const OTHER_MODULES = [
   { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
   { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                 },
 ]
+
+// ───────────────────────────────────────────────────────────────
+// Routes
+// ───────────────────────────────────────────────────────────────
 
 function AppRoutes() {
   const { user } = useAuth()
@@ -113,11 +131,27 @@ function AppRoutes() {
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* DASHBOARD */}
-      <Route path="/module/dashboard" element={<ProtectedRoute><PermissionRoute module="dashboard" page="overview"><DashboardOverview /></PermissionRoute></ProtectedRoute>} />
+      {/* ── DASHBOARD ─────────────────────────────────────── */}
+      <Route path="/module/dashboard" element={
+        <ProtectedRoute>
+          <PermissionRoute module="dashboard" page="overview">
+            <DashboardOverview />
+          </PermissionRoute>
+        </ProtectedRoute>
+      } />
 
-      {/* INVENTORY */}
-      <Route path="/module/inventory" element={<ProtectedRoute><PermissionRoute module="inventory" page="stock-balance"><InventoryProvider><LeaveProvider><Layout module="inventory" /></LeaveProvider></InventoryProvider></PermissionRoute></ProtectedRoute>}>
+      {/* ── INVENTORY ───────────────────────────────────── */}
+      <Route path="/module/inventory" element={
+        <ProtectedRoute>
+          <PermissionRoute module="inventory" page="stock-balance">
+            <InventoryProvider>
+              <LeaveProvider>
+                <Layout module="inventory" />
+              </LeaveProvider>
+            </InventoryProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index                element={<StockBalance />} />
         <Route path="stock-balance" element={<StockBalance />} />
         <Route path="stock-in"      element={<StockIn />} />
@@ -125,10 +159,19 @@ function AppRoutes() {
         <Route path="transactions"  element={<Transactions />} />
         <Route path="stock-taking"  element={<StockTaking />} />
         <Route path="categories"    element={<Categories />} />
+        <Route path="locations"     element={<StorageLocations />} />
       </Route>
 
-      {/* PROCUREMENT */}
-      <Route path="/module/procurement" element={<ProtectedRoute><PermissionRoute module="procurement" page="suppliers"><ProcurementProvider><Layout module="procurement" /></ProcurementProvider></PermissionRoute></ProtectedRoute>}>
+      {/* ── PROCUREMENT ─────────────────────────────────── */}
+      <Route path="/module/procurement" element={
+        <ProtectedRoute>
+          <PermissionRoute module="procurement" page="suppliers">
+            <ProcurementProvider>
+              <Layout module="procurement" />
+            </ProcurementProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index                        element={<Suppliers />} />
         <Route path="suppliers"             element={<Suppliers />} />
         <Route path="store-requisitions"    element={<StoreRequisitions />} />
@@ -137,8 +180,20 @@ function AppRoutes() {
         <Route path="goods-received"        element={<GoodsReceived />} />
       </Route>
 
-      {/* FUEL */}
-      <Route path="/module/fuel" element={<ProtectedRoute><PermissionRoute module="fuel" page="tanks"><ProcurementProvider><FuelProvider><LeaveProvider><Layout module="fuel" /></LeaveProvider></FuelProvider></ProcurementProvider></PermissionRoute></ProtectedRoute>}>
+      {/* ── FUEL ─────────────────────────────────────────── */}
+      <Route path="/module/fuel" element={
+        <ProtectedRoute>
+          <PermissionRoute module="fuel" page="tanks">
+            <ProcurementProvider>
+              <FuelProvider>
+                <LeaveProvider>
+                  <Layout module="fuel" />
+                </LeaveProvider>
+              </FuelProvider>
+            </ProcurementProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index              element={<FuelTanks />} />
         <Route path="tanks"       element={<FuelTanks />} />
         <Route path="issuance"    element={<FuelIssuance />} />
@@ -147,8 +202,16 @@ function AppRoutes() {
         <Route path="reports"     element={<FuelReports />} />
       </Route>
 
-      {/* FLEET */}
-      <Route path="/module/fleet" element={<ProtectedRoute><PermissionRoute module="fleet" page="dashboard"><FleetProvider><Layout module="fleet" /></FleetProvider></PermissionRoute></ProtectedRoute>}>
+      {/* ── FLEET ────────────────────────────────────────── */}
+      <Route path="/module/fleet" element={
+        <ProtectedRoute>
+          <PermissionRoute module="fleet" page="dashboard">
+            <FleetProvider>
+              <Layout module="fleet" />
+            </FleetProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
         <Route index                     element={<FleetDashboard />} />
         <Route path="dashboard"          element={<FleetDashboard />} />
         <Route path="vehicles"           element={<Vehicles />} />
@@ -158,38 +221,63 @@ function AppRoutes() {
         <Route path="asset-issues"       element={<AssetIssues />} />
       </Route>
 
-      {/* HR */}
-      <Route path="/module/hr" element={<ProtectedRoute><PermissionRoute module="hr" page="dashboard"><HRProvider><LeaveProvider><Layout module="hr" /></LeaveProvider></HRProvider></PermissionRoute></ProtectedRoute>}>
-        <Route index                   element={<HRDashboard />} />
-        <Route path="dashboard"        element={<HRDashboard />} />
-        <Route path="employees"        element={<Employees />} />
-        <Route path="departments"      element={<Departments />} />
-        <Route path="designations"     element={<Designations />} />
-        <Route path="permissions"      element={<UserPermissions />} />
-        <Route path="attendance"       element={<Attendance />} />
-        <Route path="leave"            element={<Leave />} />
-        <Route path="leave-balance"    element={<LeaveBalance />} />
-        <Route path="leave-calendar"   element={<LeaveCalendar />} />
-        <Route path="leave-reports"    element={<LeaveReports />} />
-        <Route path="travel"           element={<Travel />} />
-        <Route path="payroll"          element={<Payroll />} />
-        <Route path="timesheet"        element={<TimesheetSummary />} />
+      {/* ── HR ───────────────────────────────────────────── */}
+      <Route path="/module/hr" element={
+        <ProtectedRoute>
+          <PermissionRoute module="hr" page="dashboard">
+            <HRProvider>
+              <LeaveProvider>
+                <Layout module="hr" />
+              </LeaveProvider>
+            </HRProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                 element={<HRDashboard />} />
+        <Route path="dashboard"      element={<HRDashboard />} />
+        <Route path="employees"      element={<Employees />} />
+        <Route path="departments"    element={<Departments />} />
+        <Route path="designations"   element={<Designations />} />
+        <Route path="permissions"    element={<UserPermissions />} />
+        <Route path="attendance"     element={<Attendance />} />
+        <Route path="leave"          element={<Leave />} />
+        <Route path="leave-balance"  element={<LeaveBalance />} />
+        <Route path="leave-calendar" element={<LeaveCalendar />} />
+        <Route path="leave-reports"  element={<LeaveReports />} />
+        <Route path="travel"         element={<Travel />} />
+        <Route path="payroll"        element={<Payroll />} />
       </Route>
 
-      {/* LOGISTICS */}
-      <Route path="/module/logistics" element={<ProtectedRoute><PermissionRoute module="logistics" page="dashboard"><LogisticsProvider><Layout module="logistics" /></LogisticsProvider></PermissionRoute></ProtectedRoute>}>
-        <Route index               element={<LogisticsDashboard />} />
-        <Route path="dashboard"    element={<LogisticsDashboard />} />
-        <Route path="camp"         element={<CampManagement />} />
-        <Route path="batch-plant"  element={<BatchPlant />} />
-        <Route path="deliveries"   element={<LogisticsDeliveries />} />
+      {/* ── LOGISTICS ────────────────────────────────────── */}
+      <Route path="/module/logistics" element={
+        <ProtectedRoute>
+          <PermissionRoute module="logistics" page="dashboard">
+            <LogisticsProvider>
+              <Layout module="logistics" />
+            </LogisticsProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index              element={<LogisticsDashboard />} />
+        <Route path="dashboard"   element={<LogisticsDashboard />} />
+        <Route path="camp"        element={<CampManagement />} />
+        <Route path="batch-plant" element={<BatchPlant />} />
+        <Route path="deliveries"  element={<LogisticsDeliveries />} />
       </Route>
 
-      {/* PLACEHOLDER MODULES */}
-      {PLACEHOLDER_MODULES.map(mod => (
-        <Route key={mod.id} path={`/module/${mod.id}`} element={<ProtectedRoute><PermissionRoute module={mod.id} page={mod.pages[0]}><Layout module={mod.id} /></PermissionRoute></ProtectedRoute>}>
+      {/* ── PLACEHOLDER MODULES ──────────────────────────── */}
+      {OTHER_MODULES.map(mod => (
+        <Route key={mod.id} path={`/module/${mod.id}`} element={
+          <ProtectedRoute>
+            <PermissionRoute module={mod.id} page={mod.pages[0]}>
+              <Layout module={mod.id} />
+            </PermissionRoute>
+          </ProtectedRoute>
+        }>
           <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
-          {mod.pages.map(page => <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />)}
+          {mod.pages.map(page => (
+            <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />
+          ))}
         </Route>
       ))}
 
