@@ -66,6 +66,7 @@ import LeaveCalendar   from './pages/HR/LeaveCalendar'
 import LeaveReports    from './pages/HR/LeaveReports'
 import Travel          from './pages/HR/Travel'
 import Payroll         from './pages/HR/Payroll'
+import TimesheetSummary from './pages/HR/TimesheetSummary'
 
 // ── Logistics ─────────────────────────────────────────────────
 import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
@@ -246,6 +247,7 @@ function AppRoutes() {
         <Route path="leave-reports"  element={<LeaveReports />} />
         <Route path="travel"         element={<Travel />} />
         <Route path="payroll"        element={<Payroll />} />
+        <Route path="timesheet"      element={<TimesheetSummary />} />
       </Route>
 
       {/* ── LOGISTICS ────────────────────────────────────── */}
