@@ -1,10 +1,4 @@
 // src/pages/Inventory/StorageLocations.jsx
-//
-// Manage physical storage locations within the store.
-// Locations are grouped by Zone. Each location has a Code (short ID),
-// Name, Zone, Description, and optional Capacity.
-// Used when doing Stock In to specify where an item is stored.
-
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
@@ -14,10 +8,10 @@ export default function StorageLocations() {
   const canEdit   = useCanEdit('inventory', 'stock-balance')
   const canDelete = useCanDelete('inventory', 'stock-balance')
 
-  const [locations, setLocations] = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [editing,   setEditing]   = useState(null)
+  const [locations,  setLocations]  = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [showModal,  setShowModal]  = useState(false)
+  const [editing,    setEditing]    = useState(null)
   const [filterZone, setFilterZone] = useState('ALL')
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -26,19 +20,21 @@ export default function StorageLocations() {
 
   const fetchLocations = async () => {
     setLoading(true)
-    const { data, error } = await supabase.from('storage_locations').select('*').order('zone').order('code')
+    const { data, error } = await supabase
+      .from('storage_locations')
+      .select('*')
+      .order('zone').order('code')
     if (!error && data) setLocations(data)
     setLoading(false)
   }
 
   useEffect(() => { fetchLocations() }, [])
 
-  const zones = ['ALL', ...new Set(locations.map(l => l.zone).filter(Boolean))]
-
+  const zones    = ['ALL', ...new Set(locations.filter(l => l.is_active !== false).map(l => l.zone).filter(Boolean))]
   const filtered = locations.filter(l => {
-    if (!l.is_active) return false
+    if (l.is_active === false) return false
     if (filterZone !== 'ALL' && l.zone !== filterZone) return false
-    if (searchTerm && !(l.code.toLowerCase().includes(searchTerm.toLowerCase()) || l.name.toLowerCase().includes(searchTerm.toLowerCase()))) return false
+    if (searchTerm && !(l.code?.toLowerCase().includes(searchTerm.toLowerCase()) || l.name?.toLowerCase().includes(searchTerm.toLowerCase()))) return false
     return true
   })
 
@@ -51,39 +47,35 @@ export default function StorageLocations() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.code.trim() || !form.name.trim()) return toast.error('Code and Name are required')
+    if (!form.code.trim() || !form.name.trim()) return toast.error('Code and Name required')
     try {
       if (editing) {
         const { error } = await supabase.from('storage_locations').update({ ...form }).eq('id', editing.id)
         if (error) throw error
         toast.success('Location updated')
       } else {
-        const { error } = await supabase.from('storage_locations').insert([{
-          id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-          ...form,
-          created_at: new Date().toISOString(),
-        }])
+        const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)
+        const { error } = await supabase.from('storage_locations').insert([{ id, ...form, created_at: new Date().toISOString() }])
         if (error) {
-          if (error.message.includes('unique')) { toast.error(`Code "${form.code}" already exists`); return }
+          if (error.message?.includes('unique')) { toast.error(`Code "${form.code}" already exists`); return }
           throw error
         }
         toast.success('Location added')
       }
-      setShowModal(false)
-      setEditing(null)
+      setShowModal(false); setEditing(null)
       await fetchLocations()
     } catch (err) { toast.error(err.message) }
   }
 
   const handleDelete = async (loc) => {
-    if (!window.confirm(`Delete "${loc.name}"? Items stored here will lose their location reference.`)) return
+    if (!window.confirm(`Remove "${loc.name}"?`)) return
     const { error } = await supabase.from('storage_locations').update({ is_active: false }).eq('id', loc.id)
     if (error) { toast.error(error.message); return }
     toast.success('Location removed')
     await fetchLocations()
   }
 
-  // Group by zone for visual display
+  // Group by zone
   const byZone = {}
   filtered.forEach(l => {
     const z = l.zone || 'Unzoned'
@@ -102,15 +94,21 @@ export default function StorageLocations() {
         )}
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+      <div style={{ padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)', marginBottom: 20 }}>
         <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', color: 'var(--teal)', marginRight: 6 }}>info</span>
         Storage locations define where items are physically kept. Assign a location when doing Stock In so the storekeeper knows exactly where to find any item.
       </div>
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card"><div className="kpi-label">Total Locations</div><div className="kpi-val">{locations.filter(l => l.is_active).length}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Zones</div><div className="kpi-val">{new Set(locations.filter(l => l.is_active).map(l => l.zone).filter(Boolean)).size}</div></div>
+        <div className="kpi-card">
+          <div className="kpi-label">Total Locations</div>
+          <div className="kpi-val">{locations.filter(l => l.is_active !== false).length}</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-label">Zones</div>
+          <div className="kpi-val">{new Set(locations.filter(l => l.is_active !== false).map(l => l.zone).filter(Boolean)).size}</div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -119,15 +117,19 @@ export default function StorageLocations() {
           value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {zones.map(z => (
-            <button key={z} className={filterZone === z ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-              onClick={() => setFilterZone(z)}>{z === 'ALL' ? 'All Zones' : z}</button>
+            <button key={z}
+              className={filterZone === z ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+              onClick={() => setFilterZone(z)}>
+              {z === 'ALL' ? 'All Zones' : z}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Grouped by zone */}
-      {loading ? <div style={{ textAlign: 'center', padding: 40 }}>Loading…</div>
-      : Object.entries(byZone).length === 0 ? (
+      {/* Content */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Loading…</div>
+      ) : Object.entries(byZone).length === 0 ? (
         <div className="empty-state">
           <span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>location_on</span>
           <span>No storage locations yet — click Add Location to create your first one</span>
@@ -138,18 +140,18 @@ export default function StorageLocations() {
             <span className="material-icons" style={{ fontSize: 14 }}>folder_open</span>
             {zone} ({locs.length})
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {locs.map(loc => (
               <div key={loc.id} className="card" style={{ padding: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 800, color: 'var(--gold)', marginBottom: 2 }}>{loc.code}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 800, color: 'var(--gold)', marginBottom: 2 }}>{loc.code}</div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{loc.name}</div>
                     {loc.description && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{loc.description}</div>}
-                    {loc.capacity && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>Capacity: {loc.capacity}</div>}
+                    {loc.capacity && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>Capacity: {loc.capacity}</div>}
                   </div>
                   {(canEdit || canDelete) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, marginLeft: 8 }}>
                       {canEdit && (
                         <button className="btn btn-secondary btn-sm" onClick={() => openEdit(loc)}>
                           <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
@@ -171,16 +173,18 @@ export default function StorageLocations() {
 
       {/* Modal */}
       {showModal && (
-        <div className="overlay" onClick={() => setShowModal(false)}>
+        <div className="overlay" onClick={() => { setShowModal(false); setEditing(null) }}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editing ? 'Edit' : 'Add'} Storage <span>Location</span></div>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Location Code * <small style={{ color: 'var(--text-dim)' }}>(unique short ID)</small></label>
+                  <label>Location Code * <small style={{ color: 'var(--text-dim)' }}>(short unique ID)</small></label>
                   <input className="form-control" required placeholder="e.g. A1, SHELF-B2, YARD-01"
-                    value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                    readOnly={!!editing} style={editing ? { background: 'var(--surface2)', color: 'var(--text-dim)' } : {}} />
+                    value={form.code}
+                    onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                    readOnly={!!editing}
+                    style={editing ? { background: 'var(--surface2)', color: 'var(--text-dim)' } : {}} />
                 </div>
                 <div className="form-group">
                   <label>Zone / Area</label>
@@ -199,12 +203,12 @@ export default function StorageLocations() {
                   value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </div>
               <div className="form-group">
-                <label>Capacity (optional)</label>
+                <label>Capacity <small style={{ color: 'var(--text-dim)' }}>(optional)</small></label>
                 <input className="form-control" placeholder="e.g. 50 bags, 200 kg, 10 pallets"
                   value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditing(null) }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">
                   <span className="material-icons">{editing ? 'save' : 'add_location'}</span>
                   {editing ? 'Save Changes' : 'Add Location'}
