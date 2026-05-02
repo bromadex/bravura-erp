@@ -23,7 +23,7 @@ export function CampsiteProvider({ children }) {
       const [bRes, rRes, aRes] = await Promise.all([
         supabase.from('camp_blocks').select('*').order('name'),
         supabase.from('camp_rooms').select('*').order('code'),
-        supabase.from('room_assignments').select('*, employees(full_name,bra_number,gender)').order('created_at', { ascending: false }),
+        supabase.from('room_assignments').select('*, employees(name,employee_number,gender)').order('created_at', { ascending: false }),
       ])
       if (bRes.data) setBlocks(bRes.data)
       if (rRes.data) setRooms(rRes.data)
@@ -47,7 +47,7 @@ export function CampsiteProvider({ children }) {
           await supabase.from('room_assignments').update({ status: 'active' }).in('id', toReset)
           const { data: fresh } = await supabase
             .from('room_assignments')
-            .select('*, employees(full_name,bra_number,gender)')
+            .select('*, employees(name,employee_number,gender)')
             .order('created_at', { ascending: false })
           if (fresh) assignmentsData = fresh
         }
