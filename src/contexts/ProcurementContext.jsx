@@ -22,6 +22,49 @@ export function ProcurementProvider({ children }) {
 
   const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
+  // ── Notification helper ───────────────────────────────────────
+  const sendNotification = async ({ userId, type, title, message, link = null }) => {
+    try {
+      await supabase.from('notifications').insert([{
+        id:         generateId(),
+        user_id:    userId,
+        type,
+        title,
+        message,
+        link,
+        is_read:    false,
+        created_at: new Date().toISOString(),
+      }])
+    } catch (err) {
+      console.warn('Notification send failed:', err.message)
+    }
+  }
+
+  const notifyHOD = async ({ departmentName, type, title, message, link }) => {
+    const { data: hodEmployees } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('department', departmentName)
+      .eq('is_hod', true)
+    if (!hodEmployees?.length) return
+    for (const emp of hodEmployees) {
+      const { data: users } = await supabase.from('app_users').select('id').eq('employee_id', emp.id)
+      for (const u of (users || [])) {
+        await sendNotification({ userId: u.id, type, title, message, link })
+      }
+    }
+  }
+
+  const notifyStorekeepers = async ({ type, title, message, link }) => {
+    const { data: users } = await supabase
+      .from('app_users')
+      .select('id')
+      .in('role_id', ['role_storekeeper', 'role_store_manager'])
+    for (const u of (users || [])) {
+      await sendNotification({ userId: u.id, type, title, message, link })
+    }
+  }
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -79,6 +122,16 @@ export function ProcurementProvider({ children }) {
       updated_at: new Date().toISOString(),
     }])
     if (error) throw error
+
+    // Notify HOD that a requisition needs approval
+    await notifyHOD({
+      departmentName: req.department,
+      type:    'requisition_submitted',
+      title:   'Store Requisition Pending Approval',
+      message: `${req.requester_name || 'Someone'} submitted ${srNumber} for your approval.`,
+      link:    '/module/procurement/store-requisitions',
+    })
+
     await fetchAll()
     return id
   }
@@ -152,6 +205,17 @@ export function ProcurementProvider({ children }) {
         duration: 5000,
       })
     }
+
+    // Notify storekeepers that a requisition is ready to fulfil
+    const req = storeRequisitions.find(r => r.id === id)
+    const srNum = req?.sr_number || req?.req_number || id
+    await notifyStorekeepers({
+      type:    'requisition_approved',
+      title:   'Store Requisition Ready to Fulfil',
+      message: `${srNum} has been approved and is awaiting fulfilment.`,
+      link:    '/module/procurement/store-requisitions',
+    })
+
     await fetchAll()
   }
 
