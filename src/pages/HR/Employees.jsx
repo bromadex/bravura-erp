@@ -11,12 +11,13 @@
 //   Aids Levy:  3% of PAYE
 //   PAYE:       progressive — stored as a percentage for simplicity
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import { useLeave } from '../../contexts/LeaveContext'
+import TxnCodeBadge from '../../components/TxnCodeBadge'
 
 export default function Employees() {
   const {
@@ -518,6 +519,252 @@ export default function Employees() {
             </table>
           </div>
         </div>
+        <DisciplinarySection employee={employee} />
+      </div>
+    )
+  }
+
+  // ── Disciplinary Records (sub-section of Performance tab) ────
+  const DisciplinarySection = ({ employee }) => {
+    const [records,  setRecords]  = useState([])
+    const [loading,  setLoading]  = useState(true)
+    const [showForm, setShowForm] = useState(false)
+    const [saving,   setSaving]   = useState(false)
+    const BLANK = { type: 'verbal_warning', date: new Date().toISOString().split('T')[0], reason: '', outcome: '', issued_by: '' }
+    const [form, setForm] = useState(BLANK)
+
+    const load = useCallback(async () => {
+      setLoading(true)
+      const { data } = await supabase.from('disciplinary_records').select('*').eq('employee_id', employee.id).order('date', { ascending: false })
+      setRecords(data || [])
+      setLoading(false)
+    }, [employee.id])
+
+    useEffect(() => { load() }, [load])
+
+    const handleSave = async (e) => {
+      e.preventDefault()
+      if (!form.reason.trim()) return toast.error('Reason is required')
+      setSaving(true)
+      try {
+        const { error } = await supabase.from('disciplinary_records').insert([{
+          id:          crypto.randomUUID(),
+          employee_id: employee.id,
+          ...form,
+          created_at:  new Date().toISOString(),
+        }])
+        if (error) throw error
+        toast.success('Disciplinary record saved')
+        setShowForm(false)
+        setForm(BLANK)
+        load()
+      } catch (err) {
+        toast.error(err.message)
+      } finally { setSaving(false) }
+    }
+
+    const DISC_COLORS = {
+      verbal_warning:  'var(--yellow)',
+      written_warning: 'var(--yellow)',
+      final_warning:   'var(--red)',
+      suspension:      'var(--red)',
+      hearing:         'var(--purple)',
+    }
+    const DISC_LABELS = {
+      verbal_warning:  'Verbal Warning',
+      written_warning: 'Written Warning',
+      final_warning:   'Final Warning',
+      suspension:      'Suspension',
+      hearing:         'Hearing',
+    }
+
+    return (
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700 }}>Disciplinary Records</h4>
+          {canEdit && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(v => !v)}>
+              <span className="material-icons" style={{ fontSize: 14 }}>add</span> Add Record
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <form onSubmit={handleSave} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-group">
+                <label className="form-label">Type *</label>
+                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12 }}>
+                  {Object.entries(DISC_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Date *</label>
+                <input type="date" required value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12 }} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Reason *</label>
+              <textarea required value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} rows={2}
+                style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="form-group">
+                <label className="form-label">Outcome</label>
+                <input value={form.outcome} onChange={e => setForm(f => ({ ...f, outcome: e.target.value }))} placeholder="e.g. 2-day suspension"
+                  style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12 }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Issued By</label>
+                <input value={form.issued_by} onChange={e => setForm(f => ({ ...f, issued_by: e.target.value }))} placeholder="Name of issuing manager"
+                  style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12 }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving…' : 'Save Record'}</button>
+            </div>
+          </form>
+        )}
+
+        <div className="table-wrap">
+          <table className="stock-table">
+            <thead><tr><th>Date</th><th>Type</th><th>Reason</th><th>Outcome</th><th>Issued By</th></tr></thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>Loading…</td></tr>
+              ) : records.length === 0 ? (
+                <tr><td colSpan={5} className="empty-state">No disciplinary records</td></tr>
+              ) : records.map(r => {
+                const color = DISC_COLORS[r.type] || 'var(--text-dim)'
+                return (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{r.date}</td>
+                    <td><span style={{ fontSize: 11, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}33`, padding: '2px 8px', borderRadius: 10 }}>{DISC_LABELS[r.type] || r.type}</span></td>
+                    <td style={{ fontSize: 12, maxWidth: 200 }}>{r.reason}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{r.outcome || '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{r.issued_by || '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // ── In Possession tab ─────────────────────────────────────────
+  const InPossessionTab = ({ employee }) => {
+    const [items,   setItems]   = useState([])
+    const [loading, setLoading] = useState(true)
+    const [returning, setReturning] = useState(null)
+    const [saving,    setSaving]    = useState(false)
+
+    const load = useCallback(async () => {
+      setLoading(true)
+      const { data } = await supabase
+        .from('items_in_possession')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .eq('returned', false)
+        .order('issued_at', { ascending: false })
+      setItems(data || [])
+      setLoading(false)
+    }, [employee.id])
+
+    useEffect(() => { load() }, [load])
+
+    const handleReturn = async (item) => {
+      setSaving(true)
+      try {
+        await supabase.from('items_in_possession').update({ returned: true, returned_at: new Date().toISOString() }).eq('id', item.id)
+        // Optionally stock back in
+        if (item.item_id) {
+          const { data: inv } = await supabase.from('items').select('balance').eq('id', item.item_id).maybeSingle()
+          if (inv) {
+            await supabase.from('items').update({ balance: (inv.balance || 0) + (item.quantity || 1) }).eq('id', item.item_id)
+            await supabase.from('transactions').insert([{
+              id:         crypto.randomUUID(),
+              type:       'IN',
+              item_id:    item.item_id,
+              item_name:  item.item_name,
+              qty:        item.quantity || 1,
+              date:       new Date().toISOString().split('T')[0],
+              notes:      `Returned by ${employee.name || employee.full_name} — ${item.source_code || ''}`,
+              created_at: new Date().toISOString(),
+            }])
+          }
+        }
+        toast.success('Item marked as returned')
+        setReturning(null)
+        load()
+      } catch (err) {
+        toast.error(err.message)
+      } finally { setSaving(false) }
+    }
+
+    const SOURCE_COLOR = { SR: 'var(--purple)', PI: 'var(--teal)' }
+
+    return (
+      <div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            Items currently issued to this employee from Store Requisitions (returnable) and PPE Issuances.
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Loading…</div>
+        ) : items.length === 0 ? (
+          <div className="empty-state">
+            <span className="material-icons" style={{ fontSize: 48, opacity: 0.4 }}>inventory_2</span>
+            <p>No items currently in possession.</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="stock-table">
+              <thead><tr><th>Item</th><th>Qty</th><th>Issued</th><th>Source</th><th>Code</th><th>Actions</th></tr></thead>
+              <tbody>
+                {items.map(item => {
+                  const prefix = item.source_code?.split('-')[0]
+                  const sc = SOURCE_COLOR[prefix] || 'var(--text-dim)'
+                  return (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 600 }}>{item.item_name}</td>
+                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{item.quantity}</td>
+                      <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.issued_at ? new Date(item.issued_at).toLocaleDateString('en-GB') : '—'}</td>
+                      <td>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: `${sc}18`, padding: '2px 8px', borderRadius: 10 }}>
+                          {item.source_type || 'Store'}
+                        </span>
+                      </td>
+                      <td>{item.source_code ? <TxnCodeBadge code={item.source_code} /> : '—'}</td>
+                      <td>
+                        {canEdit && (
+                          returning === item.id ? (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn btn-primary btn-sm" onClick={() => handleReturn(item)} disabled={saving} style={{ fontSize: 11 }}>
+                                {saving ? '…' : 'Confirm Return'}
+                              </button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setReturning(null)} style={{ fontSize: 11 }}>Cancel</button>
+                            </div>
+                          ) : (
+                            <button className="btn btn-secondary btn-sm" onClick={() => setReturning(item.id)} style={{ fontSize: 11 }}>
+                              <span className="material-icons" style={{ fontSize: 13 }}>assignment_return</span> Return
+                            </button>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     )
   }
@@ -547,9 +794,10 @@ export default function Employees() {
 
   const TABS = [
     { id: 'profile',      icon: 'person',          label: 'Profile'      },
-    { id: 'compensation', icon: 'payments',         label: 'Compensation' },  // ✅ NEW
+    { id: 'compensation', icon: 'payments',         label: 'Compensation' },
     { id: 'attendance',   icon: 'schedule',         label: 'Attendance'   },
     { id: 'performance',  icon: 'trending_up',      label: 'Performance'  },
+    { id: 'possession',   icon: 'inventory_2',      label: 'In Possession' },
     { id: 'history',      icon: 'history',          label: 'History'      },
   ]
 
@@ -620,6 +868,7 @@ export default function Employees() {
               {activeTab === 'compensation' && <CompensationTab employee={selectedEmployee} />}
               {activeTab === 'attendance'   && <AttendanceTab   employee={selectedEmployee} />}
               {activeTab === 'performance'  && <PerformanceTab  employee={selectedEmployee} />}
+              {activeTab === 'possession'   && <InPossessionTab employee={selectedEmployee} />}
               {activeTab === 'history'      && <HistoryTab      employee={selectedEmployee} />}
             </div>
             <div className="modal-actions" style={{ marginTop: 16 }}>

@@ -32,6 +32,26 @@ const STATUS_CONFIG = {
 const PRIORITIES      = ['low', 'normal', 'high', 'critical']
 const PRIORITY_COLORS = { low: 'var(--text-dim)', normal: 'var(--blue)', high: 'var(--yellow)', critical: 'var(--red)' }
 
+// SLA: hours since a submitted requisition was created
+const slaHours = (r) => {
+  if (r.status !== 'submitted') return null
+  const ts = r.submitted_at || r.created_at
+  if (!ts) return null
+  return Math.floor((Date.now() - new Date(ts)) / 3600000)
+}
+const SlaIndicator = ({ r }) => {
+  const h = slaHours(r)
+  if (h === null) return null
+  if (h < 48) return null
+  const color = h >= 72 ? 'var(--red)' : 'var(--yellow)'
+  return (
+    <span title={`Pending for ${h}h — SLA ${h >= 72 ? 'OVERDUE' : 'warning'}`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color, fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
+      <span className="material-icons" style={{ fontSize: 13 }}>schedule</span>{h}h
+    </span>
+  )
+}
+
 export default function StoreRequisitions() {
   const {
     storeRequisitions, createStoreRequisition, updateStoreRequisition,
@@ -77,7 +97,7 @@ export default function StoreRequisitions() {
     priority:       'normal',
     requester_name: user?.full_name || user?.username || '',
     requester_id:   user?.id || '',
-    items: [{ item_id: '', name: '', category: '', qty: 1, unit: 'pcs', notes: '' }],
+    items: [{ item_id: '', name: '', category: '', qty: 1, unit: 'pcs', notes: '', is_returnable: false }],
     notes: '',
   })
   const [form, setForm] = useState(emptyForm())
@@ -97,7 +117,7 @@ export default function StoreRequisitions() {
     setModalOpen(true)
   }
 
-  const addItem    = () => setForm(f => ({ ...f, items: [...f.items, { item_id: '', name: '', category: '', qty: 1, unit: 'pcs', notes: '' }] }))
+  const addItem    = () => setForm(f => ({ ...f, items: [...f.items, { item_id: '', name: '', category: '', qty: 1, unit: 'pcs', notes: '', is_returnable: false }] }))
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }))
   const setItem    = (i, field, val) => setForm(f => {
     const items = [...f.items]
@@ -294,7 +314,10 @@ export default function StoreRequisitions() {
                   <td><span style={{ fontSize: 11, fontWeight: 700, color: PRIORITY_COLORS[r.priority] || 'var(--text-dim)', textTransform: 'uppercase' }}>{r.priority}</span></td>
                   <td>{r.requester_name || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
-                  <td><span className={`badge ${sc.cls}`}><span className="material-icons" style={{ fontSize: 10, marginRight: 3 }}>{sc.icon}</span>{sc.label}</span></td>
+                  <td>
+                    <span className={`badge ${sc.cls}`}><span className="material-icons" style={{ fontSize: 10, marginRight: 3 }}>{sc.icon}</span>{sc.label}</span>
+                    <SlaIndicator r={r} />
+                  </td>
                   <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {/* HOD/Manager approves submitted requests */}
                     {canApprove && r.status === 'submitted' && (
@@ -361,7 +384,7 @@ export default function StoreRequisitions() {
 
             <div className="table-wrap">
               <table className="stock-table">
-                <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th><th>Stock Available</th><th>Notes</th></tr></thead>
+                <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th><th>Stock Available</th><th>Returnable</th><th>Notes</th></tr></thead>
                 <tbody>
                   {parseItems(viewReq.items).map((it, i) => {
                     const invItem = inventoryItems.find(inv => inv.name.toLowerCase() === it.name.toLowerCase())
@@ -375,6 +398,11 @@ export default function StoreRequisitions() {
                         <td style={{ fontFamily: 'var(--mono)', color: sufficient === null ? 'var(--text-dim)' : sufficient ? 'var(--green)' : 'var(--red)' }}>
                           {invItem ? `${invItem.balance} ${invItem.unit || 'pcs'}` : '—'}
                           {invItem && !sufficient && <span style={{ fontSize: 9, marginLeft: 4 }}>⚠ short</span>}
+                        </td>
+                        <td>
+                          {it.is_returnable
+                            ? <span style={{ color: 'var(--gold)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-icons" style={{ fontSize: 13 }}>assignment_return</span>Yes</span>
+                            : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Consumable</span>}
                         </td>
                         <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{it.notes || '—'}</td>
                       </tr>
@@ -517,6 +545,17 @@ export default function StoreRequisitions() {
                           onChange={e => setItem(i, 'notes', e.target.value)} />
                       </div>
                     </div>
+
+                    {/* Returnable toggle */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, cursor: 'pointer', fontSize: 12 }}>
+                      <input type="checkbox" checked={!!it.is_returnable}
+                        onChange={e => setItem(i, 'is_returnable', e.target.checked)}
+                        style={{ width: 15, height: 15, accentColor: 'var(--gold)' }} />
+                      <span style={{ color: it.is_returnable ? 'var(--gold)' : 'var(--text-dim)' }}>
+                        <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 3 }}>assignment_return</span>
+                        Returnable item — will appear in employee In-Possession list
+                      </span>
+                    </label>
                   </div>
                 )
               })}

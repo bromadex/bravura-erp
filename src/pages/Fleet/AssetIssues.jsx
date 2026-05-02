@@ -3,6 +3,8 @@ import { useFleet } from '../../contexts/FleetContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
+import { generateTxnCode } from '../../utils/txnCode'
+import TxnCodeBadge from '../../components/TxnCodeBadge'
 import toast from 'react-hot-toast'
 
 export default function AssetIssues() {
@@ -38,8 +40,9 @@ export default function AssetIssues() {
     e.preventDefault()
     if (!form.asset_id || !form.issue_description) return toast.error('Asset and description required')
     try {
-      await addAssetIssue(form)
-      toast.success('Issue reported')
+      const txnCode = await generateTxnCode('FT')
+      await addAssetIssue({ ...form, txn_code: txnCode })
+      toast.success(`Issue reported — ${txnCode}`)
       setModalOpen(false)
       loadIssues()
     } catch (err) { toast.error(err.message) }
@@ -65,7 +68,7 @@ export default function AssetIssues() {
       <div className="table-wrap">
         <table className="stock-table">
           <thead>
-            <tr><th>Date</th><th>Asset</th><th>Issue</th><th>Urgency</th><th>Status</th><th>Reported By</th><th>Actions</th></tr>
+            <tr><th>Code</th><th>Date</th><th>Asset</th><th>Issue</th><th>Urgency</th><th>Status</th><th>Reported By</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {issues.map(issue => {
@@ -73,6 +76,7 @@ export default function AssetIssues() {
               const urgencyColor = issue.urgency === 'critical' ? 'var(--red)' : issue.urgency === 'high' ? 'var(--yellow)' : 'var(--text-dim)'
               return (
                 <tr key={issue.id}>
+                  <td>{issue.txn_code ? <TxnCodeBadge code={issue.txn_code} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{issue.reported_date}</td>
                   <td><strong>{assetName}</strong> ({issue.asset_type})</td>
                   <td>{issue.issue_description}</td>
@@ -90,7 +94,7 @@ export default function AssetIssues() {
                 </tr>
               )
             })}
-            {issues.length === 0 && <tr><td colSpan="7" className="empty-state">No issues reported</td></tr>}
+            {issues.length === 0 && <tr><td colSpan="8" className="empty-state">No issues reported</td></tr>}
           </tbody>
         </table>
       </div>
