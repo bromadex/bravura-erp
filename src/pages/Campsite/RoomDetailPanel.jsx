@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCampsite } from '../../contexts/CampsiteContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
+import TransferRoomModal from './TransferRoomModal'
 import toast from 'react-hot-toast'
 
 export default function RoomDetailPanel({ roomId, onClose }) {
@@ -26,10 +27,11 @@ export default function RoomDetailPanel({ roomId, onClose }) {
   const status = room ? getRoomStatus(roomId) : 'unknown'
   const color  = STATUS_COLOR[status]
 
-  const [maintNotes,  setMaintNotes]  = useState(room?.maintenance_notes || '')
-  const [savingMaint, setSavingMaint] = useState(false)
-  const [vacating,    setVacating]    = useState(null)
-  const [vacateNotes, setVacateNotes] = useState('')
+  const [maintNotes,   setMaintNotes]   = useState(room?.maintenance_notes || '')
+  const [savingMaint,  setSavingMaint]  = useState(false)
+  const [vacating,     setVacating]     = useState(null)
+  const [vacateNotes,  setVacateNotes]  = useState('')
+  const [transferring, setTransferring] = useState(null)
 
   if (!room) return null
 
@@ -119,6 +121,9 @@ export default function RoomDetailPanel({ roomId, onClose }) {
                   </div>
                 ) : (
                   <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                    <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setTransferring(a)}>
+                      <span className="material-icons" style={{ fontSize: 13 }}>swap_horiz</span> Transfer
+                    </button>
                     <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setVacating(a.id)}>
                       <span className="material-icons" style={{ fontSize: 13 }}>logout</span> Vacate
                     </button>
@@ -172,6 +177,13 @@ export default function RoomDetailPanel({ roomId, onClose }) {
           )}
         </div>
       </div>
+
+      {transferring && (
+        <TransferRoomModal
+          assignment={transferring}
+          onClose={() => setTransferring(null)}
+        />
+      )}
     </>
   )
 }

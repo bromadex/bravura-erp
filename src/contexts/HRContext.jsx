@@ -652,6 +652,17 @@ export function HRProvider({ children }) {
       )
     }
 
+    // Campsite leave sync — flip active room assignment to on_leave
+    if (newStatus === 'approved') {
+      try {
+        await supabase
+          .from('room_assignments')
+          .update({ status: 'on_leave' })
+          .eq('employee_id', request.employee_id)
+          .eq('status', 'active')
+      } catch { /* non-critical — campsite will self-heal on next load */ }
+    }
+
     await fetchAll()
     await logHRAction('APPROVE_LEAVE', 'leave_request', requestId, request.employee_id, null, { newStatus, comment })
   }

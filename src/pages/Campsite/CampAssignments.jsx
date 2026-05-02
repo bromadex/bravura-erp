@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCampsite } from '../../contexts/CampsiteContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
+import TransferRoomModal from './TransferRoomModal'
 import toast from 'react-hot-toast'
 
 export default function CampAssignments() {
@@ -12,9 +13,10 @@ export default function CampAssignments() {
 
   const [search,   setSearch]   = useState('')
   const [fStatus,  setFStatus]  = useState('active')
-  const [vacating, setVacating] = useState(null)
-  const [vacNotes, setVacNotes] = useState('')
-  const [saving,   setSaving]   = useState(false)
+  const [vacating,    setVacating]    = useState(null)
+  const [vacNotes,    setVacNotes]    = useState('')
+  const [transferring, setTransferring] = useState(null)
+  const [saving,      setSaving]      = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -120,9 +122,14 @@ export default function CampAssignments() {
                   </td>
                   <td>
                     {(a.status === 'active' || a.status === 'on_leave') && (
-                      <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => { setVacating(a); setVacNotes('') }}>
-                        <span className="material-icons" style={{ fontSize: 13 }}>logout</span> Vacate
-                      </button>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setTransferring(a)}>
+                          <span className="material-icons" style={{ fontSize: 13 }}>swap_horiz</span> Transfer
+                        </button>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => { setVacating(a); setVacNotes('') }}>
+                          <span className="material-icons" style={{ fontSize: 13 }}>logout</span> Vacate
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -131,6 +138,14 @@ export default function CampAssignments() {
           </tbody>
         </table>
       </div>
+
+      {/* Transfer modal */}
+      {transferring && (
+        <TransferRoomModal
+          assignment={transferring}
+          onClose={() => setTransferring(null)}
+        />
+      )}
 
       {/* Vacate confirmation */}
       {vacating && (

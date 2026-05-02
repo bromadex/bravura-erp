@@ -27,7 +27,33 @@ export function CampsiteProvider({ children }) {
       ])
       if (bRes.data) setBlocks(bRes.data)
       if (rRes.data) setRooms(rRes.data)
-      if (aRes.data) setAssignments(aRes.data)
+
+      let assignmentsData = aRes.data || []
+
+      // Auto-reset on_leave assignments whose leave has since ended
+      const today = new Date().toISOString().split('T')[0]
+      const onLeaveList = assignmentsData.filter(a => a.status === 'on_leave')
+      if (onLeaveList.length > 0) {
+        const empIds = [...new Set(onLeaveList.map(a => a.employee_id))]
+        const { data: activeLv } = await supabase
+          .from('leave_requests')
+          .select('employee_id')
+          .in('employee_id', empIds)
+          .eq('status', 'approved')
+          .gte('end_date', today)
+        const stillOnLeave = new Set((activeLv || []).map(l => l.employee_id))
+        const toReset = onLeaveList.filter(a => !stillOnLeave.has(a.employee_id)).map(a => a.id)
+        if (toReset.length > 0) {
+          await supabase.from('room_assignments').update({ status: 'active' }).in('id', toReset)
+          const { data: fresh } = await supabase
+            .from('room_assignments')
+            .select('*, employees(full_name,bra_number,gender)')
+            .order('created_at', { ascending: false })
+          if (fresh) assignmentsData = fresh
+        }
+      }
+
+      setAssignments(assignmentsData)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load campsite data')
