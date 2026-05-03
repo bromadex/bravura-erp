@@ -45,7 +45,7 @@ export default function CampAssignments() {
     if (!vacating) return
     setSaving(true)
     try {
-      const code = await vacateRoom({ assignmentId: vacating.id, checkOutNotes: vacNotes, processedBy: user?.name })
+      const code = await vacateRoom({ assignmentId: vacating.id, checkOutNotes: vacNotes, processedBy: user?.full_name })
       toast.success(`Vacated — ${code}`)
       setVacating(null)
       setVacNotes('')
