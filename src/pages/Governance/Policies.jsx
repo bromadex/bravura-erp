@@ -24,7 +24,7 @@ export default function Policies() {
     setLoading(true)
     const [pRes, rRes] = await Promise.all([
       supabase.from('governance_documents')
-        .select('*, app_users(full_name, username)')
+        .select('id, title, body, version, category, published_by_name, created_at')
         .eq('doc_type', 'policy')
         .order('created_at', { ascending: false }),
       supabase.from('governance_responses')
@@ -45,14 +45,15 @@ export default function Policies() {
     setSaving(true)
     try {
       const { error } = await supabase.from('governance_documents').insert([{
-        id:           crypto.randomUUID(),
-        doc_type:     'policy',
-        title:        form.title,
-        body:         form.body,
-        version:      form.version,
-        category:     form.category,
-        published_by: user.id,
-        created_at:   new Date().toISOString(),
+        id:                crypto.randomUUID(),
+        doc_type:          'policy',
+        title:             form.title,
+        body:              form.body,
+        version:           form.version,
+        category:          form.category,
+        published_by:      user.id,
+        published_by_name: user.full_name || user.username || '',
+        created_at:        new Date().toISOString(),
       }])
       if (error) throw error
       toast.success('Policy published')
@@ -128,7 +129,7 @@ export default function Policies() {
           {policies.map(p => {
             const resp = myResponse(p.id)
             const rs   = resp ? RESPONSE_STYLE[resp.response] : null
-            const author = p.app_users?.full_name || p.app_users?.username || 'Unknown'
+            const author = p.published_by_name || 'Unknown'
             return (
               <div key={p.id} className="card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
                 <span className="material-icons" style={{ fontSize: 32, color: rs ? rs.color : 'var(--yellow)', flexShrink: 0 }}>

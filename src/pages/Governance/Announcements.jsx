@@ -28,7 +28,7 @@ export default function Announcements() {
     setLoading(true)
     const [dRes, rRes] = await Promise.all([
       supabase.from('governance_documents')
-        .select('*, app_users(full_name, username)')
+        .select('id, title, body, priority, published_by_name, created_at')
         .eq('doc_type', 'announcement')
         .order('created_at', { ascending: false }),
       supabase.from('announcement_reads')
@@ -47,13 +47,14 @@ export default function Announcements() {
     setSaving(true)
     try {
       const { error } = await supabase.from('governance_documents').insert([{
-        id:           crypto.randomUUID(),
-        doc_type:     'announcement',
-        title:        form.title,
-        body:         form.body,
-        priority:     form.priority,
-        published_by: user.id,
-        created_at:   new Date().toISOString(),
+        id:                crypto.randomUUID(),
+        doc_type:          'announcement',
+        title:             form.title,
+        body:              form.body,
+        priority:          form.priority,
+        published_by:      user.id,
+        published_by_name: user.full_name || user.username || '',
+        created_at:        new Date().toISOString(),
       }])
       if (error) throw error
       toast.success('Announcement published')
@@ -102,7 +103,7 @@ export default function Announcements() {
           {docs.map(doc => {
             const pc    = PRIORITY_CONFIG[doc.priority] || PRIORITY_CONFIG.normal
             const isNew = !reads.has(doc.id)
-            const author = doc.app_users?.full_name || doc.app_users?.username || 'Unknown'
+            const author = doc.published_by_name || 'Unknown'
             return (
               <div key={doc.id} className="card"
                 style={{ padding: 20, borderLeft: `4px solid ${pc.color}`, cursor: isNew ? 'pointer' : 'default', opacity: isNew ? 1 : 0.85 }}

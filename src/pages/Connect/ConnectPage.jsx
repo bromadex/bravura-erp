@@ -28,12 +28,21 @@ export default function ConnectPage() {
   const messagesEndRef = useRef(null)
   const inputRef       = useRef(null)
 
-  // ── Load all system users for new-conversation picker ──────────
+  // ── Load all system users (picker + sender name lookup) ────────
+  const [userMap, setUserMap] = useState({})
   useEffect(() => {
     supabase.from('app_users').select('id, full_name, username, role_id')
       .order('full_name')
-      .then(({ data }) => { if (data) setAllUsers(data.filter(u => u.id !== user.id)) })
-  }, [user.id])
+      .then(({ data }) => {
+        if (data) {
+          setAllUsers(data.filter(u => u.id !== user.id))
+          const map = {}
+          data.forEach(u => { map[u.id] = u.full_name || u.username || 'Unknown' })
+          map[user.id] = user.full_name || user.username || 'Me'
+          setUserMap(map)
+        }
+      })
+  }, [user.id, user.full_name, user.username])
 
   // ── Load conversations ─────────────────────────────────────────
   const loadConversations = useCallback(async () => {
@@ -59,13 +68,13 @@ export default function ConnectPage() {
     setLoadingMsgs(true)
     const [mRes, pRes] = await Promise.all([
       supabase.from('chat_messages')
-        .select('*, app_users(full_name, username)')
+        .select('id, conversation_id, sender_id, body, is_deleted, created_at')
         .eq('conversation_id', convId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true })
         .limit(200),
       supabase.from('chat_participants')
-        .select('user_id, app_users(full_name, username)')
+        .select('user_id')
         .eq('conversation_id', convId),
     ])
     if (mRes.data) setMessages(mRes.data)
@@ -87,12 +96,8 @@ export default function ConnectPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'chat_messages',
         filter: `conversation_id=eq.${selectedId}`,
-      }, async (payload) => {
-        const msg = payload.new
-        // Fetch sender info
-        const { data: sender } = await supabase.from('app_users')
-          .select('full_name, username').eq('id', msg.sender_id).single()
-        setMessages(prev => [...prev, { ...msg, app_users: sender }])
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new])
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -198,9 +203,8 @@ export default function ConnectPage() {
   const getConvName = (conv) => {
     if (conv.type === 'group') return conv.name || 'Group Chat'
     const otherPart = conv.chat_participants?.find(p => p.user_id !== user.id)
-    if (!otherPart) return 'Unknown'
-    const other = allUsers.find(u => u.id === otherPart.user_id)
-    return other?.full_name || other?.username || 'Unknown'
+    if (!otherPart) return 'Direct Message'
+    return userMap[otherPart.user_id] || allUsers.find(u => u.id === otherPart.user_id)?.full_name || 'Unknown'
   }
 
   const getConvInitial = (conv) => {
@@ -211,9 +215,10 @@ export default function ConnectPage() {
   const getLastMsg = (conv) => {
     const msgs = conv.chat_messages
     if (!msgs?.length) return { text: 'No messages yet', time: '' }
-    const last = msgs.reduce((a, b) => a.created_at > b.created_at ? a : b)
-    const text = last.sender_id === user.id ? `You: ${last.body}` : last.body
-    return { text: text.slice(0, 45) + (text.length > 45 ? '…' : ''), time: formatTime(last.created_at) }
+    const last = [...msgs].sort((a, b) => a.created_at > b.created_at ? -1 : 1)[0]
+    const prefix = last.sender_id === user.id ? 'You: ' : ''
+    const text   = prefix + (last.body || '')
+    return { text: text.slice(0, 48) + (text.length > 48 ? '…' : ''), time: formatTime(last.created_at) }
   }
 
   const formatTime = (ts) => {
@@ -340,7 +345,7 @@ export default function ConnectPage() {
                     const isMine    = msg.sender_id === user.id
                     const prevMsg   = idx > 0 ? msgs[idx - 1] : null
                     const showName  = !isMine && msg.sender_id !== prevMsg?.sender_id
-                    const senderName = msg.app_users?.full_name || msg.app_users?.username || 'Unknown'
+                    const senderName = userMap[msg.sender_id] || 'Unknown'
                     return (
                       <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
                         {showName && (

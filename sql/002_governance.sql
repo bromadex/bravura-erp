@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS governance_documents (
   version                  TEXT,                    -- policies: version number
   is_mandatory_onboarding  BOOLEAN DEFAULT FALSE,   -- code_of_ethics gate
   published_by             TEXT,                    -- references app_users.id (TEXT)
+  published_by_name        TEXT,                    -- denormalized: full_name at time of publish
   created_at               TIMESTAMPTZ DEFAULT NOW(),
   updated_at               TIMESTAMPTZ
 );
