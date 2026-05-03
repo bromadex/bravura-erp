@@ -30,7 +30,7 @@ export default function TransferRoomModal({ assignment, onClose }) {
         assignmentId: assignment.id,
         newRoomId,
         reason,
-        processedBy: user?.full_name || user?.username,
+        processedBy: user?.name || user?.username,
       })
       toast.success(`Transferred — ${code}`)
       onClose()
@@ -60,10 +60,10 @@ export default function TransferRoomModal({ assignment, onClose }) {
           {/* Who + from where */}
           <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#0b0f1a', flexShrink: 0 }}>
-              {(assignment.employees?.full_name || '?').charAt(0)}
+              {(assignment.employees?.name || '?').charAt(0)}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>{assignment.employees?.full_name}</div>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{assignment.employees?.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                 Currently in <span style={{ color: 'var(--gold)', fontFamily: 'var(--mono)', fontWeight: 700 }}>{currentRoom?.code || '—'}</span>
               </div>
