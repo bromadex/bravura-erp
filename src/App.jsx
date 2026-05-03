@@ -20,16 +20,25 @@ import PermissionRoute from './components/PermissionRoute'
 import AccessDenied    from './pages/Errors/AccessDenied'
 import ChangePassword  from './pages/ChangePassword'
 
-// ── Governance (public routes — no module layout needed) ──────
-import EthicsGate    from './pages/Governance/EthicsGate'
-import Announcements from './pages/Governance/Announcements'
-import Policies      from './pages/Governance/Policies'
+// ── Governance ────────────────────────────────────────────────
+import EthicsGate        from './pages/Governance/EthicsGate'
+import GovAnnouncements  from './pages/Governance/Announcements'
+import GovMemos          from './pages/Governance/Memos'
+import GovPolicies       from './pages/Governance/Policies'
+import GovCodeOfEthics   from './pages/Governance/CodeOfEthics'
 
 // ── Campsite ──────────────────────────────────────────────────
-import CampOverview    from './pages/Campsite/CampOverview'
-import CampBlocks      from './pages/Campsite/CampBlocks'
-import CampRooms       from './pages/Campsite/CampRooms'
-import CampAssignments from './pages/Campsite/CampAssignments'
+import CampOverview      from './pages/Campsite/CampOverview'
+import CampBlocks        from './pages/Campsite/CampBlocks'
+import CampRooms         from './pages/Campsite/CampRooms'
+import CampAssignments   from './pages/Campsite/CampAssignments'
+import CampStock         from './pages/Campsite/CampStock'
+import CampConsumption   from './pages/Campsite/CampConsumption'
+import CampPPERegister   from './pages/Campsite/CampPPERegister'
+import CampHeadcount     from './pages/Campsite/CampHeadcount'
+
+// ── Connect ───────────────────────────────────────────────────
+import ConnectPage from './pages/Connect/ConnectPage'
 
 // ── Notifications ─────────────────────────────────────────────
 import NotificationCenter from './pages/Notifications/NotificationCenter'
@@ -293,20 +302,26 @@ function AppRoutes() {
       <Route path="/module/campsite" element={
         <ProtectedRoute>
           <PermissionRoute module="campsite" page="overview">
-            <CampsiteProvider>
-              <Layout module="campsite" />
-            </CampsiteProvider>
+            <LogisticsProvider>
+              <CampsiteProvider>
+                <Layout module="campsite" />
+              </CampsiteProvider>
+            </LogisticsProvider>
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index            element={<CampOverview />}    />
-        <Route path="overview"  element={<CampOverview />}    />
-        <Route path="blocks"    element={<CampBlocks />}      />
-        <Route path="rooms"     element={<CampRooms />}       />
+        <Route index              element={<CampOverview />}    />
+        <Route path="overview"    element={<CampOverview />}    />
+        <Route path="blocks"      element={<CampBlocks />}      />
+        <Route path="rooms"       element={<CampRooms />}       />
         <Route path="assignments" element={<CampAssignments />} />
+        <Route path="camp-stock"  element={<CampStock />}       />
+        <Route path="consumption" element={<CampConsumption />} />
+        <Route path="ppe-register" element={<CampPPERegister />} />
+        <Route path="headcount"   element={<CampHeadcount />}   />
       </Route>
 
-      {/* ── GOVERNANCE ─────────────────��─────────────────── */}
+      {/* ── GOVERNANCE ─────────────────────────────────────── */}
       <Route path="/module/governance" element={
         <ProtectedRoute>
           <PermissionRoute module="governance" page="announcements">
@@ -314,9 +329,11 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index                  element={<Announcements />} />
-        <Route path="announcements"   element={<Announcements />} />
-        <Route path="policies"        element={<Policies />}      />
+        <Route index                 element={<GovAnnouncements />} />
+        <Route path="announcements"  element={<GovAnnouncements />} />
+        <Route path="memos"          element={<GovMemos />}         />
+        <Route path="policies"       element={<GovPolicies />}      />
+        <Route path="code-of-ethics" element={<GovCodeOfEthics />}  />
       </Route>
 
       {/* Ethics gate — outside normal module layout */}
@@ -341,16 +358,14 @@ function AppRoutes() {
         </Route>
       ))}
 
-      {/* ── CONNECT (placeholder) ────────────────────────── */}
+      {/* ── CONNECT ──────────────────────────────────────── */}
       <Route path="/module/connect" element={
         <ProtectedRoute>
           <Layout module="connect" />
         </ProtectedRoute>
       }>
-        <Route index        element={<ModulePlaceholder module="connect" page="feed"          />} />
-        <Route path="feed"  element={<ModulePlaceholder module="connect" page="feed"          />} />
-        <Route path="chats" element={<ModulePlaceholder module="connect" page="chats"         />} />
-        <Route path="announcements" element={<ModulePlaceholder module="connect" page="announcements" />} />
+        <Route index        element={<ConnectPage />} />
+        <Route path="chats" element={<ConnectPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
