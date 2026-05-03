@@ -152,25 +152,28 @@ export default function CampOverview() {
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{blockRooms.length} room{blockRooms.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Airline seat plan: 2 columns per row, colour-coded */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 480 }}>
-              {blockRooms.map(room => {
+            {/* Airline seat plan: 2 columns per row, ordered, colour-coded */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 520 }}>
+              {blockRooms
+                .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }))
+                .map(room => {
                 const status    = getRoomStatus(room.id)
                 const color     = STATUS_COLOR[status]
                 const occupants = assignments.filter(a =>
                   a.room_id === room.id && a.status !== 'checked_out' && a.status !== 'transferred'
                 )
                 const isStore = room.room_purpose === 'storeroom'
+                const cap     = room.capacity || 1
                 return (
                   <button
                     key={room.id}
                     onClick={() => setSelectedRoomId(room.id)}
-                    title={`${room.code} — ${STATUS_LABEL[status]}\n${occupants.map(a => a.employees?.name || '?').join(', ')}`}
-                    style={{ background: `${color}15`, border: `2px solid ${color}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, minHeight: 72, textAlign: 'left' }}
+                    title={`${room.code} — ${isStore ? 'Storeroom' : STATUS_LABEL[status]}\n${occupants.map(a => a.employees?.name || '?').join(', ')}`}
+                    style={{ background: `${color}15`, border: `2px solid ${color}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, minHeight: 76, textAlign: 'left' }}
                     onMouseOver={e => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = `0 4px 16px ${color}33` }}
                     onMouseOut={e  => { e.currentTarget.style.transform = '';            e.currentTarget.style.boxShadow = '' }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--gold)', fontFamily: 'var(--mono)' }}>{room.code}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 13, color: 'var(--gold)' }}>{room.code}</div>
                     <div style={{ fontSize: 9, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       {isStore ? 'Storeroom' : STATUS_LABEL[status]}
                     </div>
@@ -178,18 +181,18 @@ export default function CampOverview() {
                       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                         {occupants.map((a, i) => {
                           const nm = a.employees?.name || '?'
-                          const initials = nm.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                          const initials = nm.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
                           return (
-                            <div key={i} style={{ width: 20, height: 20, borderRadius: '50%', background: color, color: '#0b0f1a', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div key={i} title={nm} style={{ width: 20, height: 20, borderRadius: '50%', background: color, color: '#0b0f1a', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {initials}
                             </div>
                           )
                         })}
                       </div>
                     )}
-                    {!isStore && room.capacity > 0 && (
+                    {!isStore && cap > 0 && (
                       <div style={{ display: 'flex', gap: 3, marginTop: 'auto' }}>
-                        {Array.from({ length: room.capacity }).map((_, i) => (
+                        {Array.from({ length: cap }).map((_, i) => (
                           <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i < occupants.length ? color : 'var(--border2)' }} />
                         ))}
                       </div>
