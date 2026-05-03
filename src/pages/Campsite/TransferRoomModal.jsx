@@ -30,7 +30,7 @@ export default function TransferRoomModal({ assignment, onClose }) {
         assignmentId: assignment.id,
         newRoomId,
         reason,
-        processedBy: user?.name || user?.username,
+        processedBy: user?.full_name || user?.username,
       })
       toast.success(`Transferred — ${code}`)
       onClose()
