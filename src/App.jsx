@@ -12,6 +12,7 @@ import { FleetProvider }           from './contexts/FleetContext'
 import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
+import { AccountingProvider }      from './contexts/AccountingContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
@@ -92,6 +93,16 @@ import Travel          from './pages/HR/Travel'
 import Payroll         from './pages/HR/Payroll'
 import TimesheetSummary from './pages/HR/TimesheetSummary'
 
+// ── Accounting ────────────────────────────────────────────────
+import ChartOfAccounts  from './pages/Accounting/ChartOfAccounts'
+import JournalEntries   from './pages/Accounting/JournalEntries'
+import FinancialReports from './pages/Accounting/FinancialReports'
+
+// ── Reports ───────────────────────────────────────────────────
+import ReportsOverview from './pages/Reports/ReportsOverview'
+import AuditTrail      from './pages/Reports/AuditTrail'
+import Drafts          from './pages/Reports/Drafts'
+
 // ── Logistics ─────────────────────────────────────────────────
 import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
 import CampManagement      from './pages/Logistics/CampManagement'
@@ -144,11 +155,8 @@ function ModulePlaceholder({ module, page }) {
   )
 }
 
-// Only true placeholder modules (Logistics is now real)
-const OTHER_MODULES = [
-  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
-  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                 },
-]
+// No more placeholder modules — all are implemented
+const OTHER_MODULES = []
 
 // ───────────────────────────────────────────────────────────────
 // Routes
@@ -357,6 +365,36 @@ function AppRoutes() {
           ))}
         </Route>
       ))}
+
+      {/* ── ACCOUNTING ───────────────────────────────────── */}
+      <Route path="/module/accounting" element={
+        <ProtectedRoute>
+          <PermissionRoute module="accounting" page="chart-of-accounts">
+            <AccountingProvider>
+              <Layout module="accounting" />
+            </AccountingProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                    element={<ChartOfAccounts />}  />
+        <Route path="chart-of-accounts" element={<ChartOfAccounts />}  />
+        <Route path="journal-entries"   element={<JournalEntries />}   />
+        <Route path="reports"           element={<FinancialReports />} />
+      </Route>
+
+      {/* ── REPORTS ──────────────────────────────────────── */}
+      <Route path="/module/reports" element={
+        <ProtectedRoute>
+          <PermissionRoute module="reports" page="overview">
+            <Layout module="reports" />
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index           element={<ReportsOverview />} />
+        <Route path="overview" element={<ReportsOverview />} />
+        <Route path="audit-log" element={<AuditTrail />}    />
+        <Route path="drafts"    element={<Drafts />}         />
+      </Route>
 
       {/* ── CONNECT ──────────────────────────────────────── */}
       <Route path="/module/connect" element={

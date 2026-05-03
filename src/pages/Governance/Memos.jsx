@@ -24,7 +24,7 @@ export default function Memos() {
     setLoading(true)
     const [mRes, rRes] = await Promise.all([
       supabase.from('governance_documents')
-        .select('*, app_users(full_name, username)')
+        .select('id, txn_code, title, body, category, published_by_name, created_at')
         .eq('doc_type', 'memo')
         .order('created_at', { ascending: false }),
       supabase.from('announcement_reads')
@@ -44,14 +44,15 @@ export default function Memos() {
     try {
       const txnCode = await generateTxnCode('MO')
       const { error } = await supabase.from('governance_documents').insert([{
-        id:           crypto.randomUUID(),
-        doc_type:     'memo',
-        txn_code:     txnCode,
-        title:        form.title,
-        body:         form.body,
-        category:     form.category,
-        published_by: user.id,
-        created_at:   new Date().toISOString(),
+        id:                crypto.randomUUID(),
+        doc_type:          'memo',
+        txn_code:          txnCode,
+        title:             form.title,
+        body:              form.body,
+        category:          form.category,
+        published_by:      user.id,
+        published_by_name: user.full_name || user.username || '',
+        created_at:        new Date().toISOString(),
       }])
       if (error) throw error
       toast.success(`Memo issued — ${txnCode}`)
@@ -102,7 +103,7 @@ export default function Memos() {
           {memos.map(doc => {
             const isNew    = !reads.has(doc.id)
             const isOpen   = expanded === doc.id
-            const author   = doc.app_users?.full_name || doc.app_users?.username || 'Unknown'
+            const author   = doc.published_by_name || 'Unknown'
             return (
               <div key={doc.id} className="card" style={{ overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
