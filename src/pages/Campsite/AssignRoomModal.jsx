@@ -1,10 +1,16 @@
 // src/pages/Campsite/AssignRoomModal.jsx
 //
-// FIXES:
-// 1. .neq('status','Terminated') — employees stored as 'Active' not 'active'
-// 2. Selects 'name' and 'employee_number', not 'full_name' and 'bra_number'
-// 3. Shared rooms (capacity >= 2) show an optional second employee slot
-// 4. Both employees assigned via separate assignRoom() calls
+// ROOT CAUSE FIX for "No employees found":
+//   OLD: .eq('status', 'active')   → employees stored as 'Active' (capital A) → 0 results
+//   FIX: .neq('status','Terminated') → matches Active, On Leave, Suspended
+//
+// COLUMN NAME FIX:
+//   OLD: full_name, bra_number  → columns don't exist → silent null
+//   FIX: name, employee_number  → actual column names in employees table
+//
+// SHARED ROOM SUPPORT:
+//   Rooms with capacity >= 2 show a second optional employee slot.
+//   Both are assigned via separate assignRoom() calls.
 
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,14 +18,18 @@ import { useCampsite } from '../../contexts/CampsiteContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
-const S = { width: '100%', padding: '9px 11px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }
+const S = {
+  width: '100%', padding: '9px 11px',
+  background: 'var(--surface2)', border: '1px solid var(--border)',
+  borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box',
+}
 
 export default function AssignRoomModal({ onClose, prefillEmployee = null, prefillRoom = null }) {
   const { user } = useAuth()
   const { blocks, rooms, assignments, getRoomStatus, STATUS_LABEL, assignRoom } = useCampsite()
 
   const [employees,   setEmployees]   = useState([])
-  const [loadingEmps, setLoadingEmps] = useState(true)
+  const [loading,     setLoading]     = useState(true)
   const [emp1,        setEmp1]        = useState(prefillEmployee || '')
   const [emp2,        setEmp2]        = useState('')
   const [roomId,      setRoomId]      = useState(prefillRoom || '')
@@ -27,17 +37,17 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
   const [notes,       setNotes]       = useState('')
   const [saving,      setSaving]      = useState(false)
 
-  // FIX: status stored as 'Active' not 'active' — use neq Terminated to catch all active employees
+  // THE FIX: use .neq('status','Terminated') and correct column names
   useEffect(() => {
     supabase
       .from('employees')
-      .select('id, name, employee_number, gender, status')
+      .select('id, name, employee_number, gender, status, department_id')
       .neq('status', 'Terminated')
       .order('name')
       .then(({ data, error }) => {
-        if (error) console.error('Employees fetch error:', error.message)
+        if (error) console.error('Employee fetch error:', error.message)
         setEmployees(data || [])
-        setLoadingEmps(false)
+        setLoading(false)
       })
   }, [])
 
@@ -45,25 +55,33 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
   const capacity = room?.capacity ?? 1
   const isShared = capacity >= 2 && room?.room_purpose !== 'storeroom'
 
-  const occupants     = useMemo(() => assignments.filter(a => a.room_id === roomId && a.status !== 'checked_out' && a.status !== 'transferred'), [assignments, roomId])
-  const slotsLeft     = capacity - occupants.length
-  const takenIds      = useMemo(() => new Set(assignments.filter(a => a.status !== 'checked_out' && a.status !== 'transferred').map(a => a.employee_id)), [assignments])
+  const occupants = useMemo(() =>
+    assignments.filter(a => a.room_id === roomId && a.status !== 'checked_out' && a.status !== 'transferred'),
+    [assignments, roomId]
+  )
+  const slotsLeft = capacity - occupants.length
+
+  // Employees already in an active room
+  const takenIds = useMemo(() =>
+    new Set(assignments.filter(a => a.status !== 'checked_out' && a.status !== 'transferred').map(a => a.employee_id)),
+    [assignments]
+  )
 
   const errors = useMemo(() => {
     const e = []
     if (!roomId) return e
     const s = getRoomStatus(roomId)
-    if (s === 'maintenance')              e.push('Room is under maintenance.')
-    if (slotsLeft <= 0)                   e.push('Room is at full capacity.')
+    if (s === 'maintenance') e.push('Room is under maintenance and cannot be assigned.')
+    else if (slotsLeft <= 0) e.push('Room is at full capacity.')
     if (emp1 && takenIds.has(emp1)) {
       const n = employees.find(x => x.id === emp1)?.name || 'Employee 1'
-      e.push(`${n} already has an active room assignment. Use Transfer instead.`)
+      e.push(`${n} already has an active assignment. Use Transfer instead.`)
     }
     if (emp2 && takenIds.has(emp2)) {
       const n = employees.find(x => x.id === emp2)?.name || 'Employee 2'
-      e.push(`${n} already has an active room assignment. Use Transfer instead.`)
+      e.push(`${n} already has an active assignment. Use Transfer instead.`)
     }
-    if (emp1 && emp2 && emp1 === emp2)    e.push('Same employee selected in both slots.')
+    if (emp1 && emp2 && emp1 === emp2) e.push('Same employee selected twice.')
     return e
   }, [roomId, emp1, emp2, takenIds, employees, slotsLeft, getRoomStatus])
 
@@ -74,7 +92,7 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
       [emp1, emp2].filter(Boolean).forEach(id => {
         const e = employees.find(x => x.id === id)
         if (e?.gender && e.gender.toLowerCase() !== room.gender_policy.toLowerCase())
-          w.push(`${e.name} (${e.gender}) — room is ${room.gender_policy} only.`)
+          w.push(`${e.name} is ${e.gender} — room policy is ${room.gender_policy} only.`)
       })
     }
     return w
@@ -93,14 +111,17 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
         const c2 = await assignRoom({ employeeId: emp2, ...args })
         codes.push(c2)
       }
-      toast.success(`Assigned — ${codes.join(', ')}`)
+      toast.success(`Room assigned — ${codes.join(', ')}`)
       onClose()
     } catch (err) { toast.error(err.message) }
     finally { setSaving(false) }
   }
 
-  const available = rooms.filter(r => r.room_purpose !== 'storeroom' && !['maintenance','full'].includes(getRoomStatus(r.id)))
-  const lbl       = (x) => `${x.name} (${x.employee_number || '—'})`
+  const available = rooms.filter(r =>
+    r.room_purpose !== 'storeroom' &&
+    !['maintenance', 'full'].includes(getRoomStatus(r.id))
+  )
+  const lbl = (x) => `${x.name} (${x.employee_number || '—'})`
 
   return (
     <>
@@ -119,17 +140,17 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
         <form onSubmit={handleSubmit} style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {errors.map((m, i) => (
-            <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--red)', fontSize: 12, display: 'flex', gap: 6 }}>
+            <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--red)', fontSize: 12, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
               <span className="material-icons" style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }}>error</span>{m}
             </div>
           ))}
           {warns.map((m, i) => (
-            <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', color: 'var(--yellow)', fontSize: 12, display: 'flex', gap: 6 }}>
+            <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', color: 'var(--yellow)', fontSize: 12, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
               <span className="material-icons" style={{ fontSize: 14, marginTop: 1, flexShrink: 0 }}>warning</span>{m}
             </div>
           ))}
 
-          {/* Room */}
+          {/* Room — select first so capacity determines slots */}
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>ROOM *</label>
             <select required value={roomId} onChange={e => { setRoomId(e.target.value); setEmp2('') }} style={S}>
@@ -139,7 +160,7 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
                 if (!br.length) return null
                 return (
                   <optgroup key={b.id} label={b.name}>
-                    {br.map(r => {
+                    {br.sort((a, z) => a.code.localeCompare(z.code, undefined, { numeric: true })).map(r => {
                       const occ  = assignments.filter(a => a.room_id === r.id && a.status !== 'checked_out' && a.status !== 'transferred').length
                       const free = (r.capacity || 1) - occ
                       return <option key={r.id} value={r.id}>{r.code} — {STATUS_LABEL[getRoomStatus(r.id)]} · {free} slot{free !== 1 ? 's' : ''} free</option>
@@ -149,10 +170,11 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
               })}
             </select>
             {room && (
-              <div style={{ marginTop: 5, fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: 14 }}>
+              <div style={{ marginTop: 5, fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 <span>Capacity: <strong style={{ color: 'var(--text)' }}>{room.capacity}</strong></span>
-                <span>Free slots: <strong style={{ color: slotsLeft > 0 ? 'var(--green)' : 'var(--red)' }}>{slotsLeft}</strong></span>
+                <span>Free: <strong style={{ color: slotsLeft > 0 ? 'var(--green)' : 'var(--red)' }}>{slotsLeft}</strong></span>
                 {room.gender_policy !== 'mixed' && <span style={{ color: 'var(--yellow)', textTransform: 'capitalize' }}>{room.gender_policy} only</span>}
+                {room.room_purpose === 'supervisor' && <span style={{ color: 'var(--gold)' }}>Supervisor Room</span>}
               </div>
             )}
           </div>
@@ -162,14 +184,15 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
               {isShared ? 'EMPLOYEE 1 *' : 'EMPLOYEE *'}
             </label>
-            {loadingEmps ? (
+            {loading ? (
               <div style={{ ...S, color: 'var(--text-dim)' }}>Loading employees…</div>
             ) : employees.length === 0 ? (
-              <div style={{ ...S, color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', fontSize: 12 }}>
-                No employees found. Check employees exist with Active / On Leave / Suspended status.
+              <div style={{ ...S, color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', fontSize: 12, lineHeight: 1.4 }}>
+                No employees found. Ensure employees are created in HR with Active, On Leave, or Suspended status.
               </div>
             ) : (
-              <select required value={emp1} onChange={e => setEmp1(e.target.value)} style={{ ...S, border: `1px solid ${takenIds.has(emp1) && emp1 ? 'var(--red)' : 'var(--border)'}` }}>
+              <select required value={emp1} onChange={e => setEmp1(e.target.value)}
+                style={{ ...S, border: `1px solid ${takenIds.has(emp1) && emp1 ? 'var(--red)' : 'var(--border)'}` }}>
                 <option value="">Select employee…</option>
                 {employees.filter(e => e.id !== emp2).map(e => (
                   <option key={e.id} value={e.id} disabled={takenIds.has(e.id)}>
@@ -180,13 +203,14 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
             )}
           </div>
 
-          {/* Employee 2 — only for shared rooms with spare capacity */}
+          {/* Employee 2 — only shown for shared rooms with ≥2 slots */}
           {isShared && slotsLeft >= 2 && (
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
-                EMPLOYEE 2 <span style={{ fontWeight: 400, color: 'var(--text-dim)' }}>(optional)</span>
+                EMPLOYEE 2 <span style={{ fontWeight: 400 }}>(optional)</span>
               </label>
-              <select value={emp2} onChange={e => setEmp2(e.target.value)} style={{ ...S, border: `1px solid ${takenIds.has(emp2) && emp2 ? 'var(--red)' : 'var(--border)'}` }}>
+              <select value={emp2} onChange={e => setEmp2(e.target.value)}
+                style={{ ...S, border: `1px solid ${takenIds.has(emp2) && emp2 ? 'var(--red)' : 'var(--border)'}` }}>
                 <option value="">— Assign 1 person only —</option>
                 {employees.filter(e => e.id !== emp1).map(e => (
                   <option key={e.id} value={e.id} disabled={takenIds.has(e.id)}>
@@ -226,7 +250,6 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
               {saving ? 'Assigning…' : `Assign Room${emp2 ? ' (2 people)' : ''}`}
             </button>
           </div>
-
         </form>
       </div>
     </>
