@@ -127,15 +127,22 @@ const ALL_MODULES = {
           { id: 'blocks',      label: 'Blocks',      icon: 'domain'         },
         ],
       },
+      {
+        label: 'Camp Supplies',
+        pages: [
+          { id: 'camp-stock',   label: 'Stock Levels',          icon: 'inventory_2' },
+          { id: 'consumption',  label: 'Consumption Analytics', icon: 'analytics'   },
+          { id: 'ppe-register', label: 'PPE Register',          icon: 'security'    },
+          { id: 'headcount',    label: 'Headcount',             icon: 'people'      },
+        ],
+      },
     ],
   },
   connect: {
     label: 'Connect', icon: 'forum', color: '#67e8f9',
     sections: [{
-      label: 'Communications', pages: [
-        { id: 'feed',          label: 'Feed',          icon: 'dynamic_feed'  },
-        { id: 'chats',         label: 'Chats',         icon: 'chat'          },
-        { id: 'announcements', label: 'Announcements', icon: 'campaign'      },
+      label: 'Messaging', pages: [
+        { id: 'chats', label: 'Messages', icon: 'chat' },
       ],
     }],
   },
@@ -143,8 +150,10 @@ const ALL_MODULES = {
     label: 'Governance', icon: 'policy', color: '#fcd34d',
     sections: [{
       label: 'Compliance', pages: [
-        { id: 'announcements', label: 'Announcements', icon: 'campaign'    },
-        { id: 'policies',      label: 'Policies',      icon: 'description' },
+        { id: 'announcements', label: 'Announcements',    icon: 'campaign'    },
+        { id: 'memos',         label: 'Memos',            icon: 'mail'        },
+        { id: 'policies',      label: 'Policies & Rules', icon: 'description' },
+        { id: 'code-of-ethics', label: 'Code of Ethics',  icon: 'verified'    },
       ],
     }],
   },

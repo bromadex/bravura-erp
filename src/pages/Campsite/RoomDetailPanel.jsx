@@ -34,7 +34,7 @@ export default function RoomDetailPanel({ roomId, onClose }) {
   const slotsLeft = cap - activeAssignments.length
 
   const [activeTab,    setActiveTab]    = useState('Occupants')
-  const [maintNotes,   setMaintNotes]   = useState(room?.maintenance_notes || '')
+  const [maintNotes,   setMaintNotes]   = useState(room?.maintenance_reason || '')
   const [savingMaint,  setSavingMaint]  = useState(false)
   const [vacating,     setVacating]     = useState(null)
   const [vacateNotes,  setVacateNotes]  = useState('')

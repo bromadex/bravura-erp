@@ -143,18 +143,18 @@ export function CampsiteProvider({ children }) {
   const flagMaintenance = async (roomId, isMaintenance, notes = '') => {
     const txnCode = isMaintenance ? await generateTxnCode('CM') : null
     const { error } = await supabase.from('camp_rooms').update({
-      is_maintenance:      isMaintenance,
-      maintenance_notes:   notes,
-      maintenance_flagged: isMaintenance ? new Date().toISOString() : null,
+      is_maintenance:    isMaintenance,
+      maintenance_reason: notes,
+      maintenance_since:  isMaintenance ? new Date().toISOString() : null,
     }).eq('id', roomId)
     if (error) throw error
 
     if (isMaintenance && txnCode) {
-      await supabase.from('room_maintenance').insert([{
+      await supabase.from('camp_maintenance_flags').insert([{
         id:         crypto.randomUUID(),
         txn_code:   txnCode,
         room_id:    roomId,
-        notes,
+        reason:     notes,
         created_at: new Date().toISOString(),
       }])
     }
@@ -187,7 +187,7 @@ export function CampsiteProvider({ children }) {
       room_id:     roomId,
       start_date:  startDate,
       status:      'active',
-      check_in_notes: notes || null,
+      checkin_notes: notes || null,
       processed_by:   processedBy || null,
       created_at:  new Date().toISOString(),
     }])
@@ -262,9 +262,9 @@ export function CampsiteProvider({ children }) {
     const cvCode = await generateTxnCode('CV')
 
     await supabase.from('room_assignments').update({
-      status:          'checked_out',
-      end_date:        new Date().toISOString().split('T')[0],
-      check_out_notes: checkOutNotes || null,
+      status:         'checked_out',
+      end_date:       new Date().toISOString().split('T')[0],
+      checkout_notes: checkOutNotes || null,
     }).eq('id', assignmentId)
 
     await supabase.from('room_vacates').insert([{
