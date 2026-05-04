@@ -9,10 +9,11 @@
 // 5. Better view modal layout
 // 6. Stock impact summary on the new GRN form (live total value, items count)
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function GoodsReceived() {
@@ -249,8 +250,11 @@ export default function GoodsReceived() {
               </div>
               <div className="form-group">
                 <label>RECEIVED BY</label>
-                <input className="form-control" value={form.received_by}
-                  onChange={e => setForm(f => ({ ...f, received_by: e.target.value }))} />
+                <select className="form-control" value={form.received_by}
+                  onChange={e => setForm(f => ({ ...f, received_by: e.target.value }))}>
+                  <option value="">— Select employee —</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name} ({emp.employee_number})</option>)}
+                </select>
               </div>
 
               <div style={{ margin: '16px 0 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
