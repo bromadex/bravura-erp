@@ -1,7 +1,7 @@
 // src/pages/Fuel/FuelDeliveries.jsx
 // Modern redesign: KPIs, search, filter, edit/delete, Excel export
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
@@ -22,6 +22,12 @@ export default function FuelDeliveries() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFrom,   setDateFrom]   = useState('')
   const [dateTo,     setDateTo]     = useState('')
+
+  const [suppliers, setSuppliers] = useState([])
+  useEffect(() => {
+    supabase.from('suppliers').select('id, name').eq('status', 'Active').order('name')
+      .then(({ data }) => { if (data) setSuppliers(data) })
+  }, [])
 
   const BLANK = { date: today, fuel_type: 'DIESEL', qty: '', supplier: '', dip_before: '', dip_after: '', delivery_note: '', notes: '' }
   const [form, setForm] = useState(BLANK)
@@ -217,8 +223,11 @@ export default function FuelDeliveries() {
                 </div>
                 <div className="form-group">
                   <label>Supplier</label>
-                  <input className="form-control" value={form.supplier}
-                    onChange={e => setForm({ ...form, supplier: e.target.value })} />
+                  <select className="form-control" value={form.supplier}
+                    onChange={e => setForm({ ...form, supplier: e.target.value })}>
+                    <option value="">— Select supplier —</option>
+                    {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="form-row">
