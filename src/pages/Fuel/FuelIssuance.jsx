@@ -360,8 +360,13 @@ export default function FuelIssuance() {
               <div className="form-row">
                 <div className="form-group">
                   <label>Authorized By</label>
-                  <input className="form-control" value={form.authorized_by}
-                    onChange={e => setForm({ ...form, authorized_by: e.target.value })} />
+                  <select className="form-control" value={form.authorized_by}
+                    onChange={e => setForm({ ...form, authorized_by: e.target.value })}>
+                    <option value="">— Select authoriser —</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.name}>{emp.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Purpose</label>
