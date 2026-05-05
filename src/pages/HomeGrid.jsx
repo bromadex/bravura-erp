@@ -108,7 +108,7 @@ export default function HomeGrid() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Notification bell */}
           <button
-            onClick={() => navigate('/module/notifications')}
+            onClick={() => navigate('/module/hr/leave')}
             style={{ position: 'relative', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}
             title="Notifications"
           >
