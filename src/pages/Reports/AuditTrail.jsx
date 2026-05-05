@@ -1,8 +1,11 @@
-// src/pages/Reports/AuditTrail.jsx — Cross-module transaction audit log
+// src/pages/Reports/AuditTrail.jsx
+// Queries hr_audit_logs which is the single audit table across all modules.
+// Columns: id, user_name, action, entity_type, entity_id, entity_name,
+//          module, txn_code, old_values, new_values, created_at
+
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
-import toast from 'react-hot-toast'
 
 const MODULE_COLOR = {
   inventory:   'var(--blue)',
@@ -11,9 +14,11 @@ const MODULE_COLOR = {
   fleet:       'var(--yellow)',
   hr:          'var(--green)',
   campsite:    'var(--teal)',
-  logistics:   'var(--orange)',
+  logistics:   '#f97316',
   accounting:  'var(--red)',
   governance:  '#818cf8',
+  connect:     'var(--teal)',
+  system:      'var(--text-dim)',
 }
 
 const MODULE_ICON = {
@@ -26,209 +31,158 @@ const MODULE_ICON = {
   logistics:   'local_shipping',
   accounting:  'receipt_long',
   governance:  'policy',
+  connect:     'forum',
+  system:      'settings',
 }
 
-const TODAY = new Date().toISOString().split('T')[0]
+const TODAY           = new Date().toISOString().split('T')[0]
 const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
 
 export default function AuditTrail() {
-  const [rows,    setRows]    = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search,  setSearch]  = useState('')
-  const [module,  setModule]  = useState('ALL')
+  const [rows,     setRows]     = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [search,   setSearch]   = useState('')
+  const [module,   setModule]   = useState('ALL')
   const [dateFrom, setDateFrom] = useState(THIRTY_DAYS_AGO)
   const [dateTo,   setDateTo]   = useState(TODAY)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      try {
-        // Pull recent transactions from multiple tables and merge them
-        const [invR, fuelR, procR, jeR, campsiteR] = await Promise.all([
-          supabase.from('stock_transactions')
-            .select('id, txn_code, txn_type, quantity, item_id, created_by, created_at, notes')
-            .gte('created_at', dateFrom).lte('created_at', dateTo + 'T23:59:59')
-            .order('created_at', { ascending: false }).limit(300),
+      let query = supabase
+        .from('hr_audit_logs')
+        .select('id, user_name, action, entity_type, entity_id, entity_name, module, txn_code, old_values, new_values, created_at')
+        .gte('created_at', dateFrom)
+        .lte('created_at', dateTo + 'T23:59:59')
+        .order('created_at', { ascending: false })
+        .limit(500)
 
-          supabase.from('fuel_transactions')
-            .select('id, txn_code, txn_type, quantity_liters, vehicle_id, issued_to, created_at, notes')
-            .gte('created_at', dateFrom).lte('created_at', dateTo + 'T23:59:59')
-            .order('created_at', { ascending: false }).limit(300),
+      if (module !== 'ALL') query = query.eq('module', module)
 
-          supabase.from('purchase_orders')
-            .select('id, po_number, status, total_amount, supplier_id, created_by, created_at, notes')
-            .gte('created_at', dateFrom).lte('created_at', dateTo + 'T23:59:59')
-            .order('created_at', { ascending: false }).limit(300),
-
-          supabase.from('journal_entries')
-            .select('id, entry_date, description, reference, total_debit, created_by, created_at')
-            .gte('created_at', dateFrom).lte('created_at', dateTo + 'T23:59:59')
-            .order('created_at', { ascending: false }).limit(300),
-
-          supabase.from('room_assignments')
-            .select('id, txn_code, status, employee_id, room_id, assigned_by, created_at, checkin_notes')
-            .gte('created_at', dateFrom).lte('created_at', dateTo + 'T23:59:59')
-            .order('created_at', { ascending: false }).limit(300),
-        ])
-
-        const merged = [
-          ...(invR.data || []).map(r => ({
-            id: r.id, module: 'inventory',
-            ref:    r.txn_code || r.id.slice(0, 8),
-            action: r.txn_type || 'Transaction',
-            detail: `Qty: ${r.quantity}`,
-            user:   r.created_by || '—',
-            notes:  r.notes || '',
-            ts:     r.created_at,
-          })),
-          ...(fuelR.data || []).map(r => ({
-            id: r.id, module: 'fuel',
-            ref:    r.txn_code || r.id.slice(0, 8),
-            action: r.txn_type || 'Fuel Transaction',
-            detail: `${r.quantity_liters}L`,
-            user:   r.issued_to || '—',
-            notes:  r.notes || '',
-            ts:     r.created_at,
-          })),
-          ...(procR.data || []).map(r => ({
-            id: r.id, module: 'procurement',
-            ref:    r.po_number || r.id.slice(0, 8),
-            action: `PO — ${r.status}`,
-            detail: r.total_amount ? `$${r.total_amount}` : '',
-            user:   r.created_by || '—',
-            notes:  r.notes || '',
-            ts:     r.created_at,
-          })),
-          ...(jeR.data || []).map(r => ({
-            id: r.id, module: 'accounting',
-            ref:    r.reference || r.id.slice(0, 8),
-            action: 'Journal Entry',
-            detail: r.description,
-            user:   r.created_by || '—',
-            notes:  '',
-            ts:     r.created_at,
-          })),
-          ...(campsiteR.data || []).map(r => ({
-            id: r.id, module: 'campsite',
-            ref:    r.txn_code || r.id.slice(0, 8),
-            action: `Room — ${r.status}`,
-            detail: r.checkin_notes || '',
-            user:   r.assigned_by || '—',
-            notes:  '',
-            ts:     r.created_at,
-          })),
-        ].sort((a, b) => new Date(b.ts) - new Date(a.ts))
-
-        setRows(merged)
-      } catch (err) {
-        console.error(err)
-        toast.error('Failed to load audit trail')
-      } finally {
-        setLoading(false)
-      }
+      const { data, error } = await query
+      if (error) console.error('Audit trail error:', error)
+      setRows(data || [])
+      setLoading(false)
     }
     load()
-  }, [dateFrom, dateTo])
-
-  const modules = useMemo(() => ['ALL', ...new Set(rows.map(r => r.module))], [rows])
+  }, [dateFrom, dateTo, module])
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return rows.filter(r => {
-      if (module !== 'ALL' && r.module !== module) return false
-      if (q && !r.ref.toLowerCase().includes(q) && !r.action.toLowerCase().includes(q) &&
-          !r.detail.toLowerCase().includes(q) && !r.user.toLowerCase().includes(q)) return false
-      return true
-    })
-  }, [rows, module, search])
+    if (!search) return rows
+    const t = search.toLowerCase()
+    return rows.filter(r =>
+      r.user_name?.toLowerCase().includes(t) ||
+      r.action?.toLowerCase().includes(t) ||
+      r.entity_name?.toLowerCase().includes(t) ||
+      r.entity_type?.toLowerCase().includes(t) ||
+      r.txn_code?.toLowerCase().includes(t)
+    )
+  }, [rows, search])
 
-  const exportXlsx = () => {
-    const data = [
-      ['Date/Time', 'Module', 'Reference', 'Action', 'Detail', 'User', 'Notes'],
-      ...filtered.map(r => [
-        new Date(r.ts).toLocaleString(), r.module, r.ref, r.action, r.detail, r.user, r.notes,
-      ]),
-    ]
-    const ws = XLSX.utils.aoa_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Audit Trail')
-    XLSX.writeFile(wb, `AuditTrail_${TODAY}.xlsx`)
-    toast.success('Exported')
+  const exportXLSX = () => {
+    const wb   = XLSX.utils.book_new()
+    const data  = filtered.map(r => ({
+      'Date/Time':   new Date(r.created_at).toLocaleString('en-GB'),
+      'User':        r.user_name || '—',
+      'Action':      r.action    || '—',
+      'Module':      r.module    || '—',
+      'Record Type': r.entity_type || '—',
+      'Record Name': r.entity_name || '—',
+      'Txn Code':    r.txn_code  || '—',
+    }))
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Audit Trail')
+    XLSX.writeFile(wb, `audit-trail-${TODAY}.xlsx`)
   }
 
+  const modules = ['ALL', 'hr', 'procurement', 'inventory', 'fuel', 'fleet', 'campsite', 'logistics', 'governance', 'accounting', 'connect', 'system']
+
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div>
+      <div className="page-header">
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 800 }}>Audit Trail</h2>
+          <h1 className="page-title">Audit Trail</h1>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{filtered.length} records shown</div>
         </div>
-        <button className="btn btn-secondary" onClick={exportXlsx}>
-          <span className="material-icons" style={{ fontSize: 16 }}>table_chart</span> Export
+        <button className="btn btn-secondary" onClick={exportXLSX}>
+          <span className="material-icons">table_view</span> Export
         </button>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input type="date" className="form-control" style={{ maxWidth: 140 }} value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)} />
-        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>to</span>
-        <input type="date" className="form-control" style={{ maxWidth: 140 }} value={dateTo}
-          onChange={e => setDateTo(e.target.value)} />
-        <input className="form-control" placeholder="Search…" style={{ maxWidth: 220 }}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+        <select className="form-control" style={{ width: 'auto' }}
+          value={dateFrom} onChange={e => setDateFrom(e.target.value)}>
+          {/* Using input instead for dates */}
+        </select>
+        <input type="date" className="form-control" style={{ width: 'auto' }}
+          value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <span style={{ lineHeight: '38px', color: 'var(--text-dim)', fontSize: 13 }}>to</span>
+        <input type="date" className="form-control" style={{ width: 'auto' }}
+          value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <input className="form-control" placeholder="Search user, action, record…" style={{ flex: 1, minWidth: 160 }}
           value={search} onChange={e => setSearch(e.target.value)} />
-        <select className="form-control" style={{ maxWidth: 160 }} value={module}
-          onChange={e => setModule(e.target.value)}>
+        <select className="form-control" style={{ width: 'auto' }}
+          value={module} onChange={e => setModule(e.target.value)}>
           {modules.map(m => <option key={m} value={m}>{m === 'ALL' ? 'All Modules' : m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
         </select>
       </div>
 
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Loading…</div>
+        <div className="empty-state">Loading audit records…</div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.4 }}>manage_search</span>
+          <span className="material-icons" style={{ fontSize: 48, opacity: 0.25 }}>manage_search</span>
           <p>No records found.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+            Audit entries are written by each module when records are created, updated or approved.
+          </p>
         </div>
       ) : (
-        <div className="card">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Date / Time</th>
-                  <th>Module</th>
-                  <th>Reference</th>
-                  <th>Action</th>
-                  <th>Detail</th>
-                  <th>User</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => {
-                  const color = MODULE_COLOR[r.module] || 'var(--text-dim)'
-                  const icon  = MODULE_ICON[r.module]  || 'circle'
-                  return (
-                    <tr key={r.id + r.ts}>
-                      <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
-                        {new Date(r.ts).toLocaleString()}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className="material-icons" style={{ fontSize: 14, color }}>{icon}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color, textTransform: 'capitalize' }}>{r.module}</span>
-                        </div>
-                      </td>
-                      <td style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color }}>{r.ref}</td>
-                      <td style={{ fontSize: 12, fontWeight: 600 }}>{r.action}</td>
-                      <td style={{ fontSize: 12, color: 'var(--text-dim)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detail || '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--text-mid)' }}>{r.user}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Date / Time</th>
+                <th>User</th>
+                <th>Module</th>
+                <th>Action</th>
+                <th>Record</th>
+                <th>Txn Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => {
+                const color = MODULE_COLOR[r.module] || 'var(--text-dim)'
+                const icon  = MODULE_ICON[r.module]  || 'circle'
+                return (
+                  <tr key={r.id}>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--text-dim)' }}>
+                      {new Date(r.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td style={{ fontWeight: 600, fontSize: 13 }}>{r.user_name || '—'}</td>
+                    <td>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color, background: `${color}18`, border: `1px solid ${color}44`, padding: '2px 8px', borderRadius: 10 }}>
+                        <span className="material-icons" style={{ fontSize: 12 }}>{icon}</span>
+                        {r.module || '—'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 13 }}>{r.action || '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                      <div>{r.entity_type || '—'}</div>
+                      {r.entity_name && <div style={{ color: 'var(--text)', fontWeight: 500 }}>{r.entity_name}</div>}
+                    </td>
+                    <td>
+                      {r.txn_code ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--gold)', background: 'rgba(251,191,36,.1)', border: '1px solid rgba(251,191,36,.3)', padding: '2px 8px', borderRadius: 10, fontFamily: 'monospace' }}>
+                          {r.txn_code}
+                        </span>
+                      ) : <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
