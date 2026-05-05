@@ -349,18 +349,31 @@ export default function ConnectPage() {
                   <span className="material-icons">arrow_back</span>
                 </button>
               )}
-              {/* Avatar / name — tap to view members (fix #4) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: selectedConv?.type === 'group' ? 'pointer' : 'default' }}
-                onClick={() => { if (selectedConv?.type === 'group') setShowMembers(v => !v) }}>
+              {/* Avatar / name — tap to view members (group) or contact (direct) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                onClick={() => {
+                  if (selectedConv?.type === 'group') {
+                    setShowMembers(v => !v)
+                  } else {
+                    // For direct message: show the other person's profile
+                    const other = selectedConv?.chat_participants?.find(p => p.user_id !== user.id)
+                    if (other) {
+                      const name = userMap[other.user_id] || 'Unknown'
+                      const empInfo = employeeMap[other.user_id]
+                      setProfileUser(prev => prev?.user_id === other.user_id ? null : { user_id: other.user_id, name, empInfo })
+                      setShowMembers(true)
+                    }
+                  }
+                }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: selectedConv?.type === 'group' ? 'linear-gradient(135deg,var(--blue),var(--teal))' : 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#0b0f1a' }}>
                   {selectedConv ? getConvInitial(selectedConv) : '?'}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getConvName(selectedConv)}</div>
-                  <div style={{ fontSize: 11, color: selectedConv?.type === 'group' ? 'var(--teal)' : 'var(--text-dim)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--teal)' }}>
                     {selectedConv?.type === 'group'
                       ? `${participants.length} members — tap to view`
-                      : 'Direct message'}
+                      : 'Tap for contact details'}
                   </div>
                 </div>
               </div>
@@ -435,24 +448,27 @@ export default function ConnectPage() {
         )}
       </div>
 
-      {/* ── Members panel (Fix #4 & #5) ── */}
-      {showMembers && selectedConv?.type === 'group' && (
+      {/* ── Members / Contact panel (Fix #4 & #5) ── */}
+      {showMembers && (
         <div style={{ width: 240, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', flexShrink: 0, ...(isMobile ? { position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10, width: '75%', boxShadow: '-4px 0 20px rgba(0,0,0,.3)' } : {}) }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span className="material-icons" style={{ fontSize: 18, color: 'var(--teal)' }}>group</span>
-            <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>Members ({participants.length})</div>
+            <span className="material-icons" style={{ fontSize: 18, color: 'var(--teal)' }}>{selectedConv?.type === 'group' ? 'group' : 'person'}</span>
+            <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{selectedConv?.type === 'group' ? `Members (${participants.length})` : 'Contact'}</div>
             <button onClick={() => setShowMembers(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex' }}>
               <span className="material-icons" style={{ fontSize: 20 }}>close</span>
             </button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-            {participants.map(p => {
+            {(selectedConv?.type === 'direct'
+              ? participants.filter(p => p.user_id !== user.id)
+              : participants
+            ).map(p => {
               const name  = userMap[p.user_id] || 'Unknown'
               const isMe  = p.user_id === user.id
               const empInfo = employeeMap[p.user_id]
               return (
                 <div key={p.user_id}
-                  onClick={() => setProfileUser(profileUser?.user_id === p.user_id ? null : { user_id: p.user_id, name, empInfo })}
+                  onClick={() => selectedConv?.type === 'direct' ? null : setProfileUser(profileUser?.user_id === p.user_id ? null : { user_id: p.user_id, name, empInfo })}
                   style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', marginBottom: 4, background: profileUser?.user_id === p.user_id ? 'rgba(251,191,36,.08)' : 'transparent', transition: 'background .15s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: isMe ? 'linear-gradient(135deg,var(--gold),var(--teal))' : 'linear-gradient(135deg,var(--blue),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#0b0f1a', flexShrink: 0 }}>
@@ -463,12 +479,14 @@ export default function ConnectPage() {
                         {name} {isMe ? '(You)' : ''}
                       </div>
                     </div>
-                    <span className="material-icons" style={{ fontSize: 14, color: 'var(--text-dim)' }}>
-                      {profileUser?.user_id === p.user_id ? 'expand_less' : 'expand_more'}
-                    </span>
+                    {selectedConv?.type === 'group' && (
+                      <span className="material-icons" style={{ fontSize: 14, color: 'var(--text-dim)' }}>
+                        {profileUser?.user_id === p.user_id ? 'expand_less' : 'expand_more'}
+                      </span>
+                    )}
                   </div>
-                  {/* Fix #5: Contact info when tapped */}
-                  {profileUser?.user_id === p.user_id && (
+                  {/* Fix #5: Contact info — always shown for direct, tap-to-expand for group */}
+                  {(selectedConv?.type === 'direct' || profileUser?.user_id === p.user_id) && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', paddingLeft: 4 }}>
                       {empInfo?.phone ? (
                         <a href={`tel:${empInfo.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)', marginBottom: 6, textDecoration: 'none' }}>
