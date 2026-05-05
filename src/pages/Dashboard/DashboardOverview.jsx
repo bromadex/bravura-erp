@@ -77,7 +77,7 @@ export default function DashboardOverview() {
     totalEmployees: 0, activeEmployees: 0, onLeaveToday: 0,
     attendanceToday: 0, pendingAttendance: 0, pendingLeave: 0,
     totalItems: 0, lowStockItems: 0,
-    fuelLevel: 0, fuelMax: 10103, fuelPct: 0, fuelIssuedToday: 0,
+    fuelLevel: 0, fuelMax: 10103, fuelPct: 0, fuelIssuedToday: 0, latestDip: null,
     pendingPOs: 0, pendingReqs: 0,
     openPeriod: null,
     alerts: [],
@@ -91,8 +91,8 @@ export default function DashboardOverview() {
         supabase.from('employees').select('id, status'),
         supabase.from('employee_attendance').select('id, employee_id, status, clock_in, date').gte('date', today),
         supabase.from('leave_requests').select('id, status, employee_id, start_date, end_date').in('status', ['pending_supervisor','pending_hr','approved']),
-        supabase.from('items').select('id, balance, threshold').limit(500),
-        supabase.from('fuel_log').select('amount, date').order('date', { ascending: false }).limit(200),
+        supabase.from('inventory_items').select('id, quantity, reorder_level').limit(500),
+        supabase.from('fuel_issuances').select('amount, date').order('date', { ascending: false }).limit(200),
         supabase.from('fuel_deliveries').select('qty').order('date', { ascending: false }).limit(100),
         supabase.from('purchase_orders').select('id').eq('status', 'pending'),
         supabase.from('store_requisitions').select('id').eq('status', 'pending'),
@@ -113,13 +113,18 @@ export default function DashboardOverview() {
 
       const items        = invR.data || []
       const totalItems   = items.length
-      const lowStockItems = items.filter(i => (i.balance || 0) <= (i.threshold || 0)).length
+      const lowStockItems = items.filter(i => (i.quantity || 0) <= (i.reorder_level || 0)).length
 
       const totalDelivered  = (delR.data || []).reduce((s, d) => s + (d.qty    || 0), 0)
       const totalIssuedAll  = (issR.data || []).reduce((s, i) => s + (i.amount || 0), 0)
       const fuelIssuedToday = (issR.data || []).filter(i => i.date === today).reduce((s, i) => s + (i.amount || 0), 0)
       const fuelLevel       = Math.max(0, Math.min(10103, totalDelivered - totalIssuedAll))
       const fuelPct         = (fuelLevel / 10103) * 100
+
+      // Latest dipstick reading for Zufta tank
+      const { data: latestDip } = await supabase
+        .from('dipstick_log').select('date, fuel_end, dip_end')
+        .order('date', { ascending: false }).limit(1).single()
 
       const pendingPOs   = (poR.data  || []).length
       const pendingReqs  = (srR.data  || []).length
@@ -156,7 +161,7 @@ export default function DashboardOverview() {
         return { ...mapped, text, time }
       })
 
-      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: 10103, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, alerts, activity })
+      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: 10103, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, alerts, activity, latestDip: latestDip || null })
     } catch (err) {
       console.error('Dashboard load error:', err)
     } finally {
@@ -252,9 +257,9 @@ export default function DashboardOverview() {
             <div className="kpi-grid" style={{ marginBottom: 24 }}>
               <StatCard label="Total Employees"    value={d.totalEmployees}    sub={`${d.activeEmployees} active`}          icon="people"        color="var(--teal)"                                               onClick={() => navigate('/module/hr/employees')}  />
               <StatCard label="Clocked In Today"   value={d.attendanceToday}   sub={`of ${d.activeEmployees} active`}       icon="login"         color="var(--green)"                                              onClick={() => navigate('/module/hr/attendance')} />
-              <StatCard label="On Leave Today"     value={d.onLeaveToday}      sub="approved leave"                         icon="event_busy"    color="var(--yellow)"                                             onClick={() => navigate('/module/notifications')}      />
+              <StatCard label="On Leave Today"     value={d.onLeaveToday}      sub="approved leave"                         icon="event_busy"    color="var(--yellow)"                                             onClick={() => navigate('/module/hr/leave')}      />
               <StatCard label="Pending Timesheets" value={d.pendingAttendance} sub="awaiting approval"                      icon="schedule"      color={d.pendingAttendance > 0 ? 'var(--yellow)' : 'var(--green)'} alert={d.pendingAttendance > 0} onClick={() => navigate('/module/hr/attendance')} />
-              <StatCard label="Pending Leave"      value={d.pendingLeave}      sub="needs approval"                         icon="approval"      color={d.pendingLeave > 0 ? 'var(--red)' : 'var(--green)'}        alert={d.pendingLeave > 0}      onClick={() => navigate('/module/notifications')}      />
+              <StatCard label="Pending Leave"      value={d.pendingLeave}      sub="needs approval"                         icon="approval"      color={d.pendingLeave > 0 ? 'var(--red)' : 'var(--green)'}        alert={d.pendingLeave > 0}      onClick={() => navigate('/module/hr/leave')}      />
             </div>
 
             {/* Mid row: Inventory, Fuel, Procurement */}
@@ -293,11 +298,18 @@ export default function DashboardOverview() {
                 <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 6, overflow: 'hidden', marginBottom: 6 }}>
                   <div style={{ height: '100%', width: `${Math.min(100, d.fuelPct)}%`, background: levelColor, borderRadius: 6, transition: 'width .6s' }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
                   <span style={{ fontWeight: 700 }}>{d.fuelLevel.toLocaleString()} L</span>
                   <span style={{ color: levelColor, fontWeight: 700 }}>{d.fuelPct.toFixed(0)}%</span>
                   <span style={{ color: 'var(--text-dim)' }}>10,103 L cap</span>
                 </div>
+                {d.latestDip && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, padding: '4px 8px', background: 'var(--surface2)', borderRadius: 6 }}>
+                    <span className="material-icons" style={{ fontSize: 13 }}>straighten</span>
+                    <span>Last dipstick: <strong style={{ color: 'var(--text)' }}>{d.latestDip.dip_end} cm / {Number(d.latestDip.fuel_end || 0).toFixed(0)} L</strong></span>
+                    <span style={{ marginLeft: 'auto' }}>{d.latestDip.date}</span>
+                  </div>
+                )}
                 <div className="kpi-card" style={{ padding: 10 }}>
                   <div className="kpi-label">Issued Today</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--yellow)' }}>{d.fuelIssuedToday} L</div>
