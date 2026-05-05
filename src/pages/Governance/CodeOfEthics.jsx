@@ -2,7 +2,7 @@
 // Displays the Code of Ethics document from governance_documents
 // where is_mandatory_onboarding=true. Admins can manage content.
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -46,6 +46,7 @@ export default function CodeOfEthics() {
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [editBody, setEditBody] = useState('')
+  const editorRef = useRef(null)
 
   const isAdmin = ['role_super_admin', 'role_hr_manager', 'role_hr'].includes(user?.role_id)
 
@@ -111,11 +112,34 @@ export default function CodeOfEthics() {
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Loading…</div>
       ) : editing ? (
         <div>
-          <textarea
-            value={editBody}
-            onChange={e => setEditBody(e.target.value)}
-            rows={30}
-            style={{ width: '100%', padding: '16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 13, fontFamily: 'var(--mono)', lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box', marginBottom: 12 }}
+          {/* Rich text toolbar */}
+          <div style={{ display: 'flex', gap: 4, padding: '8px 10px', background: 'var(--surface2)', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: 'none', flexWrap: 'wrap', marginBottom: 0 }}>
+            {[
+              { cmd: 'bold',               icon: 'format_bold',          title: 'Bold'           },
+              { cmd: 'italic',             icon: 'format_italic',        title: 'Italic'         },
+              { cmd: 'underline',          icon: 'format_underlined',    title: 'Underline'      },
+              { cmd: 'insertOrderedList',  icon: 'format_list_numbered', title: 'Numbered list'  },
+              { cmd: 'insertUnorderedList',icon: 'format_list_bulleted', title: 'Bullet list'    },
+            ].map(({ cmd, icon, title }) => (
+              <button key={cmd} title={title}
+                onMouseDown={e => { e.preventDefault(); document.execCommand(cmd, false, null) }}
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}>
+                <span className="material-icons" style={{ fontSize: 18 }}>{icon}</span>
+              </button>
+            ))}
+            <button title="Clear formatting"
+              onMouseDown={e => { e.preventDefault(); document.execCommand('removeFormat', false, null) }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>
+              <span className="material-icons" style={{ fontSize: 18 }}>format_clear</span>
+            </button>
+          </div>
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={e => setEditBody(e.currentTarget.innerHTML)}
+            dangerouslySetInnerHTML={{ __html: editBody }}
+            style={{ minHeight: 400, padding: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', fontSize: 13, lineHeight: 1.8, outline: 'none', overflowY: 'auto', color: 'var(--text)', marginBottom: 12 }}
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
