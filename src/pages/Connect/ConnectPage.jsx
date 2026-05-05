@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import TxnCodeMessage from '../../components/connect/TxnCodeLink'
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -382,7 +383,7 @@ export default function ConnectPage() {
                         {showName && <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>{userMap[msg.sender_id] || 'Unknown'}</div>}
                         <div style={{ maxWidth: isMobile ? '82%' : '65%', display: 'flex', alignItems: 'flex-end', gap: 5, flexDirection: isMine ? 'row-reverse' : 'row' }}>
                           <div style={{ padding: '8px 12px', borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isMine ? 'var(--gold)' : 'var(--surface)', color: isMine ? '#0b0f1a' : 'var(--text)', border: isMine ? 'none' : '1px solid var(--border)', fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word', opacity: isTemp ? 0.6 : 1 }}>
-                            {msg.body}
+                            <TxnCodeMessage body={msg.body} />
                           </div>
                           <div style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0, marginBottom: 2 }}>
                             {isTemp ? '…' : fmtTime(msg.created_at)}
