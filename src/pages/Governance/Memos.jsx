@@ -17,6 +17,7 @@ export default function Memos() {
   const [saving,   setSaving]   = useState(false)
   const [expanded, setExpanded] = useState(null)
   const [form,     setForm]     = useState({ title: '', body: '', category: 'General' })
+  const [editing,  setEditing]  = useState(null)
 
   const isAdmin = ['role_super_admin', 'role_hr_manager', 'role_hr', 'role_manager'].includes(user?.role_id)
 
@@ -38,10 +39,26 @@ export default function Memos() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  const openEdit = (memo) => {
+    setEditing(memo)
+    setForm({ title: memo.title, body: memo.body, category: memo.category || 'General' })
+    setShowForm(true)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
     try {
+      if (editing) {
+        const { error } = await supabase.from('governance_documents').update({
+          title: form.title, body: form.body, category: form.category,
+          updated_at: new Date().toISOString(),
+        }).eq('id', editing.id)
+        if (error) throw error
+        toast.success('Memo updated')
+        setEditing(null); setShowForm(false); setEditing(null)
+        await fetchData(); setSaving(false); return
+      }
       const txnCode = await generateTxnCode('MO')
       const { error } = await supabase.from('governance_documents').insert([{
         id:                crypto.randomUUID(),
@@ -56,7 +73,7 @@ export default function Memos() {
       }])
       if (error) throw error
       toast.success(`Memo issued — ${txnCode}`)
-      setShowForm(false)
+      setShowForm(false); setEditing(null)
       setForm({ title: '', body: '', category: 'General' })
       fetchData()
     } catch (err) {
@@ -135,13 +152,13 @@ export default function Memos() {
       {/* Issue memo modal */}
       {showForm && (
         <>
-          <div onClick={() => setShowForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500 }} />
+          <div onClick={() => { () => setShowForm(false); setEditing(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500 }} />
           <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 560, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span className="material-icons" style={{ color: 'var(--teal)' }}>mail</span>
               <div style={{ fontWeight: 800, fontSize: 15 }}>Issue Memo</div>
               <div style={{ flex: 1 }} />
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+              <button onClick={() => { () => setShowForm(false); setEditing(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
                 <span className="material-icons">close</span>
               </button>
             </div>
@@ -164,7 +181,7 @@ export default function Memos() {
                   onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
               </div>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { () => setShowForm(false); setEditing(null) }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Issuing…' : 'Issue Memo'}</button>
               </div>
             </form>
