@@ -26,6 +26,13 @@ export default function GoodsReceived() {
   const [saving,    setSaving]      = useState(false)
   const [stockedIn, setStockedIn]   = useState(null)   // confirmation summary
   const [searchTerm, setSearchTerm] = useState('')
+  const [employees,  setEmployees]  = useState([])
+
+  useEffect(() => {
+    supabase.from('employees').select('id, name, employee_number')
+      .neq('status', 'Terminated').order('name')
+      .then(({ data }) => { if (data) setEmployees(data) })
+  }, [])
 
   const emptyForm = () => ({
     date: new Date().toISOString().split('T')[0],
@@ -253,7 +260,9 @@ export default function GoodsReceived() {
                 <select className="form-control" value={form.received_by}
                   onChange={e => setForm(f => ({ ...f, received_by: e.target.value }))}>
                   <option value="">— Select employee —</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name} ({emp.employee_number})</option>)}
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>{emp.name} ({emp.employee_number})</option>
+                  ))}
                 </select>
               </div>
 
