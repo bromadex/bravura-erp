@@ -170,9 +170,21 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
+  const updateDipstick = async (id, record) => {
+    const { error } = await supabase.from('dipstick_log').update(record).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteDipstick = async (id) => {
+    const { error } = await supabase.from('dipstick_log').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
   return (
     <FuelContext.Provider value={{
-      issuances, deliveries, dipstickLog, loading,
+      issuances, deliveries, dipstickLog, loading, updateDipstick, deleteDipstick,
       addIssuance, addDelivery, addDipstick,
       getLitresFromCm, getCurrentTankLevel, getTankPercentage,
       getIssuanceByDay, getIssuanceByVehicle, getTankLevelTrend,
