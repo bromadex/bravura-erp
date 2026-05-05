@@ -1,13 +1,8 @@
 // src/pages/Connect/ConnectPage.jsx
-// WhatsApp-style mobile layout
-// Fixes:
-//  1. Visible to all users (handled in PermissionContext)
-//  2. Input doesn't lose focus when typing (controlled input, no re-render issues)
-//  3. Messages appear instantly via optimistic UI + realtime subscription
-//  4. Group member list panel in chat header
-//  5. Tap member avatar → see their phone & email
+// KEY FIX: Input uses useRef (uncontrolled) so typing never causes parent re-render
+// → keyboard stays open on mobile
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -15,12 +10,49 @@ import toast from 'react-hot-toast'
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
+    const h = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
   }, [])
   return isMobile
 }
+
+// ── Isolated input bar — never re-renders from parent state ───
+const MessageInput = memo(function MessageInput({ onSend }) {
+  const inputRef = useRef(null)
+
+  const handleSend = (e) => {
+    e.preventDefault()
+    const text = inputRef.current?.value?.trim()
+    if (!text) return
+    onSend(text)
+    if (inputRef.current) inputRef.current.value = ''
+    // No setTimeout focus - let browser maintain focus naturally
+  }
+
+  return (
+    <form onSubmit={handleSend} style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          ref={inputRef}
+          defaultValue=""
+          placeholder="Type a message…"
+          autoComplete="off"
+          style={{
+            flex: 1, borderRadius: 24, padding: '10px 16px', fontSize: 14,
+            background: 'var(--surface2)', border: '1px solid var(--border)',
+            color: 'var(--text)', outline: 'none',
+          }}
+        />
+        <button
+          type="submit"
+          style={{ width: 42, height: 42, borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'var(--gold)', color: '#0b0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span className="material-icons" style={{ fontSize: 20 }}>send</span>
+        </button>
+      </div>
+    </form>
+  )
+})
 
 export default function ConnectPage() {
   const { user }  = useAuth()
@@ -29,31 +61,28 @@ export default function ConnectPage() {
   const [conversations, setConversations] = useState([])
   const [selectedId,    setSelectedId]    = useState(null)
   const [messages,      setMessages]      = useState([])
-  const [participants,  setParticipants]  = useState([])   // {user_id} for selected conv
-  const [allUsers,      setAllUsers]      = useState([])   // all app_users (for picker)
-  const [employeeMap,   setEmployeeMap]   = useState({})   // user_id → {phone, email, name}
-  const [userMap,       setUserMap]       = useState({})   // user_id → display name
+  const [participants,  setParticipants]  = useState([])
+  const [allUsers,      setAllUsers]      = useState([])
+  const [employeeMap,   setEmployeeMap]   = useState({})
+  const [userMap,       setUserMap]       = useState({})
   const [loadingConvs,  setLoadingConvs]  = useState(true)
   const [loadingMsgs,   setLoadingMsgs]   = useState(false)
-  const [msgText,       setMsgText]       = useState('')
-  const [sending,       setSending]       = useState(false)
   const [showNew,       setShowNew]       = useState(false)
   const [newSearch,     setNewSearch]     = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
   const [groupName,     setGroupName]     = useState('')
   const [convSearch,    setConvSearch]    = useState('')
-  const [showMembers,   setShowMembers]   = useState(false)   // member list panel
-  const [profileUser,   setProfileUser]   = useState(null)    // clicked member profile
-  const [mobileScreen,  setMobileScreen]  = useState('list')  // 'list' | 'chat'
+  const [showMembers,   setShowMembers]   = useState(false)
+  const [profileUser,   setProfileUser]   = useState(null)
+  const [mobileScreen,  setMobileScreen]  = useState('list')
 
   const messagesEndRef = useRef(null)
-  const inputRef       = useRef(null)
 
-  // ── Load users + employee contact info ───────────────────────
+  // ── Load users + employee contact info ────────────────────────
   useEffect(() => {
     const load = async () => {
       const [userRes, empRes] = await Promise.all([
-        supabase.from('app_users').select('id, full_name, username, role_id').order('full_name'),
+        supabase.from('app_users').select('id, full_name, username').order('full_name'),
         supabase.from('employees').select('system_user_id, phone, email, name'),
       ])
       if (userRes.data) {
@@ -65,9 +94,7 @@ export default function ConnectPage() {
       }
       if (empRes.data) {
         const empMap = {}
-        empRes.data.forEach(e => {
-          if (e.system_user_id) empMap[e.system_user_id] = { phone: e.phone, email: e.email, name: e.name }
-        })
+        empRes.data.forEach(e => { if (e.system_user_id) empMap[e.system_user_id] = { phone: e.phone, email: e.email } })
         setEmployeeMap(empMap)
       }
     }
@@ -84,8 +111,7 @@ export default function ConnectPage() {
     const { data } = await supabase
       .from('chat_conversations')
       .select('*, chat_participants(user_id), chat_messages(body, created_at, sender_id)')
-      .in('id', ids)
-      .order('updated_at', { ascending: false })
+      .in('id', ids).order('updated_at', { ascending: false })
     if (data) setConversations(data)
     setLoadingConvs(false)
   }, [user.id])
@@ -101,19 +127,16 @@ export default function ConnectPage() {
         .select('id, conversation_id, sender_id, body, is_deleted, created_at')
         .eq('conversation_id', convId).eq('is_deleted', false)
         .order('created_at', { ascending: true }).limit(300),
-      supabase.from('chat_participants')
-        .select('user_id').eq('conversation_id', convId),
+      supabase.from('chat_participants').select('user_id').eq('conversation_id', convId),
     ])
     if (mRes.data) setMessages(mRes.data)
     if (pRes.data) setParticipants(pRes.data)
     setLoadingMsgs(false)
   }, [])
 
-  useEffect(() => {
-    if (selectedId) loadMessages(selectedId)
-  }, [selectedId, loadMessages])
+  useEffect(() => { if (selectedId) loadMessages(selectedId) }, [selectedId, loadMessages])
 
-  // ── Realtime subscription — messages appear instantly ─────────
+  // ── Realtime ──────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedId) return
     const channel = supabase.channel(`chat-${selectedId}`)
@@ -121,7 +144,6 @@ export default function ConnectPage() {
         event: 'INSERT', schema: 'public', table: 'chat_messages',
         filter: `conversation_id=eq.${selectedId}`,
       }, (payload) => {
-        // Only add if not already in list (avoid duplicate from optimistic)
         setMessages(prev => {
           const exists = prev.some(m => m.id === payload.new.id)
           return exists ? prev : [...prev, payload.new]
@@ -131,7 +153,7 @@ export default function ConnectPage() {
     return () => { supabase.removeChannel(channel) }
   }, [selectedId])
 
-  // ── Auto-scroll ───────────────────────────────────────────────
+  // ── Auto scroll ───────────────────────────────────────────────
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -140,6 +162,7 @@ export default function ConnectPage() {
   const selectConversation = (convId) => {
     setSelectedId(convId)
     setShowMembers(false)
+    setProfileUser(null)
     setMessages([])
     if (isMobile) setMobileScreen('chat')
   }
@@ -151,47 +174,28 @@ export default function ConnectPage() {
     setShowMembers(false)
   }
 
-  // ── Send message — OPTIMISTIC (appears immediately) ───────────
-  const sendMessage = async (e) => {
-    e?.preventDefault()
-    const body = msgText.trim()
-    if (!body || !selectedId || sending) return
-
+  // ── Send message (called by MessageInput) ─────────────────────
+  const handleSend = useCallback(async (body) => {
+    if (!body || !selectedId) return
     const tempId  = `temp-${Date.now()}`
     const now     = new Date().toISOString()
-    const tempMsg = { id: tempId, conversation_id: selectedId, sender_id: user.id, body, is_deleted: false, created_at: now }
-
-    // 1. Show immediately (optimistic)
-    setMessages(prev => [...prev, tempMsg])
-    setMsgText('')
-
-    // 2. Keep focus on input — Fix #2
-    setTimeout(() => inputRef.current?.focus(), 0)
-
-    setSending(true)
+    // Optimistic
+    setMessages(prev => [...prev, { id: tempId, conversation_id: selectedId, sender_id: user.id, body, is_deleted: false, created_at: now }])
     try {
       const realId = crypto.randomUUID()
       const { error } = await supabase.from('chat_messages').insert([{
-        id:              realId,
-        conversation_id: selectedId,
-        sender_id:       user.id,
-        body,
-        is_deleted:      false,
-        created_at:      now,
+        id: realId, conversation_id: selectedId, sender_id: user.id, body, is_deleted: false, created_at: now,
       }])
       if (error) {
-        // Remove optimistic message if failed
         setMessages(prev => prev.filter(m => m.id !== tempId))
         toast.error(error.message)
       } else {
-        // Replace temp with real ID
         setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: realId } : m))
-        await supabase.from('chat_conversations')
-          .update({ updated_at: now }).eq('id', selectedId)
+        supabase.from('chat_conversations').update({ updated_at: now }).eq('id', selectedId)
         loadConversations()
       }
-    } finally { setSending(false) }
-  }
+    } catch (err) { toast.error(err.message) }
+  }, [selectedId, user.id, loadConversations])
 
   // ── Create conversation ───────────────────────────────────────
   const createConversation = async () => {
@@ -200,7 +204,6 @@ export default function ConnectPage() {
       const isGroup = selectedUsers.length > 1
       const convId  = crypto.randomUUID()
       const now     = new Date().toISOString()
-
       if (!isGroup) {
         const otherId = selectedUsers[0]
         const { data: myParts } = await supabase
@@ -213,24 +216,17 @@ export default function ConnectPage() {
             const { data: conv } = await supabase
               .from('chat_conversations').select('id, type')
               .eq('id', shared[0].conversation_id).eq('type', 'direct').single()
-            if (conv) {
-              setShowNew(false); setSelectedUsers([])
-              selectConversation(conv.id)
-              return
-            }
+            if (conv) { setShowNew(false); setSelectedUsers([]); selectConversation(conv.id); return }
           }
         }
       }
-
       await supabase.from('chat_conversations').insert([{
         id: convId, type: isGroup ? 'group' : 'direct',
         name: isGroup ? (groupName.trim() || 'Group Chat') : null,
         created_by: user.id, created_at: now, updated_at: now,
       }])
       await supabase.from('chat_participants').insert(
-        [user.id, ...selectedUsers].map(uid => ({
-          id: crypto.randomUUID(), conversation_id: convId, user_id: uid, joined_at: now,
-        }))
+        [user.id, ...selectedUsers].map(uid => ({ id: crypto.randomUUID(), conversation_id: convId, user_id: uid, joined_at: now }))
       )
       setShowNew(false); setSelectedUsers([]); setGroupName('')
       await loadConversations()
@@ -245,10 +241,7 @@ export default function ConnectPage() {
     const other = conv.chat_participants?.find(p => p.user_id !== user.id)
     return other ? (userMap[other.user_id] || 'Unknown') : 'Direct Message'
   }
-  const getConvInitial = (conv) => {
-    if (conv?.type === 'group') return 'G'
-    return getConvName(conv).charAt(0).toUpperCase()
-  }
+  const getConvInitial = (conv) => conv?.type === 'group' ? 'G' : getConvName(conv).charAt(0).toUpperCase()
   const getLastMsg = (conv) => {
     const msgs = conv.chat_messages
     if (!msgs?.length) return { text: 'No messages yet', time: '' }
@@ -267,24 +260,19 @@ export default function ConnectPage() {
   }
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-  const filteredConvs = conversations.filter(c =>
-    !convSearch || getConvName(c).toLowerCase().includes(convSearch.toLowerCase()))
-  const filteredUsers = allUsers.filter(u =>
-    !newSearch ||
-    u.full_name?.toLowerCase().includes(newSearch.toLowerCase()) ||
-    u.username?.toLowerCase().includes(newSearch.toLowerCase()))
-  const selectedConv = conversations.find(c => c.id === selectedId)
+  const filteredConvs = conversations.filter(c => !convSearch || getConvName(c).toLowerCase().includes(convSearch.toLowerCase()))
+  const filteredUsers = allUsers.filter(u => !newSearch || u.full_name?.toLowerCase().includes(newSearch.toLowerCase()) || u.username?.toLowerCase().includes(newSearch.toLowerCase()))
+  const selectedConv  = conversations.find(c => c.id === selectedId)
 
-  const groupedMessages = messages.reduce((groups, msg) => {
-    const date = new Date(msg.created_at).toLocaleDateString('en-GB',
-      { weekday: 'long', day: 'numeric', month: 'long' })
-    if (!groups[date]) groups[date] = []
-    groups[date].push(msg)
-    return groups
+  const groupedMessages = messages.reduce((g, msg) => {
+    const date = new Date(msg.created_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (!g[date]) g[date] = []
+    g[date].push(msg)
+    return g
   }, {})
 
   // ── Conversation List ─────────────────────────────────────────
-  const ConversationList = () => (
+  const ConvList = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--surface)', ...(isMobile ? { width: '100%' } : { width: 300, minWidth: 300, borderRight: '1px solid var(--border)' }) }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span className="material-icons" style={{ color: 'var(--teal)', fontSize: 20 }}>forum</span>
@@ -310,7 +298,8 @@ export default function ConnectPage() {
           const isActive = conv.id === selectedId && !isMobile
           const last     = getLastMsg(conv)
           return (
-            <div key={conv.id} onClick={() => selectConversation(conv.id)} style={{ padding: '13px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, background: isActive ? 'rgba(251,191,36,.08)' : 'transparent', borderLeft: `3px solid ${isActive ? 'var(--gold)' : 'transparent'}`, borderBottom: '1px solid rgba(255,255,255,.04)', transition: 'background .15s' }}>
+            <div key={conv.id} onClick={() => selectConversation(conv.id)}
+              style={{ padding: '13px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, background: isActive ? 'rgba(251,191,36,.08)' : 'transparent', borderLeft: `3px solid ${isActive ? 'var(--gold)' : 'transparent'}`, borderBottom: '1px solid rgba(255,255,255,.04)', transition: 'background .15s' }}>
               <div style={{ width: 42, height: 42, borderRadius: '50%', flexShrink: 0, background: conv.type === 'group' ? 'linear-gradient(135deg,var(--blue),var(--teal))' : 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, color: '#0b0f1a' }}>
                 {getConvInitial(conv)}
               </div>
@@ -330,15 +319,14 @@ export default function ConnectPage() {
   )
 
   // ── Chat Panel ────────────────────────────────────────────────
-  const ChatPanel = () => (
+  const ChatArea = (
     <div style={{ display: 'flex', height: '100%', ...(isMobile ? { width: '100%' } : { flex: 1 }), minWidth: 0, position: 'relative' }}>
-      {/* Main chat column */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
         {!selectedId ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
             <span className="material-icons" style={{ fontSize: 72, opacity: 0.12, marginBottom: 16 }}>forum</span>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No conversation selected</div>
-            <div style={{ fontSize: 13 }}>Choose one from the list or start a new one</div>
+            <div style={{ fontSize: 13 }}>Choose one or start a new one</div>
           </div>
         ) : (
           <>
@@ -349,19 +337,15 @@ export default function ConnectPage() {
                   <span className="material-icons">arrow_back</span>
                 </button>
               )}
-              {/* Avatar / name — tap to view members (group) or contact (direct) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
                 onClick={() => {
                   if (selectedConv?.type === 'group') {
                     setShowMembers(v => !v)
                   } else {
-                    // For direct message: show the other person's profile
                     const other = selectedConv?.chat_participants?.find(p => p.user_id !== user.id)
                     if (other) {
-                      const name = userMap[other.user_id] || 'Unknown'
-                      const empInfo = employeeMap[other.user_id]
-                      setProfileUser(prev => prev?.user_id === other.user_id ? null : { user_id: other.user_id, name, empInfo })
-                      setShowMembers(true)
+                      setProfileUser({ user_id: other.user_id, name: userMap[other.user_id] || 'Unknown', empInfo: employeeMap[other.user_id] })
+                      setShowMembers(v => !v)
                     }
                   }
                 }}>
@@ -371,17 +355,10 @@ export default function ConnectPage() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getConvName(selectedConv)}</div>
                   <div style={{ fontSize: 11, color: 'var(--teal)' }}>
-                    {selectedConv?.type === 'group'
-                      ? `${participants.length} members — tap to view`
-                      : 'Tap for contact details'}
+                    {selectedConv?.type === 'group' ? `${participants.length} members — tap to view` : 'Tap for contact details'}
                   </div>
                 </div>
               </div>
-              {selectedConv?.type === 'group' && (
-                <button onClick={() => setShowMembers(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showMembers ? 'var(--gold)' : 'var(--text-dim)', padding: 4 }}>
-                  <span className="material-icons">group</span>
-                </button>
-              )}
             </div>
 
             {/* Messages */}
@@ -389,26 +366,20 @@ export default function ConnectPage() {
               {loadingMsgs ? (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Loading…</div>
               ) : messages.length === 0 ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
-                  No messages yet. Say hello! 👋
-                </div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontSize: 13 }}>No messages yet. Say hello! 👋</div>
               ) : Object.entries(groupedMessages).map(([date, msgs]) => (
                 <div key={date}>
                   <div style={{ textAlign: 'center', margin: '10px 0' }}>
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', background: 'var(--surface)', padding: '2px 12px', borderRadius: 10, border: '1px solid var(--border)' }}>{date}</span>
                   </div>
                   {msgs.map((msg, idx) => {
-                    const isMine    = msg.sender_id === user.id
-                    const prevMsg   = idx > 0 ? msgs[idx - 1] : null
-                    const showName  = !isMine && msg.sender_id !== prevMsg?.sender_id
-                    const isTemp    = msg.id?.startsWith('temp-')
+                    const isMine   = msg.sender_id === user.id
+                    const prevMsg  = idx > 0 ? msgs[idx - 1] : null
+                    const showName = !isMine && msg.sender_id !== prevMsg?.sender_id
+                    const isTemp   = msg.id?.startsWith('temp-')
                     return (
                       <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 3 }}>
-                        {showName && (
-                          <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>
-                            {userMap[msg.sender_id] || 'Unknown'}
-                          </div>
-                        )}
+                        {showName && <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>{userMap[msg.sender_id] || 'Unknown'}</div>}
                         <div style={{ maxWidth: isMobile ? '82%' : '65%', display: 'flex', alignItems: 'flex-end', gap: 5, flexDirection: isMine ? 'row-reverse' : 'row' }}>
                           <div style={{ padding: '8px 12px', borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: isMine ? 'var(--gold)' : 'var(--surface)', color: isMine ? '#0b0f1a' : 'var(--text)', border: isMine ? 'none' : '1px solid var(--border)', fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word', opacity: isTemp ? 0.6 : 1 }}>
                             {msg.body}
@@ -425,89 +396,64 @@ export default function ConnectPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input — Fix #2: autoFocus, no re-mount */}
-            <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  ref={inputRef}
-                  className="form-control"
-                  placeholder="Type a message…"
-                  value={msgText}
-                  onChange={e => setMsgText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                  style={{ flex: 1, borderRadius: 24, padding: '10px 16px', fontSize: 14 }}
-                  autoComplete="off"
-                />
-                <button type="submit" disabled={!msgText.trim()}
-                  style={{ width: 42, height: 42, borderRadius: '50%', border: 'none', cursor: msgText.trim() ? 'pointer' : 'default', background: msgText.trim() ? 'var(--gold)' : 'var(--surface2)', color: msgText.trim() ? '#0b0f1a' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .2s' }}>
-                  <span className="material-icons" style={{ fontSize: 20 }}>send</span>
-                </button>
-              </form>
-            </div>
+            {/* Isolated input — never causes parent re-render */}
+            <MessageInput onSend={handleSend} />
           </>
         )}
       </div>
 
-      {/* ── Members / Contact panel (Fix #4 & #5) ── */}
-      {showMembers && (
+      {/* Contact / Members panel */}
+      {showMembers && selectedConv && (
         <div style={{ width: 240, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', flexShrink: 0, ...(isMobile ? { position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10, width: '75%', boxShadow: '-4px 0 20px rgba(0,0,0,.3)' } : {}) }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            <span className="material-icons" style={{ fontSize: 18, color: 'var(--teal)' }}>{selectedConv?.type === 'group' ? 'group' : 'person'}</span>
-            <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{selectedConv?.type === 'group' ? `Members (${participants.length})` : 'Contact'}</div>
+            <span className="material-icons" style={{ fontSize: 18, color: 'var(--teal)' }}>{selectedConv.type === 'group' ? 'group' : 'person'}</span>
+            <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{selectedConv.type === 'group' ? `Members (${participants.length})` : 'Contact'}</div>
             <button onClick={() => setShowMembers(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex' }}>
               <span className="material-icons" style={{ fontSize: 20 }}>close</span>
             </button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-            {(selectedConv?.type === 'direct'
+            {(selectedConv.type === 'direct'
               ? participants.filter(p => p.user_id !== user.id)
               : participants
             ).map(p => {
-              const name  = userMap[p.user_id] || 'Unknown'
-              const isMe  = p.user_id === user.id
+              const name    = userMap[p.user_id] || 'Unknown'
+              const isMe    = p.user_id === user.id
               const empInfo = employeeMap[p.user_id]
+              const isOpen  = selectedConv.type === 'direct' || profileUser?.user_id === p.user_id
               return (
                 <div key={p.user_id}
-                  onClick={() => selectedConv?.type === 'direct' ? null : setProfileUser(profileUser?.user_id === p.user_id ? null : { user_id: p.user_id, name, empInfo })}
-                  style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', marginBottom: 4, background: profileUser?.user_id === p.user_id ? 'rgba(251,191,36,.08)' : 'transparent', transition: 'background .15s' }}>
+                  onClick={() => selectedConv.type === 'group' && setProfileUser(prev => prev?.user_id === p.user_id ? null : { user_id: p.user_id, name, empInfo })}
+                  style={{ padding: '10px 12px', borderRadius: 10, cursor: selectedConv.type === 'group' ? 'pointer' : 'default', marginBottom: 4, background: isOpen && selectedConv.type === 'group' ? 'rgba(251,191,36,.08)' : 'transparent' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: isMe ? 'linear-gradient(135deg,var(--gold),var(--teal))' : 'linear-gradient(135deg,var(--blue),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#0b0f1a', flexShrink: 0 }}>
                       {name.charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {name} {isMe ? '(You)' : ''}
-                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}{isMe ? ' (You)' : ''}</div>
                     </div>
-                    {selectedConv?.type === 'group' && (
-                      <span className="material-icons" style={{ fontSize: 14, color: 'var(--text-dim)' }}>
-                        {profileUser?.user_id === p.user_id ? 'expand_less' : 'expand_more'}
-                      </span>
+                    {selectedConv.type === 'group' && (
+                      <span className="material-icons" style={{ fontSize: 14, color: 'var(--text-dim)' }}>{isOpen ? 'expand_less' : 'expand_more'}</span>
                     )}
                   </div>
-                  {/* Fix #5: Contact info — always shown for direct, tap-to-expand for group */}
-                  {(selectedConv?.type === 'direct' || profileUser?.user_id === p.user_id) && (
+                  {isOpen && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', paddingLeft: 4 }}>
                       {empInfo?.phone ? (
                         <a href={`tel:${empInfo.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)', marginBottom: 6, textDecoration: 'none' }}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>phone</span>
-                          {empInfo.phone}
+                          <span className="material-icons" style={{ fontSize: 14 }}>phone</span>{empInfo.phone}
                         </a>
                       ) : (
                         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>phone_disabled</span>
-                          No phone on record
+                          <span className="material-icons" style={{ fontSize: 14 }}>phone_disabled</span>No phone on record
                         </div>
                       )}
                       {empInfo?.email ? (
                         <a href={`mailto:${empInfo.email}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--teal)', textDecoration: 'none' }}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>email</span>
-                          {empInfo.email}
+                          <span className="material-icons" style={{ fontSize: 14 }}>email</span>{empInfo.email}
                         </a>
                       ) : (
                         <div style={{ fontSize: 12, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>mail_outline</span>
-                          No email on record
+                          <span className="material-icons" style={{ fontSize: 14 }}>mail_outline</span>No email on record
                         </div>
                       )}
                     </div>
@@ -522,7 +468,7 @@ export default function ConnectPage() {
   )
 
   // ── New Conversation Modal ────────────────────────────────────
-  const NewConvModal = () => (
+  const NewConvModal = showNew && (
     <>
       <div onClick={() => { setShowNew(false); setSelectedUsers([]); setGroupName(''); setNewSearch('') }}
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 600 }} />
@@ -531,17 +477,14 @@ export default function ConnectPage() {
           <span className="material-icons" style={{ color: 'var(--teal)' }}>person_add</span>
           <div style={{ fontWeight: 800, fontSize: 15 }}>New Conversation</div>
           <div style={{ flex: 1 }} />
-          <button onClick={() => { setShowNew(false); setSelectedUsers([]); setGroupName(''); setNewSearch('') }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+          <button onClick={() => { setShowNew(false); setSelectedUsers([]); setGroupName(''); setNewSearch('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
             <span className="material-icons">close</span>
           </button>
         </div>
         <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflow: 'hidden' }}>
-          <input className="form-control" placeholder="Search people…" value={newSearch}
-            onChange={e => setNewSearch(e.target.value)} autoFocus />
+          <input className="form-control" placeholder="Search people…" value={newSearch} onChange={e => setNewSearch(e.target.value)} autoFocus />
           {selectedUsers.length > 1 && (
-            <input className="form-control" placeholder="Group name (optional)" value={groupName}
-              onChange={e => setGroupName(e.target.value)} />
+            <input className="form-control" placeholder="Group name (optional)" value={groupName} onChange={e => setGroupName(e.target.value)} />
           )}
           {selectedUsers.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -560,8 +503,7 @@ export default function ConnectPage() {
             {filteredUsers.map(u => {
               const isSel = selectedUsers.includes(u.id)
               return (
-                <div key={u.id}
-                  onClick={() => setSelectedUsers(p => isSel ? p.filter(x => x !== u.id) : [...p, u.id])}
+                <div key={u.id} onClick={() => setSelectedUsers(p => isSel ? p.filter(x => x !== u.id) : [...p, u.id])}
                   style={{ padding: '10px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: isSel ? 'rgba(251,191,36,.08)' : 'transparent' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: '#0b0f1a', flexShrink: 0 }}>
                     {(u.full_name || u.username || '?').charAt(0).toUpperCase()}
@@ -570,9 +512,7 @@ export default function ConnectPage() {
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{u.full_name || u.username}</div>
                     {u.full_name && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{u.username}</div>}
                   </div>
-                  <span className="material-icons" style={{ fontSize: 18, color: isSel ? 'var(--gold)' : 'var(--border)' }}>
-                    {isSel ? 'check_circle' : 'radio_button_unchecked'}
-                  </span>
+                  <span className="material-icons" style={{ fontSize: 18, color: isSel ? 'var(--gold)' : 'var(--border)' }}>{isSel ? 'check_circle' : 'radio_button_unchecked'}</span>
                 </div>
               )
             })}
@@ -592,16 +532,13 @@ export default function ConnectPage() {
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {isMobile ? (
         <>
-          {mobileScreen === 'list' && <ConversationList />}
-          {mobileScreen === 'chat' && <ChatPanel />}
+          {mobileScreen === 'list' && ConvList}
+          {mobileScreen === 'chat' && ChatArea}
         </>
       ) : (
-        <>
-          <ConversationList />
-          <ChatPanel />
-        </>
+        <>{ConvList}{ChatArea}</>
       )}
-      {showNew && <NewConvModal />}
+      {NewConvModal}
     </div>
   )
 }
