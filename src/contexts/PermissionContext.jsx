@@ -27,6 +27,8 @@ export function PermissionProvider({ children }) {
   const canView = (moduleName, pageName = null) => {
     if (!user) return false
     if (user.role_id === 'role_super_admin') return true
+    // Connect is open to ALL authenticated users regardless of role permissions
+    if (moduleName === 'connect') return true
     if (pageName) {
       const pageKey = `${moduleName}|${pageName}`
       if (cachedPermissions[pageKey]?.view === true) return true
