@@ -13,6 +13,8 @@
 import { useState, useEffect } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { startWorkflow, approveStep, rejectStep, getWorkflowState } from '../../engine/workflowEngine'
+import ApprovalPanel from '../../components/workflow/ApprovalPanel'
 import { useCanEdit, useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -158,6 +160,15 @@ export default function StoreRequisitions() {
         toast.success('Requisition updated')
       } else {
         await createStoreRequisition({ ...form, items: form.items, status })
+        if (status !== 'draft') {
+          try {
+            await startWorkflow('store_requisitions', savedId, {
+              id: user.id, name: user.full_name || user.username, role_id: user.role_id
+            })
+          } catch (wfErr) {
+            await supabase.from('store_requisitions').update({ status: 'submitted' }).eq('id', savedId)
+          }
+        }
         toast.success(status === 'draft' ? 'Draft saved' : 'Submitted for HOD approval')
       }
       setModalOpen(false)
@@ -165,7 +176,15 @@ export default function StoreRequisitions() {
   }
 
   const handleApprove = async (id) => {
-    try { await approveStoreRequisition(id, user?.full_name || user?.username, user?.id); toast.success('Requisition approved') }
+    try {
+      const wfState = await getWorkflowState('store_requisitions', id)
+      if (wfState?.instance) {
+        await approveStep(wfState.instance.id, { id: user.id, name: user.full_name || user.username, role_id: user.role_id })
+      } else {
+        await approveStoreRequisition(id, user?.full_name || user?.username, user?.id)
+      }
+      toast.success('Requisition approved')
+    }
     catch (err) { toast.error(err.message) }
   }
 
@@ -374,6 +393,9 @@ export default function StoreRequisitions() {
               <div><span style={{ color: 'var(--text-dim)' }}>Department:</span> {viewReq.department}</div>
               {viewReq.approver_name && <div><span style={{ color: 'var(--text-dim)' }}>Approved By:</span> {viewReq.approver_name}</div>}
               {viewReq.approved_at && <div><span style={{ color: 'var(--text-dim)' }}>Approved At:</span> {new Date(viewReq.approved_at).toLocaleString()}</div>}
+              <div style={{ marginTop: 16 }}>
+                <ApprovalPanel entityType="store_requisitions" entityId={viewReq.id} onStatusChange={() => fetchAll()} />
+              </div>
               {viewReq.issued_by && <div><span style={{ color: 'var(--text-dim)' }}>Issued By:</span> {viewReq.issued_by}</div>}
               {viewReq.issued_at && <div><span style={{ color: 'var(--text-dim)' }}>Issued At:</span> {new Date(viewReq.issued_at).toLocaleString()}</div>}
               {viewReq.rejection_reason && <div style={{ gridColumn: 'span 2', color: 'var(--red)', padding: '8px 12px', background: 'rgba(248,113,113,.08)', borderRadius: 6 }}>
