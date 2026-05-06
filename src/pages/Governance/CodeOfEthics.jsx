@@ -2,7 +2,7 @@
 // Displays the Code of Ethics document from governance_documents
 // where is_mandatory_onboarding=true. Admins can manage content.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -38,6 +38,28 @@ const FALLBACK_TEXT = `BRAVURA / KAMATIVI — CODE OF ETHICS
 
 10. PROTECTING THE BRAVURA REPUTATION
     Every employee is an ambassador of the Bravura brand and is expected to behave accordingly at all times.`
+
+// ── Stable rich text editor — content set ONCE, browser owns it after ──
+const ContentEditor = memo(function ContentEditor({ initialValue, onChange, style }) {
+  const ref = useRef(null)
+  // Set content only on mount or when initialValue actually changes from outside
+  const lastInitial = useRef(null)
+  useEffect(() => {
+    if (ref.current && lastInitial.current !== initialValue) {
+      lastInitial.current = initialValue
+      ref.current.innerHTML = initialValue || ''
+    }
+  }, [initialValue])
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={e => onChange(e.currentTarget.innerHTML)}
+      style={style}
+    />
+  )
+})
 
 export default function CodeOfEthics() {
   const { user } = useAuth()
@@ -133,12 +155,9 @@ export default function CodeOfEthics() {
               <span className="material-icons" style={{ fontSize: 18 }}>format_clear</span>
             </button>
           </div>
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={e => setEditBody(e.currentTarget.innerHTML)}
-            dangerouslySetInnerHTML={{ __html: editBody }}
+          <ContentEditor
+            initialValue={editBody}
+            onChange={setEditBody}
             style={{ minHeight: 400, padding: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', fontSize: 13, lineHeight: 1.8, outline: 'none', overflowY: 'auto', color: 'var(--text)', marginBottom: 12 }}
           />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
