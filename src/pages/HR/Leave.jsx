@@ -35,6 +35,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { startWorkflow, approveStep, rejectStep, getWorkflowState, canActOnStep } from '../../engine/workflowEngine'
+import ApprovalPanel from '../../components/workflow/ApprovalPanel'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { getWorkingDays, formatDate } from '../../utils/dateUtils'
@@ -278,7 +280,7 @@ export default function Leave() {
     }
     setSubmitting(true)
     try {
-      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, days_requested: calculatedDays, is_half_day: form.is_half_day, half_day_type: form.is_half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'pending_supervisor' }
+      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, days_requested: calculatedDays, is_half_day: form.is_half_day, half_day_type: form.is_half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'draft' }
       if (draftId) { await updateLeaveRequest(draftId, data) } else { await createLeaveRequest(data) }
       toast.success('Leave request submitted for approval')
       setForm({ employee_id: currentEmployeeId, leave_type_id: '', start_date: formatDate(new Date()), end_date: formatDate(new Date()), is_half_day: false, half_day_type: 'morning', reason: '', attachment_url: '', status: 'draft' })
@@ -324,7 +326,12 @@ export default function Leave() {
   const handleReject = async () => {
     if (!rejectModal.reason.trim()) return toast.error('Rejection reason required')
     try {
-      await rejectLeaveRequest(rejectModal.requestId, approverEmployeeId, user?.full_name || user?.username, rejectModal.reason)
+      const wfState = await getWorkflowState('leave_requests', rejectModal.requestId)
+      if (wfState?.instance) {
+        await rejectStep(wfState.instance.id, { id: user.id, name: user.full_name || user.username, role_id: user.role_id }, rejectModal.reason)
+      } else {
+        await rejectLeaveRequest(rejectModal.requestId, approverEmployeeId, user?.full_name || user?.username, rejectModal.reason)
+      }
       toast.success('Request rejected')
       setRejectModal({ open: false, requestId: null, reason: '' })
       await fetchAll()
@@ -370,6 +377,13 @@ export default function Leave() {
             "{request.reason}"
           </div>
         )}
+        {/* Workflow Approval Panel */}
+        <ApprovalPanel
+          entityType="leave_requests"
+          entityId={request.id}
+          onStatusChange={() => fetchLeaveRequests()}
+        />
+
         {Array.isArray(request.approver_comments) && request.approver_comments.length > 0 && (
           <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
             {request.approver_comments.map((c, i) => (
