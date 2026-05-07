@@ -39,6 +39,7 @@ import CampPPERegister   from './pages/Campsite/CampPPERegister'
 import CampHeadcount     from './pages/Campsite/CampHeadcount'
 
 import WorkflowAdmin from './components/workflow/WorkflowAdmin'
+import WorkflowBuilder from './components/workflow/WorkflowBuilder'
 
 // ── Connect ───────────────────────────────────────────────────
 import ConnectPage from './pages/Connect/ConnectPage'
@@ -388,7 +389,8 @@ function AppRoutes() {
       <Route path="/module/settings/workflows" element={
         <Layout module="settings" />
       }>
-        <Route index element={<WorkflowAdmin />} />
+        <Route index element={<WorkflowBuilder />} />
+        <Route path="admin" element={<WorkflowAdmin />} />
       </Route>
 
       <Route path="/module/reports" element={
