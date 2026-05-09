@@ -4,6 +4,7 @@
 // ============================================================
 
 import { supabase } from '../lib/supabase'
+import { auditLog } from './auditEngine'
 
 // ── Internal helpers ─────────────────────────────────────────
 
@@ -130,13 +131,14 @@ async function writeAuditLog(instanceId, stepId, actor, action, comment) {
       actor_role: actor.role_id || '', action, comment: comment || null,
       created_at: now,
     }]),
-    supabase.from('hr_audit_logs').insert([{
-      id: crypto.randomUUID(), module: 'workflow',
-      action: `WORKFLOW_${action.toUpperCase()}`,
-      entity_type: 'workflow_instance', entity_id: instanceId,
-      entity_name: `${action} by ${actor.name}`,
-      user_name: actor.name || '', created_at: now,
-    }]),
+    auditLog({
+      module:     'workflow',
+      action:     `WORKFLOW_${action.toUpperCase()}`,
+      entityType: 'workflow_instance',
+      entityId:   instanceId,
+      entityName: `${action} by ${actor.name}`,
+      userName:   actor.name || '',
+    }),
   ])
 }
 

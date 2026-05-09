@@ -8,6 +8,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import { generateTxnCode } from '../utils/txnCode'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const CampsiteContext = createContext(null)
 
@@ -203,6 +204,7 @@ export function CampsiteProvider({ children }) {
       timestamp:   new Date().toISOString(),
     }])
 
+    auditLog({ module: 'campsite', action: 'ASSIGN', entityType: 'room_assignment', entityId: id, entityName: `Room ${room.code}`, userName: processedBy || '', txnCode })
     await fetchAll()
     return txnCode
   }
@@ -251,6 +253,7 @@ export function CampsiteProvider({ children }) {
       created_at:      new Date().toISOString(),
     }])
 
+    auditLog({ module: 'campsite', action: 'TRANSFER', entityType: 'room_assignment', entityId: assignmentId, entityName: `→ Room ${newRoom.code}`, userName: processedBy || '', txnCode: ctCode })
     await fetchAll()
     return ctCode
   }
@@ -288,6 +291,7 @@ export function CampsiteProvider({ children }) {
       timestamp:   new Date().toISOString(),
     }])
 
+    auditLog({ module: 'campsite', action: 'VACATE', entityType: 'room_assignment', entityId: assignmentId, entityName: `Room vacated`, userName: processedBy || '', txnCode: cvCode })
     await fetchAll()
     return cvCode
   }

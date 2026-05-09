@@ -9,61 +9,24 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { pushNotificationToHOD, pushNotificationToRoles } from '../engine/notificationEngine'
+import { auditLog } from '../engine/auditEngine'
 
 const ProcurementContext = createContext(null)
 
 export function ProcurementProvider({ children }) {
-  const [suppliers,           setSuppliers]           = useState([])
-  const [storeRequisitions,   setStoreRequisitions]   = useState([])
+  const [suppliers,            setSuppliers]            = useState([])
+  const [storeRequisitions,    setStoreRequisitions]    = useState([])
   const [purchaseRequisitions, setPurchaseRequisitions] = useState([])
-  const [purchaseOrders,      setPurchaseOrders]      = useState([])
-  const [goodsReceived,       setGoodsReceived]       = useState([])
-  const [loading,             setLoading]             = useState(true)
+  const [purchaseOrders,       setPurchaseOrders]       = useState([])
+  const [goodsReceived,        setGoodsReceived]        = useState([])
+  const [loading,              setLoading]              = useState(true)
 
-  const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+  const generateId = () => crypto.randomUUID()
 
-  // ── Notification helper ───────────────────────────────────────
-  const sendNotification = async ({ userId, type, title, message, link = null }) => {
-    try {
-      await supabase.from('notifications').insert([{
-        id:         generateId(),
-        user_id:    userId,
-        type,
-        title,
-        message,
-        link,
-        is_read:    false,
-        created_at: new Date().toISOString(),
-      }])
-    } catch (err) {
-      console.warn('Notification send failed:', err.message)
-    }
-  }
-
-  const notifyHOD = async ({ departmentName, type, title, message, link }) => {
-    const { data: hodEmployees } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('department', departmentName)
-      .eq('is_hod', true)
-    if (!hodEmployees?.length) return
-    for (const emp of hodEmployees) {
-      const { data: users } = await supabase.from('app_users').select('id').eq('employee_id', emp.id)
-      for (const u of (users || [])) {
-        await sendNotification({ userId: u.id, type, title, message, link })
-      }
-    }
-  }
-
-  const notifyStorekeepers = async ({ type, title, message, link }) => {
-    const { data: users } = await supabase
-      .from('app_users')
-      .select('id')
-      .in('role_id', ['role_storekeeper', 'role_store_manager'])
-    for (const u of (users || [])) {
-      await sendNotification({ userId: u.id, type, title, message, link })
-    }
-  }
+  // Engine aliases kept for internal readability
+  const notifyHOD        = (departmentName, notif) => pushNotificationToHOD(departmentName, notif)
+  const notifyStorekeepers = (notif) => pushNotificationToRoles(['role_storekeeper', 'role_store_manager'], notif)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -124,8 +87,7 @@ export function ProcurementProvider({ children }) {
     if (error) throw error
 
     // Notify HOD that a requisition needs approval
-    await notifyHOD({
-      departmentName: req.department,
+    await notifyHOD(req.department, {
       type:    'requisition_submitted',
       title:   'Store Requisition Pending Approval',
       message: `${req.requester_name || 'Someone'} submitted ${srNumber} for your approval.`,
