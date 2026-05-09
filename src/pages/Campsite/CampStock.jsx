@@ -4,7 +4,7 @@ import { useLogistics } from '../../contexts/LogisticsContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const TODAY = new Date().toISOString().split('T')[0]
 const CATS  = ['Food', 'PPE', 'Consumables', 'General']
@@ -72,14 +72,11 @@ export default function CampStock() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredItems.map(i => ({
+  const handleExport = () => {
+    exportXLSX(filteredItems.map(i => ({
       Name: i.name, Category: i.category, Unit: i.unit,
       Balance: i.balance, 'Reorder Level': i.reorder_level, 'Used 30d': getUsed30d(i.id),
-    })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Camp Stock')
-    XLSX.writeFile(wb, `CampStock_${TODAY}.xlsx`)
+    })), `CampStock_${TODAY}`, 'Camp Stock')
     toast.success('Exported')
   }
 
@@ -105,7 +102,7 @@ export default function CampStock() {
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Camp &amp; site supplies inventory</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}>
+          <button className="btn btn-secondary" onClick={handleExport}>
             <span className="material-icons" style={{ fontSize: 16 }}>table_chart</span> Export
           </button>
           {canEdit && <>

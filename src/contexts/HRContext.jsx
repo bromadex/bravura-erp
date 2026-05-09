@@ -25,6 +25,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtils'
+import { auditLog } from '../engine/auditEngine'
+import { pushNotification } from '../engine/notificationEngine'
 
 const HRContext = createContext(null)
 
@@ -63,39 +65,15 @@ export function HRProvider({ children }) {
     return `BRA${maxNum + 1}`
   }
 
-  // ── Audit log helper ───────────────────────────────────────────
-  const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-      await supabase.from('hr_audit_logs').insert([{
-        id:          generateId(),
-        user_name:   user?.full_name || user?.username || 'System',
-        action,
-        entity_type: entityType,
-        entity_id:   entityId,
-        entity_name: entityName,
-        old_values:  oldValues ? JSON.stringify(oldValues) : null,
-        new_values:  newValues ? JSON.stringify(newValues) : null,
-        created_at:  new Date().toISOString()
-      }])
-    } catch (err) { console.warn('Audit log failed:', err) }
+  // ── Audit log helper — thin wrapper around auditEngine ────────
+  const logHRAction = (action, entityType, entityId, entityName) => {
+    const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
+    auditLog({ module: 'hr', action, entityType, entityId: entityId || '', entityName: entityName || '', userName: user?.full_name || user?.username || 'System' })
   }
 
-  // ── Notification helper (non-fatal) ────────────────────────────
-  const sendNotification = async (userId, type, title, message, link = '/module/hr/leave') => {
-    try {
-      await supabase.from('notifications').insert([{
-        id:         generateId(),
-        user_id:    userId,
-        type,
-        title,
-        message,
-        link,
-        is_read:    false,
-        created_at: new Date().toISOString()
-      }])
-    } catch { /* notifications are non-fatal */ }
-  }
+  // ── Notification helper — thin wrapper around notificationEngine
+  const sendNotification = (userId, type, title, message, link = '/module/hr/leave') =>
+    pushNotification(userId, { type, title, message, link })
 
   // ── System account creation ────────────────────────────────────
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {

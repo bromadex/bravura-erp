@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const MODULE_COLOR = {
   inventory:   'var(--blue)',
@@ -97,9 +97,8 @@ export default function AuditTrail() {
     )
   }, [rows, search])
 
-  const exportXLSX = () => {
-    const wb   = XLSX.utils.book_new()
-    const data  = filtered.map(r => ({
+  const handleExport = () => {
+    const data = filtered.map(r => ({
       'Date/Time':   new Date(r.created_at).toLocaleString('en-GB'),
       'User':        r.user_name || '—',
       'Action':      r.action    || '—',
@@ -108,8 +107,7 @@ export default function AuditTrail() {
       'Record Name': r.entity_name || '—',
       'Txn Code':    r.txn_code  || '—',
     }))
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Audit Trail')
-    XLSX.writeFile(wb, `audit-trail-${TODAY}.xlsx`)
+    exportXLSX(data, `audit-trail-${TODAY}`, 'Audit Trail')
   }
 
   const modules = ['ALL', 'hr', 'procurement', 'inventory', 'fuel', 'fleet', 'campsite', 'logistics', 'governance', 'accounting', 'connect', 'system']
@@ -121,7 +119,7 @@ export default function AuditTrail() {
           <h1 className="page-title">Audit Trail</h1>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{filtered.length} records shown</div>
         </div>
-        <button className="btn btn-secondary" onClick={exportXLSX}>
+        <button className="btn btn-secondary" onClick={handleExport}>
           <span className="material-icons">table_view</span> Export
         </button>
       </div>

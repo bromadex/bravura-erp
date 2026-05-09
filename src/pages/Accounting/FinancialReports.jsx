@@ -1,7 +1,7 @@
 // src/pages/Accounting/FinancialReports.jsx — Balance Sheet + P&L
 import { useState } from 'react'
 import { useAccounting } from '../../contexts/AccountingContext'
-import * as XLSX from 'xlsx'
+import { exportAoa } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
@@ -65,10 +65,7 @@ export default function FinancialReports() {
           ...bs.equity.map(a => [a.code, a.name, a.balance]),
           ['', 'TOTAL EQUITY', bs.totalEquity],
         ]
-    const ws = XLSX.utils.aoa_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, view === 'pl' ? 'P&L' : 'Balance Sheet')
-    XLSX.writeFile(wb, `${view === 'pl' ? 'PnL' : 'BalanceSheet'}_${new Date().toISOString().split('T')[0]}.xlsx`)
+    exportAoa(data, `${view === 'pl' ? 'PnL' : 'BalanceSheet'}_${new Date().toISOString().split('T')[0]}`, view === 'pl' ? 'P&L' : 'Balance Sheet')
     toast.success('Exported')
   }
 

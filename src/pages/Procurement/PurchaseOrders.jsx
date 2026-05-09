@@ -12,7 +12,7 @@ import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -93,15 +93,14 @@ export default function PurchaseOrders() {
   const draftPOs  = purchaseOrders.filter(p => p.status === 'draft').length
   const totalVal  = purchaseOrders.reduce((s, p) => s + (parseFloat(p.total_amount) || 0), 0)
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(po => ({
+  const handleExport = () => {
+    exportXLSX(filtered.map(po => ({
       'PO #': po.po_number, Supplier: po.supplier_name,
       'Order Date': po.order_date, 'Delivery Date': po.delivery_date,
       Items: (typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || []).length,
       Total: parseFloat(po.total_amount || 0).toFixed(2), Status: po.status
-    })))
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Purchase Orders')
-    XLSX.writeFile(wb, `PurchaseOrders_${today}.xlsx`); toast.success('Exported')
+    })), `PurchaseOrders_${today}`, 'Purchase Orders')
+    toast.success('Exported')
   }
 
   const statusBadge = (s) => {
@@ -116,7 +115,7 @@ export default function PurchaseOrders() {
       <div className="page-header">
         <h1 className="page-title">Purchase Orders</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && (
             <button className="btn btn-primary" onClick={() => { setForm(emptyForm()); setModalOpen(true) }}>
               <span className="material-icons">add</span> Create PO

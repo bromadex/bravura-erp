@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -78,11 +78,8 @@ export default function FuelDeliveries() {
   const deliveredThisMonth = deliveries.filter(r => r.date?.startsWith(today.slice(0, 7))).reduce((s, r) => s + (r.qty || 0), 0)
   const uniqueSuppliers  = new Set(deliveries.map(r => r.supplier).filter(Boolean)).size
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(r => ({ Date: r.date, Type: r.fuel_type, Qty: r.qty, Supplier: r.supplier, DipBefore: r.dip_before, DipAfter: r.dip_after, DeliveryNote: r.delivery_note, Notes: r.notes })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Deliveries')
-    XLSX.writeFile(wb, `FuelDeliveries_${today}.xlsx`)
+  const handleExport = () => {
+    exportXLSX(filtered.map(r => ({ Date: r.date, Type: r.fuel_type, Qty: r.qty, Supplier: r.supplier, DipBefore: r.dip_before, DipAfter: r.dip_after, DeliveryNote: r.delivery_note, Notes: r.notes })), `FuelDeliveries_${today}`, 'Deliveries')
     toast.success('Exported')
   }
 
@@ -91,7 +88,7 @@ export default function FuelDeliveries() {
       <div className="page-header">
         <h1 className="page-title">Fuel Deliveries</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}>
+          <button className="btn btn-secondary" onClick={handleExport}>
             <span className="material-icons">table_chart</span> Export
           </button>
           {canEdit && (

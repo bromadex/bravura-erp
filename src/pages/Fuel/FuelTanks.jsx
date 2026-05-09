@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportMultiSheet } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -53,12 +53,12 @@ export default function FuelTanks() {
   const byDriver = Object.entries(driverMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
   const maxDriver = Math.max(...byDriver.map(d => d[1]), 1)
 
-  const exportXLSX = () => {
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(issuances.map(i => ({ Date: i.date, Vehicle: i.vehicle, Driver: i.driver, Litres: i.amount, Purpose: i.purpose }))), 'Issuances')
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byVehicle.map(([v, l]) => ({ Vehicle: v, TotalLitres: l }))), 'By Vehicle')
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byDriver.map(([d, l]) => ({ Driver: d, TotalLitres: l }))), 'By Driver')
-    XLSX.writeFile(wb, `FuelTanks_${today}.xlsx`)
+  const handleExport = () => {
+    exportMultiSheet([
+      { name: 'Issuances',   rows: issuances.map(i => ({ Date: i.date, Vehicle: i.vehicle, Driver: i.driver, Litres: i.amount, Purpose: i.purpose })) },
+      { name: 'By Vehicle',  rows: byVehicle.map(([v, l]) => ({ Vehicle: v, TotalLitres: l })) },
+      { name: 'By Driver',   rows: byDriver.map(([d, l]) => ({ Driver: d, TotalLitres: l })) },
+    ], `FuelTanks_${today}`)
     toast.success('Exported')
   }
 
@@ -71,7 +71,7 @@ export default function FuelTanks() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Fuel Tanks</h1>
-        <button className="btn btn-secondary" onClick={exportXLSX}>
+        <button className="btn btn-secondary" onClick={handleExport}>
           <span className="material-icons">table_chart</span> Export
         </button>
       </div>

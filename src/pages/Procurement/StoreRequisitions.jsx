@@ -18,7 +18,7 @@ import ApprovalPanel from '../../components/workflow/ApprovalPanel'
 import { useCanEdit, useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -224,17 +224,14 @@ export default function StoreRequisitions() {
   const fulfilled = storeRequisitions.filter(r => r.status === 'fulfilled').length
   const rejected  = storeRequisitions.filter(r => r.status === 'rejected').length
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(r => ({
+  const handleExport = () => {
+    exportXLSX(filtered.map(r => ({
       'SR #': r.sr_number || r.req_number, Date: r.date, Department: r.department,
       Priority: r.priority, 'Requested By': r.requester_name,
       Items: parseItems(r.items).length, Status: r.status,
       'Approved By': r.approver_name || '—', 'Issued By': r.issued_by || '—',
       Notes: r.notes,
-    })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Store Requisitions')
-    XLSX.writeFile(wb, `StoreRequisitions_${today}.xlsx`)
+    })), `StoreRequisitions_${today}`, 'Store Requisitions')
     toast.success('Exported')
   }
 
@@ -243,7 +240,7 @@ export default function StoreRequisitions() {
       <div className="page-header">
         <h1 className="page-title">Store Requisitions</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}>
+          <button className="btn btn-secondary" onClick={handleExport}>
             <span className="material-icons">table_chart</span> Export
           </button>
           {canEdit && (

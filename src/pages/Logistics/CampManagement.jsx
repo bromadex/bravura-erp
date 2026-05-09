@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 const CATS  = ['Food', 'PPE', 'Consumables', 'General']
@@ -65,7 +65,7 @@ export default function CampManagement() {
   const handlePPE      = async (e) => { e.preventDefault(); if (!ppeForm.employee_id || !ppeForm.item_id) return toast.error('Select employee and item'); try { await issuePPE(ppeForm, user?.full_name || ''); toast.success('PPE issued'); setPpeModal(false); setPpeForm({ employee_id: '', item_id: '', item_name: '', qty: 1, size: '', date: today, condition: 'New', reason: 'New issue', issued_by: user?.full_name || '' }) } catch (err) { toast.error(err.message) } }
   const handleHeadcount = async () => { if (!hcForm.count) return toast.error('Enter headcount'); try { await setHeadcount(today, parseInt(hcForm.count), hcForm.notes, user?.full_name || ''); toast.success('Headcount recorded'); setHcForm({ count: '', notes: '' }) } catch (err) { toast.error(err.message) } }
 
-  const exportXLSX = () => { const ws = XLSX.utils.json_to_sheet(filteredItems.map(i => { const s = getStats(i.id); return { Name: i.name, Category: i.category, Unit: i.unit, Balance: i.balance, 'Reorder Level': i.reorder_level, 'Used 30d': s.totalOut30d, 'Per Person/Day': s.perPersonPerDay.toFixed(4) } })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Camp Stock'); XLSX.writeFile(wb, `CampStock_${today}.xlsx`); toast.success('Exported') }
+  const handleExport = () => { exportXLSX(filteredItems.map(i => { const s = getStats(i.id); return { Name: i.name, Category: i.category, Unit: i.unit, Balance: i.balance, 'Reorder Level': i.reorder_level, 'Used 30d': s.totalOut30d, 'Per Person/Day': s.perPersonPerDay.toFixed(4) } }), `CampStock_${today}`, 'Camp Stock'); toast.success('Exported') }
 
   const TABS = [
     { id: 'stock',     label: 'Stock Levels',  icon: 'inventory_2' },
@@ -79,7 +79,7 @@ export default function CampManagement() {
       <div className="page-header">
         <h1 className="page-title">Camp & Site Supplies</h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && <>
             <button className="btn btn-secondary" onClick={() => { setEditingItem(null); setItemForm({ name: '', category: 'General', unit: 'pcs', reorder_level: 0, unit_cost: 0, notes: '' }); setItemModal(true) }}><span className="material-icons">add</span> Item</button>
             <button className="btn btn-secondary" onClick={() => setSiModal(true)}><span className="material-icons">add_circle</span> Stock In</button>

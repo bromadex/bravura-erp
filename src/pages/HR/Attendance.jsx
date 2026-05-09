@@ -20,7 +20,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useCanApprove } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 export default function Attendance() {
   const {
@@ -231,10 +231,7 @@ export default function Attendance() {
       'Work Description': r.work_description || '—', Notes: r.notes || '—',
       'Approved By': r.approved_by || '—',
     }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Attendance')
-    XLSX.writeFile(wb, `Attendance_${today}.xlsx`)
+    exportXLSX(data, `Attendance_${today}`, 'Attendance')
     toast.success('Exported')
   }
 

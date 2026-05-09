@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const InventoryContext = createContext(null)
 
@@ -47,19 +48,24 @@ export function InventoryProvider({ children }) {
       total_out: 0, notes: item.notes || '',
     }]).select().single()
     if (error) throw error
+    auditLog({ module: 'inventory', action: 'CREATE', entityType: 'item', entityId: id, entityName: item.name })
     await fetchAll()
     return data
   }
 
   const updateItem = async (id, updates) => {
+    const item = items.find(i => i.id === id)
     const { error } = await supabase.from('items').update(updates).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'inventory', action: 'UPDATE', entityType: 'item', entityId: id, entityName: item?.name || id })
     await fetchAll()
   }
 
   const deleteItem = async (id) => {
+    const item = items.find(i => i.id === id)
     const { error } = await supabase.from('items').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'inventory', action: 'DELETE', entityType: 'item', entityId: id, entityName: item?.name || id })
     await fetchAll()
   }
 
@@ -71,14 +77,16 @@ export function InventoryProvider({ children }) {
       total_in: (item.total_in || 0) + quantity,
     }).eq('id', itemId)
     if (ie) throw ie
+    const txId = generateId()
     const { error: te } = await supabase.from('transactions').insert([{
-      id: generateId(), type: 'IN', item_id: itemId,
+      id: txId, type: 'IN', item_id: itemId,
       item_name: item.name, category: item.category,
       qty: quantity, date, delivered_by: deliveredBy,
       received_by: receivedBy, notes,
       user_name: receivedBy, created_at: new Date().toISOString(),
     }])
     if (te) throw te
+    auditLog({ module: 'inventory', action: 'STOCK_IN', entityType: 'transaction', entityId: txId, entityName: item.name, userName: receivedBy || '' })
     await fetchAll()
   }
 
@@ -91,14 +99,16 @@ export function InventoryProvider({ children }) {
       total_out: (item.total_out || 0) + quantity,
     }).eq('id', itemId)
     if (ie) throw ie
+    const txId = generateId()
     const { error: te } = await supabase.from('transactions').insert([{
-      id: generateId(), type: 'OUT', item_id: itemId,
+      id: txId, type: 'OUT', item_id: itemId,
       item_name: item.name, category: item.category,
       qty: quantity, date, issued_to: issuedTo,
       authorized_by: authorizedBy, notes: purpose,
       user_name: authorizedBy, created_at: new Date().toISOString(),
     }])
     if (te) throw te
+    auditLog({ module: 'inventory', action: 'STOCK_OUT', entityType: 'transaction', entityId: txId, entityName: item.name, userName: authorizedBy || '' })
     await fetchAll()
   }
 
@@ -106,8 +116,9 @@ export function InventoryProvider({ children }) {
     const item = items.find(i => i.id === itemId)
     if (!item) throw new Error('Item not found')
     const variance = countedQty - item.balance
+    const stId = generateId()
     await supabase.from('stock_takes').insert([{
-      id: generateId(), item_id: itemId, item_name: item.name,
+      id: stId, item_id: itemId, item_name: item.name,
       system_qty: item.balance, counted: countedQty, variance,
       date, done_by: countedBy, notes, created_at: new Date().toISOString(),
     }])
@@ -121,6 +132,7 @@ export function InventoryProvider({ children }) {
         user_name: countedBy, created_at: new Date().toISOString(),
       }])
     }
+    auditLog({ module: 'inventory', action: 'STOCK_TAKE', entityType: 'stock_take', entityId: stId, entityName: item.name, userName: countedBy || '' })
     await fetchAll()
   }
 
@@ -133,6 +145,7 @@ export function InventoryProvider({ children }) {
       await supabase.from('items').update({ balance: newBalance }).eq('id', item.id)
     }
     await supabase.from('transactions').delete().eq('id', tx.id)
+    auditLog({ module: 'inventory', action: 'DELETE', entityType: 'transaction', entityId: tx.id, entityName: tx.item_name || '' })
     await fetchAll()
   }
 
