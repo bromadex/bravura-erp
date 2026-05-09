@@ -49,19 +49,37 @@ export default function AuditTrail() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      let query = supabase
+      // Query both audit tables and merge
+      let hrQuery = supabase
         .from('hr_audit_logs')
-        .select('id, user_name, action, entity_type, entity_id, entity_name, module, txn_code, old_values, new_values, created_at')
+        .select('id, user_name, action, entity_type, entity_id, entity_name, module, txn_code, created_at')
         .gte('created_at', dateFrom)
         .lte('created_at', dateTo + 'T23:59:59')
         .order('created_at', { ascending: false })
-        .limit(500)
+        .limit(400)
+      if (module !== 'ALL') hrQuery = hrQuery.eq('module', module)
 
-      if (module !== 'ALL') query = query.eq('module', module)
+      const legacyQuery = supabase
+        .from('audit_logs')
+        .select('id, user_name, action, entity_type, entity_id, entity_name, created_at')
+        .gte('created_at', dateFrom)
+        .lte('created_at', dateTo + 'T23:59:59')
+        .order('created_at', { ascending: false })
+        .limit(100)
 
-      const { data, error } = await query
-      if (error) console.error('Audit trail error:', error)
-      setRows(data || [])
+      const [hrRes, legacyRes] = await Promise.all([hrQuery, legacyQuery])
+
+      const hrRows      = (hrRes.data     || [])
+      const legacyRows  = (legacyRes.data || []).map(r => ({ ...r, module: r.module || 'system', txn_code: '' }))
+
+      // Merge and sort by created_at descending, deduplicate by id
+      const seenIds = new Set()
+      const merged  = [...hrRows, ...legacyRows]
+        .filter(r => { if (seenIds.has(r.id)) return false; seenIds.add(r.id); return true })
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 500)
+
+      setRows(merged)
       setLoading(false)
     }
     load()
