@@ -1,4 +1,4 @@
-// src/pages/Dashboard/DashboardOverview.jsx
+    // src/pages/Dashboard/DashboardOverview.jsx
 //
 // Main ERP dashboard. Fetches live data from all modules via direct
 // Supabase queries — no context dependency, works standalone.
@@ -77,7 +77,7 @@ export default function DashboardOverview() {
     totalEmployees: 0, activeEmployees: 0, onLeaveToday: 0,
     attendanceToday: 0, pendingAttendance: 0, pendingLeave: 0,
     totalItems: 0, lowStockItems: 0,
-    fuelLevel: 0, fuelMax: 10103, fuelPct: 0, fuelIssuedToday: 0,
+    fuelLevel: 0, fuelMax: 10103, fuelPct: 0, fuelIssuedToday: 0, latestDip: null,
     pendingPOs: 0, pendingReqs: 0,
     openPeriod: null,
     alerts: [],
@@ -87,13 +87,13 @@ export default function DashboardOverview() {
   const load = async () => {
     setLoading(true)
     try {
-      const [empR, attR, leaveR, invR, issR, delR, poR, srR, payR, logR] = await Promise.all([
+      const [empR, attR, leaveR, invR, issR, dipR, poR, srR, payR, logR] = await Promise.all([
         supabase.from('employees').select('id, status'),
         supabase.from('employee_attendance').select('id, employee_id, status, clock_in, date').gte('date', today),
         supabase.from('leave_requests').select('id, status, employee_id, start_date, end_date').in('status', ['pending_supervisor','pending_hr','approved']),
-        supabase.from('inventory_items').select('id, quantity, reorder_level').limit(500),
-        supabase.from('fuel_issuances').select('amount, date').order('date', { ascending: false }).limit(200),
-        supabase.from('fuel_deliveries').select('qty').order('date', { ascending: false }).limit(100),
+        supabase.from('items').select('id, balance, threshold').limit(500),
+        supabase.from('fuel_log').select('amount, date').order('date', { ascending: false }).limit(500),
+        supabase.from('dipstick_log').select('date, fuel_end, dip_end').order('date', { ascending: false }).limit(1),
         supabase.from('purchase_orders').select('id').eq('status', 'pending'),
         supabase.from('store_requisitions').select('id').eq('status', 'pending'),
         supabase.from('payroll_periods').select('id, period_label, status').eq('status', 'open').limit(1),
@@ -113,13 +113,16 @@ export default function DashboardOverview() {
 
       const items        = invR.data || []
       const totalItems   = items.length
-      const lowStockItems = items.filter(i => (i.quantity || 0) <= (i.reorder_level || 0)).length
+      const lowStockItems = items.filter(i => (i.balance || 0) <= (i.threshold || 0)).length
 
-      const totalDelivered  = (delR.data || []).reduce((s, d) => s + (d.qty    || 0), 0)
-      const totalIssuedAll  = (issR.data || []).reduce((s, i) => s + (i.amount || 0), 0)
-      const fuelIssuedToday = (issR.data || []).filter(i => i.date === today).reduce((s, i) => s + (i.amount || 0), 0)
-      const fuelLevel       = Math.max(0, Math.min(10103, totalDelivered - totalIssuedAll))
-      const fuelPct         = (fuelLevel / 10103) * 100
+      // ── Fuel: source of truth = dipstick_log.fuel_end (matches FuelContext) ──
+      const TANK_MAX = 10103
+      const latestDip = (dipR.data || [])[0] || null
+      const fuelLevel = latestDip ? Math.max(0, latestDip.fuel_end || 0) : 0
+      const fuelPct   = (fuelLevel / TANK_MAX) * 100
+      const fuelIssuedToday = (issR.data || [])
+        .filter(i => i.date === today)
+        .reduce((s, i) => s + (i.amount || 0), 0)
 
       const pendingPOs   = (poR.data  || []).length
       const pendingReqs  = (srR.data  || []).length
@@ -130,8 +133,8 @@ export default function DashboardOverview() {
       if (pendingAttendance > 0)  alerts.push({ icon: 'schedule',          color: 'var(--yellow)', text: `${pendingAttendance} timesheet${pendingAttendance !== 1 ? 's' : ''} awaiting approval`,           route: '/module/hr/attendance' })
       if (pendingLeave > 0)       alerts.push({ icon: 'event_busy',        color: 'var(--red)',    text: `${pendingLeave} leave request${pendingLeave !== 1 ? 's' : ''} pending approval`,                    route: '/module/hr/leave'      })
       if (lowStockItems > 0)      alerts.push({ icon: 'inventory_2',       color: 'var(--yellow)', text: `${lowStockItems} item${lowStockItems !== 1 ? 's' : ''} at or below reorder level`,                   route: '/module/inventory/stock-balance' })
-      if (fuelPct < 10)           alerts.push({ icon: 'local_gas_station', color: 'var(--red)',    text: `CRITICAL: Fuel tank at ${fuelPct.toFixed(0)}% — immediate delivery required`,                       route: '/module/fuel/tanks'    })
-      else if (fuelPct < 20)      alerts.push({ icon: 'local_gas_station', color: 'var(--yellow)', text: `Fuel tank low — ${fuelPct.toFixed(0)}% remaining (${Math.round(fuelLevel).toLocaleString()} L)`,    route: '/module/fuel/tanks'    })
+      if (fuelPct < 10)           alerts.push({ icon: 'local_gas_station', color: 'var(--red)',    text: `CRITICAL: Fuel tank at ${fuelPct.toFixed(0)}% (${Math.round(fuelLevel).toLocaleString()} L) — delivery required`,  route: '/module/fuel/tanks' })
+      else if (fuelPct < 20)      alerts.push({ icon: 'local_gas_station', color: 'var(--yellow)', text: `Fuel tank low — ${fuelPct.toFixed(0)}% (${Math.round(fuelLevel).toLocaleString()} L remaining)`, route: '/module/fuel/tanks' })
       if (pendingPOs > 0)         alerts.push({ icon: 'shopping_bag',      color: 'var(--blue)',   text: `${pendingPOs} purchase order${pendingPOs !== 1 ? 's' : ''} pending approval`,                       route: '/module/procurement/purchase-orders' })
       if (openPeriod)             alerts.push({ icon: 'payments',          color: 'var(--purple)', text: `Open payroll period: ${openPeriod.period_label}`,                                                    route: '/module/hr/payroll'    })
 
@@ -156,7 +159,7 @@ export default function DashboardOverview() {
         return { ...mapped, text, time }
       })
 
-      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: 10103, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, alerts, activity })
+      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: TANK_MAX, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, alerts, activity, latestDip })
     } catch (err) {
       console.error('Dashboard load error:', err)
     } finally {
@@ -293,11 +296,18 @@ export default function DashboardOverview() {
                 <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 6, overflow: 'hidden', marginBottom: 6 }}>
                   <div style={{ height: '100%', width: `${Math.min(100, d.fuelPct)}%`, background: levelColor, borderRadius: 6, transition: 'width .6s' }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
                   <span style={{ fontWeight: 700 }}>{d.fuelLevel.toLocaleString()} L</span>
                   <span style={{ color: levelColor, fontWeight: 700 }}>{d.fuelPct.toFixed(0)}%</span>
                   <span style={{ color: 'var(--text-dim)' }}>10,103 L cap</span>
                 </div>
+                {d.latestDip && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, padding: '4px 8px', background: 'var(--surface2)', borderRadius: 6 }}>
+                    <span className="material-icons" style={{ fontSize: 13 }}>straighten</span>
+                    <span>Last dipstick: <strong style={{ color: 'var(--text)' }}>{d.latestDip.dip_end} cm / {Number(d.latestDip.fuel_end || 0).toFixed(0)} L</strong></span>
+                    <span style={{ marginLeft: 'auto' }}>{d.latestDip.date}</span>
+                  </div>
+                )}
                 <div className="kpi-card" style={{ padding: 10 }}>
                   <div className="kpi-label">Issued Today</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--yellow)' }}>{d.fuelIssuedToday} L</div>
