@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { buildTimesheetSummary, getPayrollPeriod, WORK_SCHEDULE, calculateAttendancePay } from '../../utils/attendanceUtils'
 import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
+import { PageHeader, KPICard, EmptyState } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -98,17 +99,14 @@ export default function TimesheetSummary() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Timesheet Summary</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX} disabled={!selectedPeriod}>
-            <span className="material-icons">table_chart</span> Export Excel
-          </button>
-          <button className="btn btn-secondary" onClick={printAll}>
-            <span className="material-icons">print</span> Print All
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Timesheet Summary">
+        <button className="btn btn-secondary" onClick={exportXLSX} disabled={!selectedPeriod}>
+          <span className="material-icons">table_chart</span> Export Excel
+        </button>
+        <button className="btn btn-secondary" onClick={printAll}>
+          <span className="material-icons">print</span> Print All
+        </button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="card" style={{ padding: 14, marginBottom: 20 }}>
@@ -142,36 +140,16 @@ export default function TimesheetSummary() {
       {/* KPIs */}
       {selectedPeriod && summaries.length > 0 && (
         <div className="kpi-grid" style={{ marginBottom: 20 }}>
-          <div className="kpi-card">
-            <div className="kpi-label">Employees</div>
-            <div className="kpi-val">{summaries.length}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total Reg Hours</div>
-            <div className="kpi-val">{totals.regularHours.toFixed(0)}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total OT Hours</div>
-            <div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totals.overtimeHours.toFixed(1)}</div>
-            <div className="kpi-sub">at 1.5×</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total Absent Days</div>
-            <div className="kpi-val" style={{ color: totals.absentWeekdays > 0 ? 'var(--red)' : 'var(--green)' }}>{totals.absentWeekdays}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Est. Total Pay</div>
-            <div className="kpi-val" style={{ fontSize: 20, color: 'var(--teal)' }}>${totals.totalPay.toFixed(0)}</div>
-            <div className="kpi-sub">before deductions</div>
-          </div>
+          <KPICard label="Employees" value={summaries.length} icon="people" color="blue" />
+          <KPICard label="Total Reg Hours" value={totals.regularHours.toFixed(0)} icon="schedule" color="teal" />
+          <KPICard label="Total OT Hours" value={totals.overtimeHours.toFixed(1)} sub="at 1.5×" icon="more_time" color="yellow" />
+          <KPICard label="Total Absent Days" value={totals.absentWeekdays} icon="event_busy" color={totals.absentWeekdays > 0 ? 'red' : 'green'} />
+          <KPICard label="Est. Total Pay" value={`$${totals.totalPay.toFixed(0)}`} sub="before deductions" icon="payments" color="teal" />
         </div>
       )}
 
       {!selectedPeriod ? (
-        <div className="empty-state">
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>calendar_today</span>
-          <span>Select a payroll period to view timesheet summaries</span>
-        </div>
+        <EmptyState icon="calendar_today" message="Select a payroll period to view timesheet summaries" />
       ) : (
         <>
           {/* Master table */}
