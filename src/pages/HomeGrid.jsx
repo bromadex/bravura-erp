@@ -29,6 +29,7 @@ const MODULE_PAGES = {
   hr:          ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet'],
   campsite:    ['overview','blocks','rooms','assignments'],
   connect:     ['chats'],
+  settings:    ['workflows'],
   governance:  ['announcements','policies','ethics'],
   accounting:  ['chart-of-accounts','journal-entries','reports'],
   reports:     ['overview','audit-log','drafts'],
@@ -47,6 +48,7 @@ const ALL_MODULES = [
   { id: 'governance',  icon: 'policy',              label: 'Governance',         color: '#fcd34d', desc: 'Policies & ethics',       route: '/module/governance',  moduleName: 'governance'  },
   { id: 'accounting',  icon: 'receipt',             label: 'Accounting',         color: '#818cf8', desc: 'Journals & reports',      route: '/module/accounting',  moduleName: 'accounting'  },
   { id: 'reports',     icon: 'bar_chart',           label: 'Reports',            color: '#38bdf8', desc: 'Analytics & exports',     route: '/module/reports',     moduleName: 'reports'     },
+  { id: 'settings',    icon: 'admin_panel_settings', label: 'Settings & Admin',   color: '#a78bfa', desc: 'Workflow builder & config', route: '/module/settings/workflows', moduleName: 'settings' },
 ]
 
 export default function HomeGrid() {
