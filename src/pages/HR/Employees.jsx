@@ -693,7 +693,7 @@ export default function Employees() {
               item_name:  item.item_name,
               qty:        item.quantity || 1,
               date:       new Date().toISOString().split('T')[0],
-              notes:      `Returned by ${employee.name || '—'} — ${item.source_code || ''}`,
+              notes:      `Returned by ${employee.name || employee.full_name} — ${item.source_code || ''}`,
               created_at: new Date().toISOString(),
             }])
           }
