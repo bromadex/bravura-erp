@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const FuelContext = createContext(null)
 
@@ -153,6 +154,7 @@ export function FuelProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('fuel_log').insert([{ id, ...issuance, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fuel', action: 'LOG', entityType: 'fuel_issuance', entityId: id, entityName: issuance.vehicle || '' })
     await fetchAll()
   }
 
@@ -160,6 +162,7 @@ export function FuelProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('fuel_deliveries').insert([{ id, ...delivery, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fuel', action: 'LOG', entityType: 'fuel_delivery', entityId: id, entityName: delivery.supplier || delivery.delivered_by || '' })
     await fetchAll()
   }
 
@@ -167,18 +170,21 @@ export function FuelProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('dipstick_log').insert([{ id, ...record, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fuel', action: 'LOG', entityType: 'dipstick', entityId: id, entityName: record.date || '' })
     await fetchAll()
   }
 
   const updateDipstick = async (id, record) => {
     const { error } = await supabase.from('dipstick_log').update(record).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fuel', action: 'UPDATE', entityType: 'dipstick', entityId: id })
     await fetchAll()
   }
 
   const deleteDipstick = async (id) => {
     const { error } = await supabase.from('dipstick_log').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fuel', action: 'DELETE', entityType: 'dipstick', entityId: id })
     await fetchAll()
   }
 

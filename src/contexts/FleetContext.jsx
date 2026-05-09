@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const FleetContext = createContext(null)
 
@@ -61,18 +62,23 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('fleet').insert([{ id, ...vehicle, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'vehicle', entityId: id, entityName: vehicle.reg || id })
     await fetchAll()
   }
 
   const updateVehicle = async (id, updates) => {
+    const v = vehicles.find(x => x.id === id)
     const { error } = await supabase.from('fleet').update(updates).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'vehicle', entityId: id, entityName: v?.reg || id })
     await fetchAll()
   }
 
   const deleteVehicle = async (id) => {
+    const v = vehicles.find(x => x.id === id)
     const { error } = await supabase.from('fleet').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'vehicle', entityId: id, entityName: v?.reg || id })
     await fetchAll()
   }
 
@@ -81,18 +87,23 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('generators').insert([{ id, ...generator, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'generator', entityId: id, entityName: generator.gen_code || id })
     await fetchAll()
   }
 
   const updateGenerator = async (id, updates) => {
+    const g = generators.find(x => x.id === id)
     const { error } = await supabase.from('generators').update(updates).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'generator', entityId: id, entityName: g?.gen_code || id })
     await fetchAll()
   }
 
   const deleteGenerator = async (id) => {
+    const g = generators.find(x => x.id === id)
     const { error } = await supabase.from('generators').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'generator', entityId: id, entityName: g?.gen_code || id })
     await fetchAll()
   }
 
@@ -101,18 +112,23 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('earth_movers').insert([{ id, ...equipment, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'heavy_equipment', entityId: id, entityName: equipment.reg || id })
     await fetchAll()
   }
 
   const updateEarthMover = async (id, updates) => {
+    const e = earthMovers.find(x => x.id === id)
     const { error } = await supabase.from('earth_movers').update(updates).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'heavy_equipment', entityId: id, entityName: e?.reg || id })
     await fetchAll()
   }
 
   const deleteEarthMover = async (id) => {
+    const e = earthMovers.find(x => x.id === id)
     const { error } = await supabase.from('earth_movers').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'heavy_equipment', entityId: id, entityName: e?.reg || id })
     await fetchAll()
   }
 
@@ -121,12 +137,14 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('gen_run_log').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'LOG', entityType: 'gen_run', entityId: id, entityName: log.gen_id || '' })
     await fetchAll()
   }
 
   const deleteGenRunLog = async (id) => {
     const { error } = await supabase.from('gen_run_log').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'gen_run', entityId: id })
     await fetchAll()
   }
 
@@ -139,6 +157,7 @@ export function FleetProvider({ children }) {
     }
     const { error } = await supabase.from('vehicle_trips').insert([{ id, ...trip, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'LOG', entityType: 'vehicle_trip', entityId: id, entityName: vehicle?.reg || '' })
     await fetchAll()
   }
 
@@ -151,6 +170,7 @@ export function FleetProvider({ children }) {
     }
     const { error } = await supabase.from('equipment_hour_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'LOG', entityType: 'equipment_hours', entityId: id, entityName: equipment?.reg || '' })
     await fetchAll()
   }
 
@@ -159,12 +179,15 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('asset_issues').insert([{ id, ...issue, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'asset_issue', entityId: id, entityName: issue.txn_code || issue.asset_id || '' })
     await fetchAll()
   }
 
   const updateAssetIssue = async (id, updates) => {
+    const ai = assetIssues.find(x => x.id === id)
     const { error } = await supabase.from('asset_issues').update(updates).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'asset_issue', entityId: id, entityName: ai?.txn_code || id })
     await fetchAll()
   }
 
@@ -173,6 +196,7 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('service_maintenance_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'LOG', entityType: 'maintenance', entityId: id, entityName: log.asset_id || '' })
     await fetchAll()
   }
 
@@ -180,6 +204,7 @@ export function FleetProvider({ children }) {
     const id = generateId()
     const { error } = await supabase.from('downtime_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
+    auditLog({ module: 'fleet', action: 'LOG', entityType: 'downtime', entityId: id, entityName: log.asset_id || '' })
     await fetchAll()
   }
 

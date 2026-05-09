@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const LogisticsContext = createContext(null)
 
@@ -45,25 +46,31 @@ export function LogisticsProvider({ children }) {
 
   // ── Items ─────────────────────────────────────────────────────
   const addItem = async (item) => {
+    const id = generateId()
     const { error } = await supabase.from('logistics_items').insert([{
-      id: generateId(), ...item,
+      id, ...item,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }])
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'CREATE', entityType: 'logistics_item', entityId: id, entityName: item.name || id })
     await fetchAll()
   }
 
   const updateItem = async (id, updates) => {
+    const item = items.find(i => i.id === id)
     const { error } = await supabase.from('logistics_items')
       .update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'UPDATE', entityType: 'logistics_item', entityId: id, entityName: item?.name || id })
     await fetchAll()
   }
 
   const deleteItem = async (id) => {
+    const item = items.find(i => i.id === id)
     const { error } = await supabase.from('logistics_items').update({ is_active: false }).eq('id', id)
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'DELETE', entityType: 'logistics_item', entityId: id, entityName: item?.name || id })
     await fetchAll()
   }
 
@@ -78,13 +85,15 @@ export function LogisticsProvider({ children }) {
       updated_at: new Date().toISOString(),
     }).eq('id', itemId)
     if (ie) throw new Error(ie.message)
+    const txInId = generateId()
     const { error: te } = await supabase.from('logistics_transactions').insert([{
-      id: generateId(), type: 'IN', item_id: itemId, item_name: item.name,
+      id: txInId, type: 'IN', item_id: itemId, item_name: item.name,
       category: item.category, qty, date, supplier, reference,
       unit_cost: unitCost, total_cost: qty * (unitCost || item.unit_cost || 0),
       notes, user_name: userName, created_at: new Date().toISOString(),
     }])
     if (te) throw new Error(te.message)
+    auditLog({ module: 'logistics', action: 'STOCK_IN', entityType: 'logistics_transaction', entityId: txInId, entityName: item.name, userName })
     await fetchAll()
   }
 
@@ -99,14 +108,16 @@ export function LogisticsProvider({ children }) {
       updated_at: new Date().toISOString(),
     }).eq('id', itemId)
     if (ie) throw new Error(ie.message)
+    const txOutId = generateId()
     const { error: te } = await supabase.from('logistics_transactions').insert([{
-      id: generateId(), type: 'OUT', item_id: itemId, item_name: item.name,
+      id: txOutId, type: 'OUT', item_id: itemId, item_name: item.name,
       category: item.category, qty, date, issued_to: issuedTo,
       authorized_by: authorizedBy, delivery_id: deliveryId, batch_id: batchId,
       unit_cost: item.unit_cost, total_cost: qty * (item.unit_cost || 0),
       notes, user_name: userName, created_at: new Date().toISOString(),
     }])
     if (te) throw new Error(te.message)
+    auditLog({ module: 'logistics', action: 'STOCK_OUT', entityType: 'logistics_transaction', entityId: txOutId, entityName: item.name, userName })
     await fetchAll()
   }
 
@@ -122,6 +133,7 @@ export function LogisticsProvider({ children }) {
       created_at: new Date().toISOString(),
     }])
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'CREATE', entityType: 'delivery', entityId: id, entityName: delivery.delivery_note || delivery.supplier || id, userName })
     // Auto stock-in received items
     for (const it of deliveryItems.filter(it => it.name && it.received > 0)) {
       const existing = items.find(i => i.name.toLowerCase() === it.name.toLowerCase() && i.category === it.category)
@@ -148,6 +160,7 @@ export function LogisticsProvider({ children }) {
       id, ...record, created_at: new Date().toISOString(),
     }])
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'CREATE', entityType: 'batch_record', entityId: id, entityName: `${record.volume_m3 || ''}m³ ${record.mix_design || ''}`.trim(), userName })
     // Auto deduct raw materials
     const matMap = {
       cement:   { name: 'Cement',               unit: 'kg', category: 'Batch Plant', qty: record.cement_kg    || 0 },
@@ -175,15 +188,18 @@ export function LogisticsProvider({ children }) {
       id, date, count, notes, recorded_by: recordedBy,
     }], { onConflict: 'date' })
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'LOG', entityType: 'headcount', entityId: id, entityName: date, userName: recordedBy || '' })
     await fetchAll()
   }
 
   // ── PPE Issuance ───────────────────────────────────────────────
   const issuePPE = async (issuance, userName = '') => {
+    const ppeId = generateId()
     const { error } = await supabase.from('ppe_issuances').insert([{
-      id: generateId(), ...issuance, created_at: new Date().toISOString(),
+      id: ppeId, ...issuance, created_at: new Date().toISOString(),
     }])
     if (error) throw new Error(error.message)
+    auditLog({ module: 'logistics', action: 'LOG', entityType: 'ppe_issuance', entityId: ppeId, entityName: issuance.employee_id || '', userName })
     if (issuance.item_id) {
       await stockOut(issuance.item_id, issuance.qty, issuance.date,
         issuance.employee_id, issuance.issued_by || userName,
