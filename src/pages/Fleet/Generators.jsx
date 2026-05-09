@@ -36,7 +36,7 @@ export default function Generators() {
       setForm({
         gen_code: gen.gen_code, gen_name: gen.gen_name || '', location: gen.location || '',
         capacity: gen.capacity || '', status: gen.status || 'Stopped',
-        service_date: gen.service_date || '',
+        service_date: gen.last_service_date || gen.service_date || '',
         assigned_operator_id: gen.assigned_operator_id || '',
         assigned_operator_name: gen.assigned_operator_name || ''
       })
