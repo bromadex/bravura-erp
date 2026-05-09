@@ -11,6 +11,8 @@ import { FuelProvider }            from './contexts/FuelContext'
 import { FleetProvider }           from './contexts/FleetContext'
 import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
+import { CampsiteProvider }        from './contexts/CampsiteContext'
+import { AccountingProvider }      from './contexts/AccountingContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
@@ -18,6 +20,32 @@ import Layout          from './components/layout/Layout'
 import PermissionRoute from './components/PermissionRoute'
 import AccessDenied    from './pages/Errors/AccessDenied'
 import ChangePassword  from './pages/ChangePassword'
+
+// ── Governance ────────────────────────────────────────────────
+import EthicsGate        from './pages/Governance/EthicsGate'
+import GovAnnouncements  from './pages/Governance/Announcements'
+import GovMemos          from './pages/Governance/Memos'
+import GovPolicies       from './pages/Governance/Policies'
+import GovCodeOfEthics   from './pages/Governance/CodeOfEthics'
+
+// ── Campsite ──────────────────────────────────────────────────
+import CampOverview      from './pages/Campsite/CampOverview'
+import CampBlocks        from './pages/Campsite/CampBlocks'
+import CampRooms         from './pages/Campsite/CampRooms'
+import CampAssignments   from './pages/Campsite/CampAssignments'
+import CampStock         from './pages/Campsite/CampStock'
+import CampConsumption   from './pages/Campsite/CampConsumption'
+import CampPPERegister   from './pages/Campsite/CampPPERegister'
+import CampHeadcount     from './pages/Campsite/CampHeadcount'
+
+import WorkflowAdmin from './components/workflow/WorkflowAdmin'
+import WorkflowBuilder from './components/workflow/WorkflowBuilder'
+
+// ── Connect ───────────────────────────────────────────────────
+import ConnectPage from './pages/Connect/ConnectPage'
+
+// ── Notifications ─────────────────────────────────────────────
+import NotificationCenter from './pages/Notifications/NotificationCenter'
 
 // ── Dashboard ─────────────────────────────────────────────────
 import DashboardOverview from './pages/Dashboard/DashboardOverview'
@@ -66,6 +94,17 @@ import LeaveCalendar   from './pages/HR/LeaveCalendar'
 import LeaveReports    from './pages/HR/LeaveReports'
 import Travel          from './pages/HR/Travel'
 import Payroll         from './pages/HR/Payroll'
+import TimesheetSummary from './pages/HR/TimesheetSummary'
+
+// ── Accounting ────────────────────────────────────────────────
+import ChartOfAccounts  from './pages/Accounting/ChartOfAccounts'
+import JournalEntries   from './pages/Accounting/JournalEntries'
+import FinancialReports from './pages/Accounting/FinancialReports'
+
+// ── Reports ───────────────────────────────────────────────────
+import ReportsOverview from './pages/Reports/ReportsOverview'
+import AuditTrail      from './pages/Reports/AuditTrail'
+import Drafts          from './pages/Reports/Drafts'
 
 // ── Logistics ─────────────────────────────────────────────────
 import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
@@ -87,8 +126,15 @@ function ProtectedRoute({ children }) {
     )
   }
   if (!user) return <Navigate to="/login" replace />
-  if (user.must_change_password === true && window.location.pathname !== '/change-password') {
+  const path = window.location.pathname
+  if (user.must_change_password === true && path !== '/change-password') {
     return <Navigate to="/change-password" replace />
+  }
+  // Ethics gate: only redirect when explicitly false.
+  // null or undefined = column not yet populated for this user = treat as signed.
+  const needsEthicsSign = user.has_signed_code_of_ethics === false
+  if (needsEthicsSign && path !== '/governance/ethics-gate' && path !== '/change-password') {
+    return <Navigate to="/governance/ethics-gate" replace />
   }
   return children
 }
@@ -112,11 +158,8 @@ function ModulePlaceholder({ module, page }) {
   )
 }
 
-// Only true placeholder modules (Logistics is now real)
-const OTHER_MODULES = [
-  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
-  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                 },
-]
+// No more placeholder modules — all are implemented
+const OTHER_MODULES = []
 
 // ───────────────────────────────────────────────────────────────
 // Routes
@@ -246,6 +289,7 @@ function AppRoutes() {
         <Route path="leave-reports"  element={<LeaveReports />} />
         <Route path="travel"         element={<Travel />} />
         <Route path="payroll"        element={<Payroll />} />
+        <Route path="timesheet"      element={<TimesheetSummary />} />
       </Route>
 
       {/* ── LOGISTICS ────────────────────────────────────── */}
@@ -265,7 +309,51 @@ function AppRoutes() {
         <Route path="deliveries"  element={<LogisticsDeliveries />} />
       </Route>
 
-      {/* ── PLACEHOLDER MODULES ──────────────────────────── */}
+      {/* ── CAMPSITE ─────────────────────────────────────── */}
+      <Route path="/module/campsite" element={
+        <ProtectedRoute>
+          <PermissionRoute module="campsite" page="overview">
+            <LogisticsProvider>
+              <CampsiteProvider>
+                <Layout module="campsite" />
+              </CampsiteProvider>
+            </LogisticsProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index              element={<CampOverview />}    />
+        <Route path="overview"    element={<CampOverview />}    />
+        <Route path="blocks"      element={<CampBlocks />}      />
+        <Route path="rooms"       element={<CampRooms />}       />
+        <Route path="assignments" element={<CampAssignments />} />
+        <Route path="camp-stock"  element={<CampStock />}       />
+        <Route path="consumption" element={<CampConsumption />} />
+        <Route path="ppe-register" element={<CampPPERegister />} />
+        <Route path="headcount"   element={<CampHeadcount />}   />
+      </Route>
+
+      {/* ── GOVERNANCE ─────────────────────────────────────── */}
+      <Route path="/module/governance" element={
+        <ProtectedRoute>
+          <PermissionRoute module="governance" page="announcements">
+            <Layout module="governance" />
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                 element={<GovAnnouncements />} />
+        <Route path="announcements"  element={<GovAnnouncements />} />
+        <Route path="memos"          element={<GovMemos />}         />
+        <Route path="policies"       element={<GovPolicies />}      />
+        <Route path="code-of-ethics" element={<GovCodeOfEthics />}  />
+      </Route>
+
+      {/* Ethics gate — outside normal module layout */}
+      <Route path="/governance/ethics-gate" element={<ProtectedRoute><EthicsGate /></ProtectedRoute>} />
+
+      {/* ── NOTIFICATIONS PAGE ───────────────────────────── */}
+      <Route path="/module/notifications" element={<ProtectedRoute><NotificationCenter /></ProtectedRoute>} />
+
+      {/* ── PLACEHOLDER MODULES ──────────────���───────────── */}
       {OTHER_MODULES.map(mod => (
         <Route key={mod.id} path={`/module/${mod.id}`} element={
           <ProtectedRoute>
@@ -280,6 +368,53 @@ function AppRoutes() {
           ))}
         </Route>
       ))}
+
+      {/* ── ACCOUNTING ───────────────────────────────────── */}
+      <Route path="/module/accounting" element={
+        <ProtectedRoute>
+          <PermissionRoute module="accounting" page="chart-of-accounts">
+            <AccountingProvider>
+              <Layout module="accounting" />
+            </AccountingProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                    element={<ChartOfAccounts />}  />
+        <Route path="chart-of-accounts" element={<ChartOfAccounts />}  />
+        <Route path="journal-entries"   element={<JournalEntries />}   />
+        <Route path="reports"           element={<FinancialReports />} />
+      </Route>
+
+      {/* ── REPORTS ──────────────────────────────────────── */}
+      <Route path="/module/settings/workflows" element={
+        <Layout module="settings" />
+      }>
+        <Route index element={<WorkflowBuilder />} />
+        <Route path="admin" element={<WorkflowAdmin />} />
+      </Route>
+
+      <Route path="/module/reports" element={
+        <ProtectedRoute>
+          <PermissionRoute module="reports" page="overview">
+            <Layout module="reports" />
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index           element={<ReportsOverview />} />
+        <Route path="overview" element={<ReportsOverview />} />
+        <Route path="audit-log" element={<AuditTrail />}    />
+        <Route path="drafts"    element={<Drafts />}         />
+      </Route>
+
+      {/* ── CONNECT ──────────────────────────────────────── */}
+      <Route path="/module/connect" element={
+        <ProtectedRoute>
+          <Layout module="connect" />
+        </ProtectedRoute>
+      }>
+        <Route index        element={<ConnectPage />} />
+        <Route path="chats" element={<ConnectPage />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
