@@ -1,0 +1,10 @@
+// src/components/ui/index.js — barrel export for shared UI primitives
+export { StatusBadge }           from './StatusBadge'
+export { ModalDialog, ModalActions } from './ModalDialog'
+export { ConfirmDialog }         from './ConfirmDialog'
+export { PageHeader }            from './PageHeader'
+export { KPICard }               from './KPICard'
+export { EmptyState }            from './EmptyState'
+export { SectionCard }           from './SectionCard'
+export { TabNav }                from './TabNav'
+export { AlertBanner }           from './AlertBanner'

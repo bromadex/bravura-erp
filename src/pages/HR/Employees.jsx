@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import { useLeave } from '../../contexts/LeaveContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
+import { PageHeader, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
 export default function Employees() {
   const {
@@ -344,7 +345,7 @@ export default function Employees() {
                 <div key={doc.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <span className="material-icons" style={{ fontSize: 22, color: isImage ? 'var(--teal)' : 'var(--blue)' }}>{isImage ? 'image' : 'description'}</span>
                   <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}</div></div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="btn-group-sm">
                     <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm"><span className="material-icons" style={{ fontSize: 14 }}>open_in_new</span></a>
                     <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDocument(doc.path)}><span className="material-icons" style={{ fontSize: 14 }}>delete</span></button>
                   </div>
@@ -734,7 +735,7 @@ export default function Employees() {
                   return (
                     <tr key={item.id}>
                       <td style={{ fontWeight: 600 }}>{item.item_name}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{item.quantity}</td>
+                      <td className="td-mono">{item.quantity}</td>
                       <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{item.issued_at ? new Date(item.issued_at).toLocaleDateString('en-GB') : '—'}</td>
                       <td>
                         <span style={{ fontSize: 11, fontWeight: 700, color: sc, background: `${sc}18`, padding: '2px 8px', borderRadius: 10 }}>
@@ -803,10 +804,9 @@ export default function Employees() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Employees</h1>
+      <PageHeader title="Employees">
         {canEdit && <button className="btn btn-primary" onClick={() => openModal()}><span className="material-icons">add</span> Add Employee</button>}
-      </div>
+      </PageHeader>
 
       {/* Filters */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
@@ -821,7 +821,7 @@ export default function Employees() {
 
       {/* Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-        {hrLoading ? <div>Loading…</div> : filteredEmployees.length === 0 ? <div className="empty-state">No employees match your filters</div> : filteredEmployees.map(emp => {
+        {hrLoading ? <div>Loading…</div> : filteredEmployees.length === 0 ? <EmptyState icon="people" message="No employees match your filters" /> : filteredEmployees.map(emp => {
           const ws = getWeeklyHours(emp.id)
           const { cls, label } = getStatusBadge(emp)
           return (
@@ -854,15 +854,12 @@ export default function Employees() {
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Employee: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div>{canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView} style={{ marginRight: 8 }}><span className="material-icons">edit</span> Edit</button>}{canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}</div>
+              <div className="btn-group-sm">
+                {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView}><span className="material-icons">edit</span> Edit</button>}
+                {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20, flexWrap: 'wrap' }}>
-              {TABS.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ padding: '8px 14px', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span className="material-icons" style={{ fontSize: 15 }}>{tab.icon}</span>{tab.label}
-                </button>
-              ))}
-            </div>
+            <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
             <div style={{ maxHeight: '62vh', overflowY: 'auto', paddingRight: 8 }}>
               {activeTab === 'profile'      && <ProfileTab      employee={selectedEmployee} />}
               {activeTab === 'compensation' && <CompensationTab employee={selectedEmployee} />}

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCanView, useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { PageHeader, KPICard, EmptyState } from '../../components/ui'
 
 export default function HRDashboard() {
   const navigate           = useNavigate()
@@ -140,20 +141,17 @@ export default function HRDashboard() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">HR Dashboard</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canViewEmployees && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/employees')} style={{ marginRight: 4 }}><span className="material-icons">people</span> Employees</button>}
-          {canViewAttendance && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/attendance')}><span className="material-icons">schedule</span> Attendance</button>}
-        </div>
-      </div>
+      <PageHeader title="HR Dashboard">
+        {canViewEmployees && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/employees')}><span className="material-icons">people</span> Employees</button>}
+        {canViewAttendance && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/attendance')}><span className="material-icons">schedule</span> Attendance</button>}
+      </PageHeader>
 
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card"><div className="kpi-label">Total Employees</div><div className="kpi-val">{dashboardData.totalEmployees}</div><div className="kpi-sub">Active: {dashboardData.activeEmployees} · Inactive: {dashboardData.inactiveEmployees}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Attendance Today</div><div className="kpi-val">{dashboardData.attendanceToday}</div><div className="kpi-sub">{dashboardData.attendanceRate}% of active</div></div>
-        <div className="kpi-card"><div className="kpi-label">Pending Timesheets</div><div className="kpi-val" style={{ color: dashboardData.pendingAttendance > 0 ? 'var(--yellow)' : 'var(--green)' }}>{dashboardData.pendingAttendance}</div><div className="kpi-sub">awaiting approval</div></div>
-        <div className="kpi-card"><div className="kpi-label">Leave Requests</div><div className="kpi-val" style={{ color: (dashboardData.pendingLeave + dashboardData.pendingSupervLeave) > 0 ? 'var(--yellow)' : 'var(--green)' }}>{dashboardData.pendingLeave + dashboardData.pendingSupervLeave}</div><div className="kpi-sub">HR: {dashboardData.pendingLeave} · Supervisor: {dashboardData.pendingSupervLeave}</div></div>
+        <KPICard label="Total Employees" value={dashboardData.totalEmployees} sub={`Active: ${dashboardData.activeEmployees} · Inactive: ${dashboardData.inactiveEmployees}`} icon="people" color="blue" />
+        <KPICard label="Attendance Today" value={dashboardData.attendanceToday} sub={`${dashboardData.attendanceRate}% of active`} icon="today" color="teal" />
+        <KPICard label="Pending Timesheets" value={dashboardData.pendingAttendance} sub="awaiting approval" icon="schedule" color={dashboardData.pendingAttendance > 0 ? 'yellow' : 'green'} />
+        <KPICard label="Leave Requests" value={dashboardData.pendingLeave + dashboardData.pendingSupervLeave} sub={`HR: ${dashboardData.pendingLeave} · Supervisor: ${dashboardData.pendingSupervLeave}`} icon="event_busy" color={(dashboardData.pendingLeave + dashboardData.pendingSupervLeave) > 0 ? 'yellow' : 'green'} />
       </div>
 
       {/* Quick alerts for pending leave */}
@@ -229,10 +227,7 @@ export default function HRDashboard() {
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Smart Alerts</h3>
         {dashboardData.alerts.length === 0 ? (
-          <div className="empty-state">
-            <span className="material-icons" style={{ fontSize: 36, opacity: 0.5 }}>check_circle</span>
-            <div>All systems normal. No alerts.</div>
-          </div>
+          <EmptyState icon="check_circle" message="All systems normal. No alerts." />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {dashboardData.alerts.map((alert, idx) => (

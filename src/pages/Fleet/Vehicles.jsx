@@ -6,6 +6,7 @@ import { useFleet } from '../../contexts/FleetContext'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { PageHeader, StatusBadge, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function Vehicles() {
   const { vehicles, addVehicle, updateVehicle, deleteVehicle, loading, fetchAll } = useFleet()
@@ -103,22 +104,18 @@ export default function Vehicles() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Vehicles</h1>
+      <PageHeader title="Vehicles">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => openModal()}>
             <span className="material-icons">add</span> Add Vehicle
           </button>
         )}
-      </div>
+      </PageHeader>
 
       {loading ? (
-        <div className="empty-state">Loading vehicles…</div>
+        <EmptyState icon="hourglass_empty" message="Loading vehicles…" />
       ) : vehicles.length === 0 ? (
-        <div className="empty-state">
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>directions_car</span>
-          <p>No vehicles added yet</p>
-        </div>
+        <EmptyState icon="directions_car" message="No vehicles added yet" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {vehicles.map(v => {
@@ -127,7 +124,7 @@ export default function Vehicles() {
               <div key={v.id} className="card" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span className="material-icons" style={{ fontSize: 32, color: 'var(--gold)' }}>directions_car</span>
-                  <span className={`badge ${v.status === 'Active' ? 'bg-green' : v.status === 'Maintenance' ? 'bg-yellow' : 'bg-red'}`}>{v.status}</span>
+                  <StatusBadge status={v.status} />
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{v.reg}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{v.type || '—'} {v.description ? `· ${v.description}` : ''}</div>
@@ -144,7 +141,7 @@ export default function Vehicles() {
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>🔢 {Number(v.odometer_km).toLocaleString()} km</div>
                 )}
                 <div style={{ marginTop: 8, fontSize: 12 }}>⛽ Total Fuel: <strong>{totalFuel.toLocaleString()} L</strong></div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <div className="btn-group-sm" style={{ justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => openModal(v)}><span className="material-icons">edit</span></button>}
                   {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(v)}><span className="material-icons">delete</span></button>}
                 </div>
@@ -154,75 +151,70 @@ export default function Vehicles() {
         </div>
       )}
 
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Vehicle</span></div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Registration *</label>
-                  <input className="form-control" required value={form.reg} onChange={e => setForm({...form, reg: e.target.value.toUpperCase()})} placeholder="e.g. ABC 123Z" />
-                </div>
-                <div className="form-group">
-                  <label>Type</label>
-                  <select className="form-control" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                    <option value="">— Select type —</option>
-                    {vehicleTypes.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Description / Model</label>
-                <input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="e.g. Toyota Hilux D4D" />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Assigned Driver</label>
-                  <select className="form-control" value={form.driver_id} onChange={e => handleDriverSelect(e.target.value)}>
-                    <option value="">— Select employee —</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
-                    <option>Active</option>
-                    <option>Grounded</option>
-                    <option>Maintenance</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Odometer (km)</label>
-                  <input type="number" className="form-control" value={form.odometer_km} onChange={e => setForm({...form, odometer_km: e.target.value})} placeholder="0" />
-                </div>
-                <div className="form-group">
-                  <label>Service Interval (km)</label>
-                  <input type="number" className="form-control" value={form.service_interval_km} onChange={e => setForm({...form, service_interval_km: e.target.value})} placeholder="5000" />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Last Service Date</label>
-                  <input type="date" className="form-control" value={form.last_service_date} onChange={e => setForm({...form, last_service_date: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Assigned Project</label>
-                  <input className="form-control" value={form.assigned_project} onChange={e => setForm({...form, assigned_project: e.target.value})} placeholder="e.g. Boxcut" />
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Vehicle</button>
-              </div>
-            </form>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title={`${editing ? 'Edit' : 'Add'} Vehicle`}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Registration *</label>
+              <input className="form-control" required value={form.reg} onChange={e => setForm({...form, reg: e.target.value.toUpperCase()})} placeholder="e.g. ABC 123Z" />
+            </div>
+            <div className="form-group">
+              <label>Type</label>
+              <select className="form-control" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                <option value="">— Select type —</option>
+                {vehicleTypes.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+          <div className="form-group">
+            <label>Description / Model</label>
+            <input className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="e.g. Toyota Hilux D4D" />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Assigned Driver</label>
+              <select className="form-control" value={form.driver_id} onChange={e => handleDriverSelect(e.target.value)}>
+                <option value="">— Select employee —</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                <option>Active</option>
+                <option>Grounded</option>
+                <option>Maintenance</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Odometer (km)</label>
+              <input type="number" className="form-control" value={form.odometer_km} onChange={e => setForm({...form, odometer_km: e.target.value})} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label>Service Interval (km)</label>
+              <input type="number" className="form-control" value={form.service_interval_km} onChange={e => setForm({...form, service_interval_km: e.target.value})} placeholder="5000" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Last Service Date</label>
+              <input type="date" className="form-control" value={form.last_service_date} onChange={e => setForm({...form, last_service_date: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>Assigned Project</label>
+              <input className="form-control" value={form.assigned_project} onChange={e => setForm({...form, assigned_project: e.target.value})} placeholder="e.g. Boxcut" />
+            </div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save Vehicle</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }
