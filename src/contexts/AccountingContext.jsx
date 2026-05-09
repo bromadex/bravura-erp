@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLog } from '../engine/auditEngine'
 
 const AccountingContext = createContext(null)
 
@@ -31,24 +32,29 @@ export function AccountingProvider({ children }) {
   useEffect(() => { fetchAll() }, [fetchAll])
 
   // ── Accounts ─────────────────────────────────────────────────
-  const addAccount = async (data) => {
+  const addAccount = async (data, userName = '') => {
+    const id = crypto.randomUUID()
     const { error } = await supabase.from('accounts').insert([{
-      id: crypto.randomUUID(), ...data, is_active: true, balance: 0,
-      created_at: new Date().toISOString(),
+      id, ...data, is_active: true, balance: 0, created_at: new Date().toISOString(),
     }])
     if (error) throw error
+    auditLog({ module: 'accounting', action: 'CREATE', entityType: 'account', entityId: id, entityName: `${data.code} ${data.name}`, userName })
     await fetchAll()
   }
 
-  const updateAccount = async (id, data) => {
+  const updateAccount = async (id, data, userName = '') => {
     const { error } = await supabase.from('accounts').update(data).eq('id', id)
     if (error) throw error
+    const acct = accounts.find(a => a.id === id)
+    auditLog({ module: 'accounting', action: 'UPDATE', entityType: 'account', entityId: id, entityName: acct ? `${acct.code} ${acct.name}` : id, userName })
     await fetchAll()
   }
 
-  const deleteAccount = async (id) => {
+  const deleteAccount = async (id, userName = '') => {
     const { error } = await supabase.from('accounts').update({ is_active: false }).eq('id', id)
     if (error) throw error
+    const acct = accounts.find(a => a.id === id)
+    auditLog({ module: 'accounting', action: 'DELETE', entityType: 'account', entityId: id, entityName: acct ? `${acct.code} ${acct.name}` : id, userName })
     await fetchAll()
   }
 
@@ -98,6 +104,7 @@ export function AccountingProvider({ children }) {
       await supabase.from('accounts').update({ balance: acct.balance + delta }).eq('id', acct.id)
     }
 
+    auditLog({ module: 'accounting', action: 'POST', entityType: 'journal_entry', entityId: entryId, entityName: description, userName: createdBy || '', txnCode: reference || '' })
     await fetchAll()
     return entryId
   }
