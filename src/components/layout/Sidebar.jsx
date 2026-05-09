@@ -22,24 +22,32 @@ const ALL_MODULES = {
   },
   inventory: {
     label: 'Inventory', icon: 'inventory', color: '#2dd4bf',
-    sections: [{
-      label: 'Stock Management', pages: [
-        { id: 'stock-balance', label: 'Stock Balance', icon: 'list_alt'      },
-        { id: 'stock-in',      label: 'Stock In',      icon: 'add_circle'    },
-        { id: 'stock-out',     label: 'Stock Out',     icon: 'remove_circle' },
-        { id: 'transactions',  label: 'Transactions',  icon: 'swap_horiz'    },
-        { id: 'stock-taking',  label: 'Stock Taking',  icon: 'fact_check'    },
-        { id: 'categories',    label: 'Categories',    icon: 'category'      },
-      ],
-    }],
+    sections: [
+      {
+        label: 'Stock Management', pages: [
+          { id: 'stock-balance', label: 'Stock Balance', icon: 'list_alt'      },
+          { id: 'stock-in',      label: 'Stock In',      icon: 'add_circle'    },
+          { id: 'stock-out',     label: 'Stock Out',     icon: 'remove_circle' },
+          { id: 'transactions',  label: 'Transactions',  icon: 'swap_horiz'    },
+          { id: 'stock-taking',  label: 'Stock Taking',  icon: 'fact_check'    },
+          { id: 'categories',    label: 'Categories',    icon: 'category'      },
+        ],
+      },
+      {
+        label: 'Configuration', pages: [
+          { id: 'locations', label: 'Storage Locations', icon: 'location_on' },
+        ],
+      },
+    ],
   },
   logistics: {
     label: 'Logistics', icon: 'local_shipping', color: '#60a5fa',
     sections: [{
       label: 'Operations', pages: [
-        { id: 'goods-received', label: 'Goods Received', icon: 'move_to_inbox' },
-        { id: 'batch-plant',    label: 'Batch Plant',    icon: 'factory'        },
-        { id: 'campsite',       label: 'Campsite',       icon: 'cabin'          },
+        { id: 'dashboard',   label: 'Dashboard',   icon: 'dashboard'       },
+        { id: 'batch-plant', label: 'Batch Plant', icon: 'factory'         },
+        { id: 'deliveries',  label: 'Deliveries',  icon: 'local_shipping'  },
+        { id: 'camp',        label: 'Camp Stock',  icon: 'storefront'      },
       ],
     }],
   },
@@ -97,11 +105,57 @@ const ALL_MODULES = {
       {
         label: 'Payroll & Travel',
         pages: [
-          { id: 'payroll', label: 'Payroll', icon: 'payments' },
-          { id: 'travel',  label: 'Travel',  icon: 'flight'   },
+          { id: 'payroll',    label: 'Payroll',           icon: 'payments'   },
+          { id: 'travel',     label: 'Travel',            icon: 'flight'     },
+          { id: 'timesheet',  label: 'Timesheet Summary', icon: 'fact_check' },
         ],
       },
     ],
+  },
+  campsite: {
+    label: 'Campsite', icon: 'cabin', color: '#86efac',
+    sections: [
+      {
+        label: 'Overview',
+        pages: [{ id: 'overview', label: 'Camp Overview', icon: 'map' }],
+      },
+      {
+        label: 'Assignments',
+        pages: [
+          { id: 'assignments', label: 'Assignments', icon: 'assignment_ind' },
+          { id: 'rooms',       label: 'Rooms',       icon: 'bed'            },
+          { id: 'blocks',      label: 'Blocks',      icon: 'domain'         },
+        ],
+      },
+      {
+        label: 'Camp Supplies',
+        pages: [
+          { id: 'camp-stock',   label: 'Stock Levels',          icon: 'inventory_2' },
+          { id: 'consumption',  label: 'Consumption Analytics', icon: 'analytics'   },
+          { id: 'ppe-register', label: 'PPE Register',          icon: 'security'    },
+          { id: 'headcount',    label: 'Headcount',             icon: 'people'      },
+        ],
+      },
+    ],
+  },
+  connect: {
+    label: 'Connect', icon: 'forum', color: '#67e8f9',
+    sections: [{
+      label: 'Messaging', pages: [
+        { id: 'chats', label: 'Messages', icon: 'chat' },
+      ],
+    }],
+  },
+  governance: {
+    label: 'Governance', icon: 'policy', color: '#fcd34d',
+    sections: [{
+      label: 'Compliance', pages: [
+        { id: 'announcements', label: 'Announcements',    icon: 'campaign'    },
+        { id: 'memos',         label: 'Memos',            icon: 'mail'        },
+        { id: 'policies',      label: 'Policies & Rules', icon: 'description' },
+        { id: 'code-of-ethics', label: 'Code of Ethics',  icon: 'verified'    },
+      ],
+    }],
   },
   accounting: {
     label: 'Accounting', icon: 'receipt', color: '#818cf8',
@@ -120,6 +174,14 @@ const ALL_MODULES = {
         { id: 'overview',  label: 'Overview',    icon: 'dashboard' },
         { id: 'audit-log', label: 'Audit Trail', icon: 'history'   },
         { id: 'drafts',    label: 'Drafts',      icon: 'drafts'    },
+      ],
+    }],
+  },
+  settings: {
+    label: 'Settings & Admin', icon: 'admin_panel_settings', color: '#a78bfa',
+    sections: [{
+      label: 'System Configuration', pages: [
+        { id: 'workflows', label: 'Workflow Builder', icon: 'account_tree' },
       ],
     }],
   },
