@@ -17,7 +17,8 @@ export default function Vehicles() {
   const [employees, setEmployees] = useState([])
   const [form, setForm] = useState({
     reg: '', type: '', description: '', driver_name: '', driver_id: '', status: 'Active',
-    odometer_km: '', last_service_date: '', service_interval_km: '', assigned_project: ''
+    odometer_km: '', last_service_date: '', service_interval_km: '',
+    service_interval_days: '', assigned_project: '', utilization_available_hours: ''
   })
 
   useEffect(() => {
@@ -45,7 +46,9 @@ export default function Vehicles() {
         status: vehicle.status || 'Active', odometer_km: vehicle.odometer_km || '',
         last_service_date: vehicle.last_service_date || '',
         service_interval_km: vehicle.service_interval_km || '',
-        assigned_project: vehicle.assigned_project || ''
+        service_interval_days: vehicle.service_interval_days || '',
+        assigned_project: vehicle.assigned_project || '',
+        utilization_available_hours: vehicle.utilization_available_hours || ''
       })
     } else {
       setEditing(null)
@@ -64,9 +67,18 @@ export default function Vehicles() {
     if (!form.reg) return toast.error('Registration required')
     try {
       const payload = {
-        ...form,
-        odometer_km: form.odometer_km ? parseFloat(form.odometer_km) : null,
-        service_interval_km: form.service_interval_km ? parseInt(form.service_interval_km) : null,
+        reg:                          form.reg,
+        type:                         form.type,
+        description:                  form.description,
+        driver_id:                    form.driver_id || null,
+        driver_name:                  form.driver_name || '',   // added by migration 008
+        status:                       form.status,
+        odometer_km:                  form.odometer_km ? parseFloat(form.odometer_km) : null,
+        last_service_date:            form.last_service_date || null,
+        service_interval_km:          form.service_interval_km ? parseInt(form.service_interval_km) : null,
+        service_interval_days:        form.service_interval_days ? parseInt(form.service_interval_days) : null,
+        assigned_project:             form.assigned_project || '',
+        utilization_available_hours:  form.utilization_available_hours ? parseFloat(form.utilization_available_hours) : 0,
       }
       if (editing) {
         await updateVehicle(editing.id, payload)
