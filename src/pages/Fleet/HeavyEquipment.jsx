@@ -35,12 +35,12 @@ export default function HeavyEquipment() {
       setForm({
         reg: eq.reg, type: eq.type || '', description: eq.description || '',
         operator_id: eq.operator_id || '', operator_name: eq.operator_name || '',
-        status: eq.status || 'Active', odometer_km: eq.odometer_km || '',
+        status: eq.status || 'Active', hour_meter: eq.hour_meter || '', odometer_km: eq.odometer_km || '',
         last_service_date: eq.last_service_date || '', assigned_project: eq.assigned_project || ''
       })
     } else {
       setEditing(null)
-      setForm({ reg: '', type: '', description: '', operator_id: '', operator_name: '', status: 'Active', odometer_km: '', last_service_date: '', assigned_project: '' })
+      setForm({ reg: '', type: '', description: '', operator_id: '', operator_name: '', status: 'Active', hour_meter: '', odometer_km: '', last_service_date: '', assigned_project: '' })
     }
     setModalOpen(true)
   }
@@ -49,7 +49,15 @@ export default function HeavyEquipment() {
     e.preventDefault()
     if (!form.reg) return toast.error('Registration/code required')
     try {
-      const payload = { ...form, odometer_km: form.odometer_km ? parseFloat(form.odometer_km) : null }
+      const hourVal = form.hour_meter ? parseFloat(form.hour_meter) : null
+      const payload = {
+        reg: form.reg, type: form.type, description: form.description,
+        operator_id: form.operator_id || null, operator_name: form.operator_name || '',
+        status: form.status, last_service_date: form.last_service_date || null,
+        assigned_project: form.assigned_project || '',
+        hour_meter:   hourVal,
+        odometer_km:  hourVal,  // kept in sync — both columns exist after migration 008
+      }
       if (editing) { await updateEarthMover(editing.id, payload); toast.success('Equipment updated') }
       else { await addEarthMover(payload); toast.success('Equipment added') }
       setModalOpen(false)
@@ -164,7 +172,7 @@ export default function HeavyEquipment() {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group"><label>Hours / Odometer</label><input type="number" className="form-control" value={form.odometer_km} onChange={e => setForm({...form, odometer_km: e.target.value})} placeholder="0" /></div>
+                <div className="form-group"><label>Hour Meter</label><input type="number" className="form-control" value={form.hour_meter || form.odometer_km} onChange={e => setForm({...form, hour_meter: e.target.value, odometer_km: e.target.value})} placeholder="0" /></div>
                 <div className="form-group"><label>Last Service Date</label><input type="date" className="form-control" value={form.last_service_date} onChange={e => setForm({...form, last_service_date: e.target.value})} /></div>
               </div>
               <div className="form-group"><label>Assigned Project</label><input className="form-control" value={form.assigned_project} onChange={e => setForm({...form, assigned_project: e.target.value})} /></div>
