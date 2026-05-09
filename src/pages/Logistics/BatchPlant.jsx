@@ -4,7 +4,7 @@ import { useLogistics } from '../../contexts/LogisticsContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 const MIX_DESIGNS = ['C20','C25','C30','C35','Standard','Blinding','Other']
@@ -59,10 +59,9 @@ export default function BatchPlant() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(recent.map(r => ({ Date: r.date, 'Batch #': r.batch_number, Mix: r.mix_design, 'Volume (m³)': r.volume_m3, 'Cement (kg)': r.cement_kg, 'Sand (kg)': r.sand_kg, 'Stone (kg)': r.stone_kg, 'kg/m³': (r.cement_per_m3 || (r.volume_m3 > 0 ? r.cement_kg/r.volume_m3 : 0)).toFixed(1), Location: r.pour_location, Operator: r.operator })))
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Batch Records')
-    XLSX.writeFile(wb, `BatchPlant_${today}.xlsx`); toast.success('Exported')
+  const handleExport = () => {
+    exportXLSX(recent.map(r => ({ Date: r.date, 'Batch #': r.batch_number, Mix: r.mix_design, 'Volume (m³)': r.volume_m3, 'Cement (kg)': r.cement_kg, 'Sand (kg)': r.sand_kg, 'Stone (kg)': r.stone_kg, 'kg/m³': (r.cement_per_m3 || (r.volume_m3 > 0 ? r.cement_kg/r.volume_m3 : 0)).toFixed(1), Location: r.pour_location, Operator: r.operator })), `BatchPlant_${today}`, 'Batch Records')
+    toast.success('Exported')
   }
 
   return (
@@ -70,7 +69,7 @@ export default function BatchPlant() {
       <div className="page-header">
         <h1 className="page-title">Batch Plant</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && <button className="btn btn-primary" onClick={() => setShowModal(true)}><span className="material-icons">add</span> Record Batch</button>}
         </div>
       </div>

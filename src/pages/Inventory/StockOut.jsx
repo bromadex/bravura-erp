@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 export default function StockOut() {
   const { transactions, loading } = useInventory()
@@ -29,7 +29,7 @@ export default function StockOut() {
   const totalValue = filtered.reduce((s, t) => s + ((t.quantity || 0) * (t.unit_cost || 0)), 0)
 
   const exportExcel = () => {
-    const rows = filtered.map(t => ({
+    exportXLSX(filtered.map(t => ({
       Date:       t.date,
       Item:       t.item_name,
       Quantity:   t.quantity,
@@ -38,11 +38,7 @@ export default function StockOut() {
       'Total':    (t.quantity || 0) * (t.unit_cost || 0),
       Reference:  t.reference || '',
       Notes:      t.notes || '',
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock Out')
-    XLSX.writeFile(wb, `stock-out-${new Date().toISOString().split('T')[0]}.xlsx`)
+    })), `stock-out-${new Date().toISOString().split('T')[0]}`, 'Stock Out')
   }
 
   return (

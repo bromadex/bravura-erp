@@ -13,7 +13,7 @@ import { useCanEdit, useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import { getPayrollPeriod, buildTimesheetSummary, WORK_SCHEDULE } from '../../utils/attendanceUtils'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 // Zimbabwe PAYE brackets 2024/2025 (rough progressive estimate)
 const calcPAYE = (gross, rate) => {
@@ -198,10 +198,7 @@ export default function Payroll() {
       'Basic': r.basic_salary, 'Gross': r.gross_pay?.toFixed(2), 'PAYE': r.paye?.toFixed(2), 'NSSA': r.nssa?.toFixed(2), 'Aids Levy': r.aids_levy?.toFixed(2), 'Other Ded': r.other_deductions?.toFixed(2), 'Total Ded': r.total_deductions?.toFixed(2), 'Net Pay': r.net_pay?.toFixed(2),
       'Absent': r.absent_days, 'Leave': r.leave_days,
     }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Payroll')
-    XLSX.writeFile(wb, `Payroll_${selectedPeriod?.period_label?.replace(/ /g,'_')}.xlsx`)
+    exportXLSX(data, `Payroll_${selectedPeriod?.period_label?.replace(/ /g,'_')}`, 'Payroll')
     toast.success('Exported')
   }
 

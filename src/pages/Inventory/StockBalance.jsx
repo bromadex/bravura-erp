@@ -14,7 +14,7 @@ import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -204,17 +204,14 @@ export default function StockBalance() {
     catch (err) { toast.error(err.message) }
   }
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(i => ({
+  const handleExport = () => {
+    exportXLSX(filtered.map(i => ({
       Name: i.name, Category: i.category, Unit: i.unit,
       'Balance': i.balance, 'Total In': i.total_in, 'Total Out': i.total_out,
       'Unit Cost': i.cost, 'Total Value': ((i.balance || 0) * (i.cost || 0)).toFixed(2),
       'Reorder Level': i.threshold, Status: getStatus(i.balance, i.threshold).label,
       Notes: i.notes
-    })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock Balance')
-    XLSX.writeFile(wb, `StockBalance_${today}.xlsx`)
+    })), `StockBalance_${today}`, 'Stock Balance')
     toast.success('Exported')
   }
 
@@ -231,7 +228,7 @@ export default function StockBalance() {
       <div className="page-header">
         <h1 className="page-title">Stock Balance</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}>
+          <button className="btn btn-secondary" onClick={handleExport}>
             <span className="material-icons">table_chart</span> Export
           </button>
           {canEdit && (

@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import { buildTimesheetSummary, getPayrollPeriod, WORK_SCHEDULE, calculateAttendancePay } from '../../utils/attendanceUtils'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
 
 const today = new Date().toISOString().split('T')[0]
@@ -79,10 +79,7 @@ export default function TimesheetSummary() {
       'PH Pay':            r.pay?.publicHolidayPay?.toFixed(2) || '—',
       'Total Pay':         r.pay?.totalPay?.toFixed(2)    || '—',
     }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Timesheet')
-    XLSX.writeFile(wb, `Timesheet_${selectedPeriod.period_label?.replace(/ /g,'_')}.xlsx`)
+    exportXLSX(rows, `Timesheet_${selectedPeriod.period_label?.replace(/ /g,'_')}`, 'Timesheet')
     toast.success('Exported')
   }
 

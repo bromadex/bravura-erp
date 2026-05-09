@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useCanApprove } from '../../hooks/usePermission'
 import { getWorkingDays } from '../../utils/dateUtils'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
 
 export default function LeaveReports() {
@@ -115,10 +115,7 @@ export default function LeaveReports() {
       data      = pendingData.map(r => ({ Employee: r.name, 'Leave Type': r.type, 'Start': r.start, 'End': r.end, 'Days': r.days, 'Status': r.status, 'Submitted': r.created }))
       sheetName = 'Pending Approvals'
     }
-    const ws = XLSX.utils.json_to_sheet(data)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, sheetName)
-    XLSX.writeFile(wb, `LeaveReport_${sheetName}_${today}.xlsx`)
+    exportXLSX(data, `LeaveReport_${sheetName}_${today}`, sheetName)
     toast.success('Exported to Excel')
   }
 

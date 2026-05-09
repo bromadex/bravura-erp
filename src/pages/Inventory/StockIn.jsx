@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -30,13 +30,12 @@ export default function StockIn() {
   const todayIn      = stockInTx.filter(t => t.date === today).reduce((s, t) => s + (t.qty || 0), 0)
   const thisMonthIn  = stockInTx.filter(t => t.date?.startsWith(today.slice(0, 7))).reduce((s, t) => s + (t.qty || 0), 0)
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(t => ({
+  const handleExport = () => {
+    exportXLSX(filtered.map(t => ({
       Date: t.date, Type: t.type, Item: t.item_name, Category: t.category,
       Qty: t.qty, 'Delivered By': t.delivered_by, 'Received By': t.received_by, Notes: t.notes
-    })))
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Stock In')
-    XLSX.writeFile(wb, `StockIn_${today}.xlsx`); toast.success('Exported')
+    })), `StockIn_${today}`, 'Stock In')
+    toast.success('Exported')
   }
 
   return (
@@ -44,7 +43,7 @@ export default function StockIn() {
       <div className="page-header">
         <h1 className="page-title">Stock In Log</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <span className="material-icons">add_circle</span> Stock In

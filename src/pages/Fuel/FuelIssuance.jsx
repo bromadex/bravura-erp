@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase'
 import { generateTxnCode } from '../../utils/txnCode'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const FUEL_COLORS = { DIESEL: 'badge-yellow', PETROL: 'badge-green', PARAFFIN: 'badge-blue' }
 const today = new Date().toISOString().split('T')[0]
@@ -131,11 +131,8 @@ export default function FuelIssuance() {
   const uniqueVehicles = new Set(issuances.map(r => r.vehicle).filter(Boolean)).size
   const uniqueDrivers  = new Set(issuances.map(r => r.driver).filter(Boolean)).size
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(filtered.map(r => ({ Date: r.date, Time: r.time, Type: r.fuel_type, Litres: r.amount, Vehicle: r.vehicle, Driver: r.driver, Odometer: r.odometer, Flowmeter: r.flowmeter, Purpose: r.purpose, AuthorisedBy: r.authorized_by })))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Issuances')
-    XLSX.writeFile(wb, `FuelIssuance_${today}.xlsx`)
+  const handleExport = () => {
+    exportXLSX(filtered.map(r => ({ Date: r.date, Time: r.time, Type: r.fuel_type, Litres: r.amount, Vehicle: r.vehicle, Driver: r.driver, Odometer: r.odometer, Flowmeter: r.flowmeter, Purpose: r.purpose, AuthorisedBy: r.authorized_by })), `FuelIssuance_${today}`, 'Issuances')
     toast.success('Exported')
   }
 
@@ -144,7 +141,7 @@ export default function FuelIssuance() {
       <div className="page-header">
         <h1 className="page-title">Fuel Issuance</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}>
+          <button className="btn btn-secondary" onClick={handleExport}>
             <span className="material-icons">table_chart</span> Export
           </button>
           {canEdit && (

@@ -4,7 +4,7 @@ import { useLogistics } from '../../contexts/LogisticsContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 const CATS  = ['Food', 'PPE', 'Consumables', 'Batch Plant', 'General']
@@ -49,10 +49,9 @@ export default function LogisticsDeliveries() {
     finally { setSaving(false) }
   }
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(deliveries.map(d => ({ Date: d.date, Supplier: d.supplier, Driver: d.driver, Truck: d.truck_reg, DN: d.delivery_note, Loaded: d.total_loaded, Received: d.total_received, Variance: (d.total_received||0)-(d.total_loaded||0), Status: d.status })))
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Deliveries')
-    XLSX.writeFile(wb, `LogisticsDeliveries_${today}.xlsx`); toast.success('Exported')
+  const handleExport = () => {
+    exportXLSX(deliveries.map(d => ({ Date: d.date, Supplier: d.supplier, Driver: d.driver, Truck: d.truck_reg, DN: d.delivery_note, Loaded: d.total_loaded, Received: d.total_received, Variance: (d.total_received||0)-(d.total_loaded||0), Status: d.status })), `LogisticsDeliveries_${today}`, 'Deliveries')
+    toast.success('Exported')
   }
 
   const parseItems = (raw) => typeof raw === 'string' ? JSON.parse(raw || '[]') : (raw || [])
@@ -64,7 +63,7 @@ export default function LogisticsDeliveries() {
       <div className="page-header">
         <h1 className="page-title">Site Deliveries</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && <button className="btn btn-primary" onClick={() => setShowModal(true)}><span className="material-icons">local_shipping</span> Record Delivery</button>}
         </div>
       </div>

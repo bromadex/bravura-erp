@@ -6,7 +6,7 @@ import { useInventory } from '../../contexts/InventoryContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
-import * as XLSX from 'xlsx'
+import { exportXLSX } from '../../engine/reportingEngine'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -54,13 +54,12 @@ export default function StockTaking() {
     finally { setSaving(false) }
   }
 
-  const exportXLSX = () => {
-    const ws = XLSX.utils.json_to_sheet(stockTakes.map(st => ({
+  const handleExport = () => {
+    exportXLSX(stockTakes.map(st => ({
       Date: st.date, Item: st.item_name, 'System Qty': st.system_qty,
       Counted: st.counted, Variance: st.variance, 'Done By': st.done_by, Notes: st.notes
-    })))
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Stock Takes')
-    XLSX.writeFile(wb, `StockTaking_${today}.xlsx`); toast.success('Exported')
+    })), `StockTaking_${today}`, 'Stock Takes')
+    toast.success('Exported')
   }
 
   return (
@@ -68,7 +67,7 @@ export default function StockTaking() {
       <div className="page-header">
         <h1 className="page-title">Stock Taking</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX}><span className="material-icons">table_chart</span> Export</button>
+          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
           {canEdit && (
             <button className="btn btn-primary" onClick={() => setTabActive(tabActive === 'new' ? 'history' : 'new')}>
               <span className="material-icons">{tabActive === 'new' ? 'history' : 'fact_check'}</span>
