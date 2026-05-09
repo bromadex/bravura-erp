@@ -23,14 +23,14 @@ const MODULE_PAGES = {
   dashboard:   null,
   procurement: ['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'],
   inventory:   ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories','locations'],
-  logistics:   ['dashboard','batch-plant','deliveries'],
+  logistics:   ['dashboard','camp','batch-plant','deliveries'],
   fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
   fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues'],
   hr:          ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet'],
-  campsite:    ['overview','blocks','rooms','assignments','camp-stock','consumption','ppe-register','headcount'],
+  campsite:    ['overview','blocks','rooms','assignments'],
   connect:     ['chats'],
   settings:    ['workflows'],
-  governance:  ['announcements','memos','policies','code-of-ethics'],
+  governance:  ['announcements','policies','ethics'],
   accounting:  ['chart-of-accounts','journal-entries','reports'],
   reports:     ['overview','audit-log','drafts'],
 }
@@ -78,10 +78,6 @@ export default function HomeGrid() {
   // Show module if user can view ANY page in it (or if module has no sub-pages)
   const visibleModules = ALL_MODULES.filter(mod => {
     if (!mod.route) return true  // "coming soon" tiles always visible
-    // Super admin sees everything, no permission check needed
-    if (user?.role_id === 'role_super_admin') return true
-    // Connect is open to all authenticated users (per spec)
-    if (mod.moduleName === 'connect') return true
     const pages = MODULE_PAGES[mod.moduleName]
     if (!pages) return true      // null = no sub-pages, always accessible
     return pages.some(page => canView(mod.moduleName, page))
@@ -93,11 +89,6 @@ export default function HomeGrid() {
     const pages = MODULE_PAGES[mod.moduleName]
     // null means no sub-pages — go directly to the module root
     if (!pages) { navigate(mod.route); return }
-    // Super admin: always navigate to first page in the list
-    if (user?.role_id === 'role_super_admin') {
-      navigate(`/module/${mod.moduleName}/${pages[0]}`)
-      return
-    }
     const firstPage = pages.find(page => canView(mod.moduleName, page))
     if (firstPage) {
       navigate(`/module/${mod.moduleName}/${firstPage}`)
