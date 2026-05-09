@@ -249,8 +249,8 @@ export default function StockBalance() {
           <div className="kpi-val">{totalItems}</div>
           <div className="kpi-sub">in inventory</div>
         </div>
-        <div className="kpi-card" style={{ borderLeft: outOfStock > 0 ? '3px solid var(--red)' : undefined }}
-          onClick={() => setStatusFilter(statusFilter === 'OUT' ? 'ALL' : 'OUT')} style={{ cursor: 'pointer', borderLeft: outOfStock > 0 ? '3px solid var(--red)' : undefined }}>
+        <div className="kpi-card" style={{ cursor: 'pointer', borderLeft: outOfStock > 0 ? '3px solid var(--red)' : undefined }}
+          onClick={() => setStatusFilter(statusFilter === 'OUT' ? 'ALL' : 'OUT')}>
           <div className="kpi-label">Out of Stock</div>
           <div className="kpi-val" style={{ color: outOfStock > 0 ? 'var(--red)' : 'var(--green)' }}>{outOfStock}</div>
           <div className="kpi-sub">{outOfStock > 0 ? 'needs restock' : 'none'}</div>
