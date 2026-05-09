@@ -126,7 +126,7 @@ export function useProcurement() {
       }])
     }
     await fetchAll()
-    if (deficits.length) toast.info(`${deficits.length} purchase requisition(s) created due to stock shortage`)
+    if (deficits.length) toast(`${deficits.length} purchase requisition(s) created due to stock shortage`, { icon: '📋' })
     return deficits
   }
 
