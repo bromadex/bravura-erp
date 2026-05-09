@@ -94,11 +94,30 @@ const TABLE_MAP = {
   purchase_orders:       'purchase_orders',
 }
 
+// Valid statuses per DB CHECK constraints (from schema analysis)
+const VALID_STATUSES = {
+  leave_requests:        ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  travel_requests:       ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  employee_attendance:   ['pending','approved','rejected','cancelled'],
+  store_requisitions:    ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
+  purchase_requisitions: ['draft','submitted','pending','approved','rejected','cancelled'],
+  purchase_orders:       ['draft','pending','approved','rejected','cancelled','partially_received','received'],
+}
+
+function validateStatus(entityType, status) {
+  const valid = VALID_STATUSES[entityType]
+  if (!valid) return status  // unknown entity — pass through
+  if (valid.includes(status)) return status
+  console.warn(`Status "${status}" not valid for "${entityType}". Falling back to "pending".`)
+  return 'pending'
+}
+
 async function mirrorStatusToEntity(entityType, entityId, status) {
   const table = TABLE_MAP[entityType]
   if (!table) return
+  const safeStatus = validateStatus(entityType, status)
   await supabase.from(table).update({
-    status, updated_at: new Date().toISOString()
+    status: safeStatus, updated_at: new Date().toISOString()
   }).eq('id', entityId)
 }
 
