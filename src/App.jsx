@@ -1,186 +1,306 @@
-// src/pages/HomeGrid.jsx
-//
-// FIX: Module visibility was checking only defaultPage (e.g. 'hr|dashboard').
-// If a user had hr|leave but NOT hr|dashboard, the HR module was invisible on
-// the home screen even though they could navigate to it directly. They had to
-// type the URL — that's the bug reported.
-//
-// Fix: check canView against ALL known pages of the module. If the user can
-// see ANY page in a module, the module tile appears on the home screen.
-// The tile navigates to the first page the user actually has access to.
-//
-// Also added: notification bell showing unread count.
+// src/App.jsx
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { usePermission } from '../contexts/PermissionContext'
-import { supabase } from '../lib/supabase'
+import { AuthProvider, useAuth }   from './contexts/AuthContext'
+import { PermissionProvider }      from './contexts/PermissionContext'
+import { LeaveProvider }           from './contexts/LeaveContext'
+import { InventoryProvider }       from './contexts/InventoryContext'
+import { ProcurementProvider }     from './contexts/ProcurementContext'
+import { FuelProvider }            from './contexts/FuelContext'
+import { FleetProvider }           from './contexts/FleetContext'
+import { HRProvider }              from './contexts/HRContext'
+import { LogisticsProvider }       from './contexts/LogisticsContext'
 
-// All pages per module — must match Sidebar manifest
-// null means the module has no sub-pages; navigate directly to its root route
-const MODULE_PAGES = {
-  dashboard:   null,
-  procurement: ['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'],
-  inventory:   ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories','locations'],
-  logistics:   ['dashboard','batch-plant','deliveries'],
-  fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
-  fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues'],
-  hr:          ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet'],
-  campsite:    ['overview','blocks','rooms','assignments','camp-stock','consumption','ppe-register','headcount'],
-  connect:     ['chats'],
-  settings:    ['workflows'],
-  governance:  ['announcements','memos','policies','code-of-ethics'],
-  accounting:  ['chart-of-accounts','journal-entries','reports'],
-  reports:     ['overview','audit-log','drafts'],
+import Login           from './pages/Login'
+import HomeGrid        from './pages/HomeGrid'
+import Layout          from './components/layout/Layout'
+import PermissionRoute from './components/PermissionRoute'
+import AccessDenied    from './pages/Errors/AccessDenied'
+import ChangePassword  from './pages/ChangePassword'
+
+// ── Dashboard ─────────────────────────────────────────────────
+import DashboardOverview from './pages/Dashboard/DashboardOverview'
+
+// ── Inventory ─────────────────────────────────────────────────
+import StockBalance     from './pages/Inventory/StockBalance'
+import StockIn          from './pages/Inventory/StockIn'
+import StockOut         from './pages/Inventory/StockOut'
+import Transactions     from './pages/Inventory/Transactions'
+import StockTaking      from './pages/Inventory/StockTaking'
+import Categories       from './pages/Inventory/Categories'
+import StorageLocations from './pages/Inventory/StorageLocations'
+
+// ── Procurement ───────────────────────────────────────────────
+import Suppliers            from './pages/Procurement/Suppliers'
+import StoreRequisitions    from './pages/Procurement/StoreRequisitions'
+import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
+import PurchaseOrders       from './pages/Procurement/PurchaseOrders'
+import GoodsReceived        from './pages/Procurement/GoodsReceived'
+
+// ── Fuel ──────────────────────────────────────────────────────
+import FuelTanks      from './pages/Fuel/FuelTanks'
+import FuelIssuance   from './pages/Fuel/FuelIssuance'
+import FuelDeliveries from './pages/Fuel/FuelDeliveries'
+import DipstickLog    from './pages/Fuel/DipstickLog'
+import FuelReports    from './pages/Fuel/FuelReports'
+
+// ── Fleet ─────────────────────────────────────────────────────
+import FleetDashboard    from './pages/Fleet/FleetDashboard'
+import Vehicles          from './pages/Fleet/Vehicles'
+import Generators        from './pages/Fleet/Generators'
+import HeavyEquipment    from './pages/Fleet/HeavyEquipment'
+import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
+import AssetIssues       from './pages/Fleet/AssetIssues'
+
+// ── HR ────────────────────────────────────────────────────────
+import HRDashboard     from './pages/HR/HRDashboard'
+import Employees       from './pages/HR/Employees'
+import Departments     from './pages/HR/Departments'
+import Designations    from './pages/HR/Designations'
+import UserPermissions from './pages/HR/UserPermissions'
+import Attendance      from './pages/HR/Attendance'
+import Leave           from './pages/HR/Leave'
+import LeaveBalance    from './pages/HR/LeaveBalance'
+import LeaveCalendar   from './pages/HR/LeaveCalendar'
+import LeaveReports    from './pages/HR/LeaveReports'
+import Travel          from './pages/HR/Travel'
+import Payroll         from './pages/HR/Payroll'
+
+// ── Logistics ─────────────────────────────────────────────────
+import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
+import CampManagement      from './pages/Logistics/CampManagement'
+import BatchPlant          from './pages/Logistics/BatchPlant'
+import LogisticsDeliveries from './pages/Logistics/LogisticsDeliveries'
+
+// ───────────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────────
+
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-dim)' }}>
+        Loading…
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
+  if (user.must_change_password === true && window.location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
+  }
+  return children
 }
 
-const ALL_MODULES = [
-  { id: 'dashboard',   icon: 'dashboard',          label: 'Dashboard',          color: '#f4a261', desc: 'KPIs & overview',         route: '/module/dashboard',   moduleName: 'dashboard'   },
-  { id: 'hr',          icon: 'badge',               label: 'Human Resources',    color: '#f87171', desc: 'Employees & payroll',     route: '/module/hr',          moduleName: 'hr'          },
-  { id: 'procurement', icon: 'shopping_cart',       label: 'Procurement',        color: '#a78bfa', desc: 'Suppliers & orders',      route: '/module/procurement', moduleName: 'procurement' },
-  { id: 'inventory',   icon: 'inventory',           label: 'Inventory',          color: '#2dd4bf', desc: 'Stock & warehouse',       route: '/module/inventory',   moduleName: 'inventory'   },
-  { id: 'fuel',        icon: 'local_gas_station',   label: 'Fuel Management',    color: '#fbbf24', desc: 'Tanks & issuance',        route: '/module/fuel',        moduleName: 'fuel'        },
-  { id: 'fleet',       icon: 'directions_car',      label: 'Fleet & Assets',     color: '#34d399', desc: 'Vehicles & generators',   route: '/module/fleet',       moduleName: 'fleet'       },
-  { id: 'logistics',   icon: 'local_shipping',      label: 'Logistics',          color: '#60a5fa', desc: 'Batch Plant & deliveries', route: '/module/logistics',  moduleName: 'logistics'   },
-  { id: 'campsite',    icon: 'cabin',               label: 'Campsite',           color: '#86efac', desc: 'Rooms & occupancy',       route: '/module/campsite',    moduleName: 'campsite'    },
-  { id: 'connect',     icon: 'forum',               label: 'Connect',            color: '#67e8f9', desc: 'Chat & announcements',    route: '/module/connect',     moduleName: 'connect'     },
-  { id: 'governance',  icon: 'policy',              label: 'Governance',         color: '#fcd34d', desc: 'Policies & ethics',       route: '/module/governance',  moduleName: 'governance'  },
-  { id: 'accounting',  icon: 'receipt',             label: 'Accounting',         color: '#818cf8', desc: 'Journals & reports',      route: '/module/accounting',  moduleName: 'accounting'  },
-  { id: 'reports',     icon: 'bar_chart',           label: 'Reports',            color: '#38bdf8', desc: 'Analytics & exports',     route: '/module/reports',     moduleName: 'reports'     },
-  { id: 'settings',    icon: 'admin_panel_settings', label: 'Settings & Admin',   color: '#a78bfa', desc: 'Workflow builder & config', route: '/module/settings/workflows', moduleName: 'settings' },
+function ModulePlaceholder({ module, page }) {
+  const navigate = useNavigate()
+  const label    = page?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const modLabel = module?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 16 }}>
+      <span className="material-icons" style={{ fontSize: 72, opacity: .3, color: 'var(--gold)' }}>construction</span>
+      <div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 2, marginBottom: 6 }}>{modLabel}</div>
+        <h2 style={{ fontSize: 22, fontWeight: 800 }}>{label}</h2>
+        <p style={{ color: 'var(--text-dim)', marginTop: 8, fontSize: 13 }}>Under development</p>
+      </div>
+      <button className="btn btn-secondary" onClick={() => navigate('/')}>
+        <span className="material-icons" style={{ fontSize: 16 }}>home</span> Back to Home
+      </button>
+    </div>
+  )
+}
+
+// Only true placeholder modules (Logistics is now real)
+const OTHER_MODULES = [
+  { id: 'accounting', pages: ['chart-of-accounts', 'journal-entries', 'reports'] },
+  { id: 'reports',    pages: ['overview', 'audit-log', 'drafts']                 },
 ]
 
-export default function HomeGrid() {
-  const { user, logout } = useAuth()
-  const navigate          = useNavigate()
-  const { canView }       = usePermission()
+// ───────────────────────────────────────────────────────────────
+// Routes
+// ───────────────────────────────────────────────────────────────
 
-  const [unreadCount, setUnreadCount] = useState(0)
-
-  // Load unread notification count
-  useEffect(() => {
-    if (!user?.id) return
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-      setUnreadCount(count || 0)
-    }
-    fetchUnread()
-    // Poll every 30 seconds
-    const interval = setInterval(fetchUnread, 30000)
-    return () => clearInterval(interval)
-  }, [user?.id])
-
-  // Show module if user can view ANY page in it (or if module has no sub-pages)
-  const visibleModules = ALL_MODULES.filter(mod => {
-    if (!mod.route) return true  // "coming soon" tiles always visible
-    // Super admin sees everything, no permission check needed
-    if (user?.role_id === 'role_super_admin') return true
-    // Connect is open to all authenticated users (per spec)
-    if (mod.moduleName === 'connect') return true
-    const pages = MODULE_PAGES[mod.moduleName]
-    if (!pages) return true      // null = no sub-pages, always accessible
-    return pages.some(page => canView(mod.moduleName, page))
-  })
-
-  // Navigate to first accessible page within a module
-  const navigateToModule = (mod) => {
-    if (!mod.route) { alert(`${mod.label} – coming soon`); return }
-    const pages = MODULE_PAGES[mod.moduleName]
-    // null means no sub-pages — go directly to the module root
-    if (!pages) { navigate(mod.route); return }
-    // Super admin: always navigate to first page in the list
-    if (user?.role_id === 'role_super_admin') {
-      navigate(`/module/${mod.moduleName}/${pages[0]}`)
-      return
-    }
-    const firstPage = pages.find(page => canView(mod.moduleName, page))
-    if (firstPage) {
-      navigate(`/module/${mod.moduleName}/${firstPage}`)
-    } else {
-      navigate(mod.route)
-    }
-  }
-
+function AppRoutes() {
+  const { user } = useAuth()
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <Routes>
+      <Route path="/login"           element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/access-denied"   element={<AccessDenied />} />
+      <Route path="/change-password" element={<ChangePassword />} />
+      <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
 
-      {/* Top bar */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--gold)' }}>BRAVURA ERP</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1 }}>KAMATIVI OPERATIONS</div>
-        </div>
+      {/* ── DASHBOARD ─────────────────────────────────────── */}
+      <Route path="/module/dashboard" element={
+        <ProtectedRoute>
+          <PermissionRoute module="dashboard" page="overview">
+            <DashboardOverview />
+          </PermissionRoute>
+        </ProtectedRoute>
+      } />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Notification bell */}
-          <button
-            onClick={() => navigate('/module/hr/leave')}
-            style={{ position: 'relative', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}
-            title="Notifications"
-          >
-            <span className="material-icons" style={{ fontSize: 20 }}>notifications</span>
-            {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--red)', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
+      {/* ── INVENTORY ───────────────────────────────────── */}
+      <Route path="/module/inventory" element={
+        <ProtectedRoute>
+          <PermissionRoute module="inventory" page="stock-balance">
+            <InventoryProvider>
+              <LeaveProvider>
+                <Layout module="inventory" />
+              </LeaveProvider>
+            </InventoryProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                element={<StockBalance />} />
+        <Route path="stock-balance" element={<StockBalance />} />
+        <Route path="stock-in"      element={<StockIn />} />
+        <Route path="stock-out"     element={<StockOut />} />
+        <Route path="transactions"  element={<Transactions />} />
+        <Route path="stock-taking"  element={<StockTaking />} />
+        <Route path="categories"    element={<Categories />} />
+        <Route path="locations"     element={<StorageLocations />} />
+      </Route>
 
-          {/* User chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 12px' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: '#0b0f1a' }}>
-              {(user?.full_name || user?.username || '?').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.2 }}>{user?.full_name || user?.username}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-                {user?.role_id?.replace('role_', '').replace(/_/g, ' ').toUpperCase() || 'USER'}
-              </div>
-            </div>
-          </div>
+      {/* ── PROCUREMENT ─────────────────────────────────── */}
+      <Route path="/module/procurement" element={
+        <ProtectedRoute>
+          <PermissionRoute module="procurement" page="suppliers">
+            <ProcurementProvider>
+              <Layout module="procurement" />
+            </ProcurementProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                        element={<Suppliers />} />
+        <Route path="suppliers"             element={<Suppliers />} />
+        <Route path="store-requisitions"    element={<StoreRequisitions />} />
+        <Route path="purchase-requisitions" element={<PurchaseRequisitions />} />
+        <Route path="purchase-orders"       element={<PurchaseOrders />} />
+        <Route path="goods-received"        element={<GoodsReceived />} />
+      </Route>
 
-          <button className="btn btn-secondary btn-sm" onClick={logout}>
-            <span className="material-icons" style={{ fontSize: 16 }}>logout</span> Logout
-          </button>
-        </div>
-      </div>
+      {/* ── FUEL ─────────────────────────────────────────── */}
+      <Route path="/module/fuel" element={
+        <ProtectedRoute>
+          <PermissionRoute module="fuel" page="tanks">
+            <ProcurementProvider>
+              <FuelProvider>
+                <LeaveProvider>
+                  <Layout module="fuel" />
+                </LeaveProvider>
+              </FuelProvider>
+            </ProcurementProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index              element={<FuelTanks />} />
+        <Route path="tanks"       element={<FuelTanks />} />
+        <Route path="issuance"    element={<FuelIssuance />} />
+        <Route path="deliveries"  element={<FuelDeliveries />} />
+        <Route path="dipstick"    element={<DipstickLog />} />
+        <Route path="reports"     element={<FuelReports />} />
+      </Route>
 
-      {/* Welcome */}
-      <div style={{ padding: '32px 24px 16px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
-          Welcome, {user?.full_name?.split(' ')[0] || user?.username}
-        </h2>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Select a module to get started</p>
-      </div>
+      {/* ── FLEET ────────────────────────────────────────── */}
+      <Route path="/module/fleet" element={
+        <ProtectedRoute>
+          <PermissionRoute module="fleet" page="dashboard">
+            <FleetProvider>
+              <Layout module="fleet" />
+            </FleetProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                     element={<FleetDashboard />} />
+        <Route path="dashboard"          element={<FleetDashboard />} />
+        <Route path="vehicles"           element={<Vehicles />} />
+        <Route path="generators"         element={<Generators />} />
+        <Route path="heavy-equipment"    element={<HeavyEquipment />} />
+        <Route path="maintenance-alerts" element={<MaintenanceAlerts />} />
+        <Route path="asset-issues"       element={<AssetIssues />} />
+      </Route>
 
-      {/* Module grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, padding: '16px 24px 40px', maxWidth: 1000, margin: '0 auto' }}>
-        {visibleModules.length === 0 ? (
-          <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-            <span className="material-icons" style={{ fontSize: 48, opacity: 0.5 }}>lock</span>
-            <p>You don't have access to any modules. Please contact HR.</p>
-          </div>
-        ) : visibleModules.map(m => (
-          <button
-            key={m.id}
-            onClick={() => navigateToModule(m)}
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, cursor: 'pointer', transition: 'all .2s', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}
-            onMouseOver={e => { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 24px ${m.color}22` }}
-            onMouseOut={e =>  { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
-          >
-            <span className="material-icons" style={{ fontSize: 44, color: m.color }}>{m.icon}</span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{m.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{m.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
+      {/* ── HR ───────────────────────────────────────────── */}
+      <Route path="/module/hr" element={
+        <ProtectedRoute>
+          <PermissionRoute module="hr" page="dashboard">
+            <HRProvider>
+              <LeaveProvider>
+                <Layout module="hr" />
+              </LeaveProvider>
+            </HRProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                 element={<HRDashboard />} />
+        <Route path="dashboard"      element={<HRDashboard />} />
+        <Route path="employees"      element={<Employees />} />
+        <Route path="departments"    element={<Departments />} />
+        <Route path="designations"   element={<Designations />} />
+        <Route path="permissions"    element={<UserPermissions />} />
+        <Route path="attendance"     element={<Attendance />} />
+        <Route path="leave"          element={<Leave />} />
+        <Route path="leave-balance"  element={<LeaveBalance />} />
+        <Route path="leave-calendar" element={<LeaveCalendar />} />
+        <Route path="leave-reports"  element={<LeaveReports />} />
+        <Route path="travel"         element={<Travel />} />
+        <Route path="payroll"        element={<Payroll />} />
+      </Route>
+
+      {/* ── LOGISTICS ────────────────────────────────────── */}
+      <Route path="/module/logistics" element={
+        <ProtectedRoute>
+          <PermissionRoute module="logistics" page="dashboard">
+            <LogisticsProvider>
+              <Layout module="logistics" />
+            </LogisticsProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index              element={<LogisticsDashboard />} />
+        <Route path="dashboard"   element={<LogisticsDashboard />} />
+        <Route path="camp"        element={<CampManagement />} />
+        <Route path="batch-plant" element={<BatchPlant />} />
+        <Route path="deliveries"  element={<LogisticsDeliveries />} />
+      </Route>
+
+      {/* ── PLACEHOLDER MODULES ──────────────────────────── */}
+      {OTHER_MODULES.map(mod => (
+        <Route key={mod.id} path={`/module/${mod.id}`} element={
+          <ProtectedRoute>
+            <PermissionRoute module={mod.id} page={mod.pages[0]}>
+              <Layout module={mod.id} />
+            </PermissionRoute>
+          </ProtectedRoute>
+        }>
+          <Route index element={<ModulePlaceholder module={mod.id} page={mod.pages[0]} />} />
+          {mod.pages.map(page => (
+            <Route key={page} path={page} element={<ModulePlaceholder module={mod.id} page={page} />} />
+          ))}
+        </Route>
+      ))}
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <PermissionProvider>
+        <LeaveProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <Toaster position="top-right" toastOptions={{
+              style: { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border2)' },
+              success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
+              error:   { iconTheme: { primary: 'var(--red)',   secondary: 'var(--surface)' } },
+            }} />
+          </BrowserRouter>
+        </LeaveProvider>
+      </PermissionProvider>
+    </AuthProvider>
   )
 }
