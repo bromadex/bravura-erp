@@ -1,5 +1,6 @@
 import { useFleet } from '../../contexts/FleetContext'
 import { useNavigate } from 'react-router-dom'
+import { PageHeader, EmptyState } from '../../components/ui'
 
 export default function MaintenanceAlerts() {
   const navigate = useNavigate()
@@ -31,15 +32,10 @@ export default function MaintenanceAlerts() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Maintenance Alerts</h1>
-      </div>
+      <PageHeader title="Maintenance Alerts" />
 
       {alerts.length === 0 ? (
-        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.5 }}>check_circle</span>
-          <div style={{ marginTop: 12 }}>All assets are in good health. No urgent alerts.</div>
-        </div>
+        <EmptyState icon="check_circle" message="All assets are in good health. No urgent alerts." />
       ) : (
         alerts.map((alert, idx) => (
           <div key={idx} className="card" style={{ padding: 16, marginBottom: 16, borderLeft: `4px solid ${alert.isOverdue ? 'var(--red)' : alert.health?.color || 'var(--red)'}` }}>

@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCampsite } from '../../contexts/CampsiteContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import TransferRoomModal from './TransferRoomModal'
+import { ModalDialog, ModalActions, StatusBadge } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 export default function CampAssignments() {
@@ -111,7 +112,7 @@ export default function CampAssignments() {
                     <div style={{ fontWeight: 600 }}>{a.employees?.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.employees?.employee_number}</div>
                   </td>
-                  <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{getRoomCode(a.room_id)}</td>
+                  <td className="td-mono">{getRoomCode(a.room_id)}</td>
                   <td>{getBlockName(a.room_id)}</td>
                   <td style={{ fontSize: 12 }}>{a.start_date || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.end_date || '—'}</td>
@@ -122,7 +123,7 @@ export default function CampAssignments() {
                   </td>
                   <td>
                     {(a.status === 'active' || a.status === 'on_leave') && (
-                      <div style={{ display: 'flex', gap: 4 }}>
+                      <div className="btn-group-sm">
                         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setTransferring(a)}>
                           <span className="material-icons" style={{ fontSize: 13 }}>swap_horiz</span> Transfer
                         </button>
@@ -148,23 +149,17 @@ export default function CampAssignments() {
       )}
 
       {/* Vacate confirmation */}
-      {vacating && (
-        <>
-          <div onClick={() => setVacating(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 400, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 401, padding: 20 }}>
-            <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Confirm Vacate</div>
-            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-              Checking out <strong style={{ color: 'var(--text)' }}>{vacating.employees?.name}</strong> from room <strong style={{ color: 'var(--gold)' }}>{getRoomCode(vacating.room_id)}</strong>.
-            </p>
-            <textarea value={vacNotes} onChange={e => setVacNotes(e.target.value)} placeholder="Check-out notes (optional)" rows={2}
-              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', marginBottom: 12, boxSizing: 'border-box' }} />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setVacating(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleVacate} disabled={saving}>{saving ? 'Processing…' : 'Confirm Vacate'}</button>
-            </div>
-          </div>
-        </>
-      )}
+      <ModalDialog open={!!vacating} onClose={() => setVacating(null)} title="Confirm Vacate">
+        <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+          Checking out <strong style={{ color: 'var(--text)' }}>{vacating?.employees?.name}</strong> from room <strong style={{ color: 'var(--gold)' }}>{vacating ? getRoomCode(vacating.room_id) : ''}</strong>.
+        </p>
+        <textarea value={vacNotes} onChange={e => setVacNotes(e.target.value)} placeholder="Check-out notes (optional)" rows={2}
+          style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', marginBottom: 12, boxSizing: 'border-box' }} />
+        <ModalActions>
+          <button className="btn btn-secondary" onClick={() => setVacating(null)}>Cancel</button>
+          <button className="btn btn-danger" onClick={handleVacate} disabled={saving}>{saving ? 'Processing…' : 'Confirm Vacate'}</button>
+        </ModalActions>
+      </ModalDialog>
     </div>
   )
 }

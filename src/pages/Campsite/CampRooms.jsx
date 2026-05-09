@@ -11,6 +11,7 @@
 
 import { useState, useMemo } from 'react'
 import { useCampsite } from '../../contexts/CampsiteContext'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 // Room purpose config
@@ -357,16 +358,8 @@ export default function CampRooms() {
       )}
 
       {/* ADD / EDIT MODAL */}
-      {modal && (
-        <>
-          <div onClick={() => setModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 460, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 401, maxHeight: '90vh', overflowY: 'auto' }}>
-
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 800, fontSize: 15 }}>
-              {modal === 'add' ? 'Add Room' : `Edit Room — ${modal.code}`}
-            </div>
-
-            <form onSubmit={handleSave} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <ModalDialog open={!!modal} onClose={() => setModal(null)} title={modal === 'add' ? 'Add Room' : `Edit Room — ${modal?.code}`}>
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
               {/* Room Code */}
               <div className="form-group">
@@ -471,16 +464,14 @@ export default function CampRooms() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <ModalActions>
                 <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   {saving ? 'Saving…' : 'Save Room'}
                 </button>
-              </div>
+              </ModalActions>
             </form>
-          </div>
-        </>
-      )}
+      </ModalDialog>
     </div>
   )
 }

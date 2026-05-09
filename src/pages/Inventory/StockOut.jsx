@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { KPICard, EmptyState, AlertBanner } from '../../components/ui'
 
 export default function StockOut() {
   const { transactions, loading } = useInventory()
@@ -44,34 +45,24 @@ export default function StockOut() {
   return (
     <div style={{ padding: 24 }}>
       {/* Banner explaining the policy */}
-      <div style={{ background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <span className="material-icons" style={{ color: 'var(--gold)', fontSize: 20, flexShrink: 0, marginTop: 1 }}>info</span>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>Stock exits only through Store Requisitions</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-            Direct stock-out is disabled. To issue stock, submit a Store Requisition in the Procurement module.
-            Stock is deducted automatically when the storekeeper fulfils an approved requisition.
-          </div>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="kpi-grid" style={{ marginBottom: 24 }}>
-        {[
-          { label: 'Total Issues',  value: filtered.length,             icon: 'remove_circle', color: 'var(--red)'  },
-          { label: 'Total Qty Out', value: totalQty.toLocaleString(),   icon: 'inventory_2',   color: 'var(--yellow)' },
-          { label: 'Total Value',   value: `$${totalValue.toFixed(2)}`, icon: 'attach_money',  color: 'var(--gold)' },
-        ].map(k => (
-          <div key={k.label} className="card" style={{ padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="material-icons" style={{ fontSize: 22, color: k.color }}>{k.icon}</span>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{k.label}</div>
-              </div>
+      <AlertBanner
+        type="warning"
+        message={
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>Stock exits only through Store Requisitions</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+              Direct stock-out is disabled. To issue stock, submit a Store Requisition in the Procurement module.
+              Stock is deducted automatically when the storekeeper fulfils an approved requisition.
             </div>
           </div>
-        ))}
+        }
+      />
+
+      {/* KPIs */}
+      <div className="kpi-grid" style={{ marginBottom: 24, marginTop: 20 }}>
+        <KPICard label="Total Issues"  value={filtered.length}             icon="remove_circle" color="red"    />
+        <KPICard label="Total Qty Out" value={totalQty.toLocaleString()}   icon="inventory_2"   color="yellow" />
+        <KPICard label="Total Value"   value={`$${totalValue.toFixed(2)}`} icon="attach_money"  color="gold"   />
       </div>
 
       {/* Filters */}
@@ -108,14 +99,14 @@ export default function StockOut() {
             {loading ? (
               <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No stock-out transactions found</td></tr>
+              <tr><td colSpan={6}><EmptyState icon="assignment_return" message="No stock-out transactions found" /></td></tr>
             ) : filtered.map(t => (
               <tr key={t.id}>
                 <td style={{ fontSize: 12 }}>{t.date}</td>
                 <td style={{ fontWeight: 600 }}>{t.item_name}</td>
                 <td style={{ color: 'var(--red)', fontWeight: 700 }}>−{t.quantity}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.unit}</td>
-                <td style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{t.reference || '—'}</td>
+                <td className="td-mono" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t.reference || '—'}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.notes || '—'}</td>
               </tr>
             ))}

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { generateTxnCode } from '../../utils/txnCode'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import toast from 'react-hot-toast'
+import { PageHeader, StatusBadge, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function AssetIssues() {
   const { vehicles, generators, earthMovers, addAssetIssue, updateAssetIssue } = useFleet()
@@ -56,14 +57,13 @@ export default function AssetIssues() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Asset Issues & Maintenance</h1>
+      <PageHeader title="Asset Issues & Maintenance">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
             <span className="material-icons">bug_report</span> Report Issue
           </button>
         )}
-      </div>
+      </PageHeader>
 
       <div className="table-wrap">
         <table className="stock-table">
@@ -81,14 +81,14 @@ export default function AssetIssues() {
                   <td><strong>{assetName}</strong> ({issue.asset_type})</td>
                   <td>{issue.issue_description}</td>
                   <td style={{ color: urgencyColor }}>{issue.urgency}</td>
-                  <td><span className={`badge ${issue.status === 'resolved' ? 'bg-green' : issue.status === 'in_progress' ? 'bg-yellow' : 'bg-red'}`}>{issue.status}</span></td>
+                  <td><StatusBadge status={issue.status} /></td>
                   <td>{issue.reported_by || '-'}</td>
                   <td>
                     {canEdit && issue.status !== 'resolved' && (
-                      <>
+                      <div className="btn-group-sm">
                         <button className="btn btn-secondary btn-sm" onClick={() => handleStatusUpdate(issue.id, 'in_progress')}>In Progress</button>
                         <button className="btn btn-primary btn-sm" onClick={() => handleStatusUpdate(issue.id, 'resolved')}>Resolve</button>
-                      </>
+                      </div>
                     )}
                    </td>
                 </tr>
@@ -99,45 +99,43 @@ export default function AssetIssues() {
         </table>
       </div>
 
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Report <span>Issue</span></div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group"><label>Asset Type</label>
-                  <select className="form-control" value={form.asset_type} onChange={e => setForm({...form, asset_type: e.target.value, asset_id: ''})}>
-                    <option value="vehicle">Vehicle</option>
-                    <option value="generator">Generator</option>
-                    <option value="earthmover">Heavy Equipment</option>
-                  </select>
-                </div>
-                <div className="form-group"><label>Asset</label>
-                  <select className="form-control" required value={form.asset_id} onChange={e => setForm({...form, asset_id: e.target.value})}>
-                    <option value="">Select</option>
-                    {form.asset_type === 'vehicle' && vehicles.map(v => <option key={v.id} value={v.id}>{v.reg}</option>)}
-                    {form.asset_type === 'generator' && generators.map(g => <option key={g.id} value={g.id}>{g.gen_code}</option>)}
-                    {form.asset_type === 'earthmover' && earthMovers.map(e => <option key={e.id} value={e.id}>{e.reg}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Reported Date</label><input type="date" className="form-control" required value={form.reported_date} onChange={e => setForm({...form, reported_date: e.target.value})} /></div>
-                <div className="form-group"><label>Reported By</label><input className="form-control" value={form.reported_by} onChange={e => setForm({...form, reported_by: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Urgency</label>
-                  <select className="form-control" value={form.urgency} onChange={e => setForm({...form, urgency: e.target.value})}>
-                    <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-group"><label>Issue Description *</label><textarea className="form-control" rows="3" required value={form.issue_description} onChange={e => setForm({...form, issue_description: e.target.value})} /></div>
-              <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">Report Issue</button></div>
-            </form>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title="Report Issue" size="lg">
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group"><label>Asset Type</label>
+              <select className="form-control" value={form.asset_type} onChange={e => setForm({...form, asset_type: e.target.value, asset_id: ''})}>
+                <option value="vehicle">Vehicle</option>
+                <option value="generator">Generator</option>
+                <option value="earthmover">Heavy Equipment</option>
+              </select>
+            </div>
+            <div className="form-group"><label>Asset</label>
+              <select className="form-control" required value={form.asset_id} onChange={e => setForm({...form, asset_id: e.target.value})}>
+                <option value="">Select</option>
+                {form.asset_type === 'vehicle' && vehicles.map(v => <option key={v.id} value={v.id}>{v.reg}</option>)}
+                {form.asset_type === 'generator' && generators.map(g => <option key={g.id} value={g.id}>{g.gen_code}</option>)}
+                {form.asset_type === 'earthmover' && earthMovers.map(e => <option key={e.id} value={e.id}>{e.reg}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group"><label>Reported Date</label><input type="date" className="form-control" required value={form.reported_date} onChange={e => setForm({...form, reported_date: e.target.value})} /></div>
+            <div className="form-group"><label>Reported By</label><input className="form-control" value={form.reported_by} onChange={e => setForm({...form, reported_by: e.target.value})} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Urgency</label>
+              <select className="form-control" value={form.urgency} onChange={e => setForm({...form, urgency: e.target.value})}>
+                <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group"><label>Issue Description *</label><textarea className="form-control" rows="3" required value={form.issue_description} onChange={e => setForm({...form, issue_description: e.target.value})} /></div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Report Issue</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

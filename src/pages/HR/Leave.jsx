@@ -41,6 +41,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { getWorkingDays, formatDate } from '../../utils/dateUtils'
 import { useCanApprove } from '../../hooks/usePermission'
+import { PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 
 export default function Leave() {
   const { user } = useAuth()
@@ -352,6 +353,7 @@ export default function Leave() {
   const getLeaveTypeName = (id) => leaveTypes.find(lt => lt.id === id)?.name || '—'
 
   const statusBadge = (s) => ({ draft: 'badge-yellow', pending_supervisor: 'badge-blue', pending_hr: 'badge-blue', approved: 'badge-green', rejected: 'badge-red', cancelled: 'badge-purple' }[s] || 'badge-gold')
+  // kept for backward compat in ApprovalCard; StatusBadge used for My Requests list
 
   // ── Approval card ───────────────────────────────────────────
   const ApprovalCard = ({ request, role, onApprove, onReject, onComment }) => {
@@ -393,7 +395,7 @@ export default function Leave() {
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="btn-group-sm" style={{ marginTop: 12 }}>
           <button className="btn btn-primary btn-sm" onClick={onApprove}>
             <span className="material-icons" style={{ fontSize: 14 }}>check</span> Approve
           </button>
@@ -426,9 +428,7 @@ export default function Leave() {
   // ════════════════════════════════════════════════════════════
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Leave Management</h1>
-      </div>
+      <PageHeader title="Leave Management" />
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
@@ -537,10 +537,7 @@ export default function Leave() {
         <div className="card" style={{ flex: 1.5, minWidth: 280, padding: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>My Leave Requests</h2>
           {myRequests.length === 0 ? (
-            <div className="empty-state">
-              <span className="material-icons" style={{ fontSize: 32, opacity: 0.4 }}>event_note</span>
-              <span>No leave requests yet</span>
-            </div>
+            <EmptyState icon="event_note" message="No leave requests yet" />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {myRequests.map(req => (
@@ -595,10 +592,7 @@ export default function Leave() {
               Pending Approvals
             </h2>
             {pendingSupervisor.length === 0 && pendingHR.length === 0 ? (
-              <div className="empty-state">
-                <span className="material-icons" style={{ fontSize: 32, opacity: 0.4 }}>check_circle</span>
-                <span>No requests pending your approval</span>
-              </div>
+              <EmptyState icon="check_circle" message="No requests pending your approval" />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {pendingSupervisor.length > 0 && (

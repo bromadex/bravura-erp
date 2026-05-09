@@ -101,9 +101,9 @@ export default function RoomDetailPanel({ roomId, onClose }) {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div className="tab-nav" style={{ borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           {TABS.map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: '10px 4px', background: 'transparent', border: 'none', borderBottom: `2px solid ${activeTab === tab ? 'var(--gold)' : 'transparent'}`, color: activeTab === tab ? 'var(--gold)' : 'var(--text-dim)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            <button key={tab} className={`tab-btn${activeTab === tab ? ' active' : ''}`} onClick={() => setActiveTab(tab)}>
               {tab}
               {tab === 'Occupants' && activeAssignments.length > 0 && (
                 <span style={{ marginLeft: 5, background: activeTab === tab ? 'var(--gold)' : 'var(--surface2)', color: activeTab === tab ? '#0b0f1a' : 'var(--text-dim)', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 800 }}>

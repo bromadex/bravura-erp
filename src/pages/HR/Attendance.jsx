@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase'
 import { useCanApprove } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { PageHeader, KPICard, StatusBadge, EmptyState } from '../../components/ui'
 
 export default function Attendance() {
   const {
@@ -235,27 +236,21 @@ export default function Attendance() {
     toast.success('Exported')
   }
 
-  const statusBadge = (s) => {
-    const map = { pending: 'badge-yellow', approved: 'badge-green', rejected: 'badge-red' }
-    return <span className={`badge ${map[s] || 'badge-gold'}`}>{s}</span>
-  }
+  const statusBadge = (s) => <StatusBadge status={s} />
 
   // ════════════════════════════════════════════════════════════
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Attendance</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canApprove && (
-            <button className="btn btn-primary" onClick={() => openManualModal()}>
-              <span className="material-icons">add</span> Manual Entry
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={exportToExcel}>
-            <span className="material-icons">table_chart</span> Export
+      <PageHeader title="Attendance">
+        {canApprove && (
+          <button className="btn btn-primary" onClick={() => openManualModal()}>
+            <span className="material-icons">add</span> Manual Entry
           </button>
-        </div>
-      </div>
+        )}
+        <button className="btn btn-secondary" onClick={exportToExcel}>
+          <span className="material-icons">table_chart</span> Export
+        </button>
+      </PageHeader>
 
       {/* ── MY TODAY STATUS ──────────────────────────────────────── */}
       {myEmployeeId && (
@@ -348,10 +343,10 @@ export default function Attendance() {
 
       {/* ── KPIs ─────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card"><div className="kpi-label">Total Hours</div><div className="kpi-val">{totalHours.toFixed(1)}</div><div className="kpi-sub">filtered</div></div>
-        <div className="kpi-card"><div className="kpi-label">Overtime</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totalOvertime.toFixed(1)}</div><div className="kpi-sub">filtered</div></div>
-        <div className="kpi-card"><div className="kpi-label">Records</div><div className="kpi-val">{filteredAttendance.length}</div><div className="kpi-sub">filtered</div></div>
-        {canApprove && <div className="kpi-card"><div className="kpi-label">Pending Approval</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{pendingCount}</div><div className="kpi-sub">awaiting review</div></div>}
+        <KPICard label="Total Hours" value={totalHours.toFixed(1)} sub="filtered" icon="schedule" color="teal" />
+        <KPICard label="Overtime" value={totalOvertime.toFixed(1)} sub="filtered" icon="more_time" color="yellow" />
+        <KPICard label="Records" value={filteredAttendance.length} sub="filtered" icon="list" color="blue" />
+        {canApprove && <KPICard label="Pending Approval" value={pendingCount} sub="awaiting review" icon="pending" color="yellow" />}
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────── */}
@@ -429,8 +424,8 @@ export default function Attendance() {
                     <td>{record.clock_in}</td>
                     <td>{record.clock_out || '—'}</td>
                     <td><span className="badge badge-blue">{record.shift_type}</span></td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{record.total_hours?.toFixed(1) || '—'}</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: record.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{record.overtime_hours?.toFixed(1) || '—'}</td>
+                    <td className="td-mono">{record.total_hours?.toFixed(1) || '—'}</td>
+                    <td className="td-mono" style={{ color: record.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{record.overtime_hours?.toFixed(1) || '—'}</td>
                     <td style={{ maxWidth: 200 }}>
                       <div style={{ fontSize: 12, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {record.work_description || '—'}

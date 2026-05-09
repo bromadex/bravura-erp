@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCampsite } from '../../contexts/CampsiteContext'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 export default function TransferRoomModal({ assignment, onClose }) {
@@ -42,20 +43,8 @@ export default function TransferRoomModal({ assignment, onClose }) {
   const currentRoom = rooms.find(r => r.id === assignment.room_id)
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 500 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 460, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, overflow: 'hidden' }}>
-
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="material-icons" style={{ color: 'var(--blue)' }}>swap_horiz</span>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>Transfer Room</div>
-          <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-            <span className="material-icons">close</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <ModalDialog open title="Transfer Room" onClose={onClose}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Who + from where */}
           <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -103,14 +92,13 @@ export default function TransferRoomModal({ assignment, onClose }) {
               style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <ModalActions>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving || !newRoomId || availableRooms.length === 0}>
               {saving ? 'Transferring…' : 'Confirm Transfer'}
             </button>
-          </div>
+          </ModalActions>
         </form>
-      </div>
-    </>
+    </ModalDialog>
   )
 }

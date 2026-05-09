@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useCampsite } from '../../contexts/CampsiteContext'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 const EMPTY_BLOCK = { name: '', type: 'Standard Single', gender_policy: 'mixed', notes: '' }
@@ -97,52 +98,44 @@ export default function CampBlocks() {
       )}
 
       {/* Modal */}
-      {modal && (
-        <>
-          <div onClick={() => setModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 440, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 401 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 800, fontSize: 15 }}>
-              {modal === 'add' ? 'Add Block' : `Edit — ${modal.name}`}
-            </div>
-            <form onSubmit={handleSave} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Block Name *</label>
-                <input required type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Block A, Relocation 1, VIP Block"
-                  style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Type</label>
-                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-                  <option>Standard Single</option>
-                  <option>Shared Double</option>
-                  <option>Executive Single</option>
-                  <option>Family</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Gender Policy</label>
-                <select value={form.gender_policy} onChange={e => setForm(f => ({ ...f, gender_policy: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-                  <option value="mixed">Mixed</option>
-                  <option value="male">Male Only</option>
-                  <option value="female">Female Only</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
-                  style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-              </div>
-            </form>
+      <ModalDialog open={!!modal} onClose={() => setModal(null)} title={modal === 'add' ? 'Add Block' : `Edit — ${modal?.name}`}>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Block Name *</label>
+            <input required type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Block A, Relocation 1, VIP Block"
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
           </div>
-        </>
-      )}
+          <div className="form-group">
+            <label className="form-label">Type</label>
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              <option>Standard Single</option>
+              <option>Shared Double</option>
+              <option>Executive Single</option>
+              <option>Family</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Gender Policy</label>
+            <select value={form.gender_policy} onChange={e => setForm(f => ({ ...f, gender_policy: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              <option value="mixed">Mixed</option>
+              <option value="male">Male Only</option>
+              <option value="female">Female Only</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
+              style={{ width: '100%', padding: '8px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }
