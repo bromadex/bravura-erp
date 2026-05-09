@@ -29,6 +29,8 @@ export function PermissionProvider({ children }) {
     if (user.role_id === 'role_super_admin') return true
     // Connect is open to ALL authenticated users regardless of role permissions
     if (moduleName === 'connect') return true
+    // Settings/Workflow Builder is always accessible to super admin
+    if (moduleName === 'settings' && user?.role_id === 'role_super_admin') return true
     if (pageName) {
       const pageKey = `${moduleName}|${pageName}`
       if (cachedPermissions[pageKey]?.view === true) return true
