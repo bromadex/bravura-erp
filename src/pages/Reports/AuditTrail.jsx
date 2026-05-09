@@ -128,10 +128,6 @@ export default function AuditTrail() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-        <select className="form-control" style={{ width: 'auto' }}
-          value={dateFrom} onChange={e => setDateFrom(e.target.value)}>
-          {/* Using input instead for dates */}
-        </select>
         <input type="date" className="form-control" style={{ width: 'auto' }}
           value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         <span style={{ lineHeight: '38px', color: 'var(--text-dim)', fontSize: 13 }}>to</span>
