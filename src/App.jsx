@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
+import { ThemeProvider }            from './contexts/ThemeContext'
 import { AuthProvider, useAuth }   from './contexts/AuthContext'
 import { PermissionProvider }      from './contexts/PermissionContext'
 import { LeaveProvider }           from './contexts/LeaveContext'
@@ -429,6 +430,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <PermissionProvider>
         <MasterDataProvider>
@@ -445,5 +447,6 @@ export default function App() {
         </MasterDataProvider>
       </PermissionProvider>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

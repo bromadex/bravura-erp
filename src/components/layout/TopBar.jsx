@@ -1,12 +1,13 @@
 // src/components/layout/TopBar.jsx
 //
 // Notification bell: Supabase Realtime subscription with 5-min polling fallback.
-// Global search: live transaction-code lookup across all txn_code columns.
+// Global search: live transaction-code lookup + entity name search.
 // Footer link updated to /module/notifications (full notification page).
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../lib/supabase'
 import { TXN_CODE_REGEX } from '../../utils/txnCode'
 import QuickActionModal from '../QuickActionModal'
@@ -55,6 +56,17 @@ const SEARCH_TABLES = [
   { table: 'room_assignments',      label: 'Room Assignment',      prefix: 'CA' },
 ]
 
+// Tables for entity name search
+const ENTITY_SEARCH_TABLES = [
+  { table: 'employees',          nameCol: 'name',           codeCol: 'employee_number', icon: 'person',         label: 'Employee',       route: '/module/hr/employees'                   },
+  { table: 'fleet',              nameCol: 'reg',            codeCol: 'fleet_code',      icon: 'directions_car', label: 'Vehicle',        route: '/module/fleet/vehicles'                 },
+  { table: 'earth_movers',       nameCol: 'reg',            codeCol: 'fleet_code',      icon: 'agriculture',    label: 'Equipment',      route: '/module/fleet/vehicles'                 },
+  { table: 'suppliers',          nameCol: 'name',           codeCol: null,              icon: 'local_shipping', label: 'Supplier',       route: '/module/procurement/suppliers'          },
+  { table: 'governance_documents', nameCol: 'title',        codeCol: 'txn_code',        icon: 'description',    label: 'Document',       route: '/module/governance/memos'               },
+  { table: 'purchase_orders',    nameCol: 'supplier_name',  codeCol: 'po_number',       icon: 'shopping_bag',   label: 'Purchase Order', route: '/module/procurement/purchase-orders'    },
+  { table: 'store_requisitions', nameCol: 'requester_name', codeCol: 'req_number',      icon: 'assignment',     label: 'Requisition',    route: '/module/procurement/store-requisitions' },
+]
+
 function relativeTime(ts) {
   const diff = Date.now() - new Date(ts)
   const mins = Math.floor(diff / 60000)
@@ -67,6 +79,7 @@ function relativeTime(ts) {
 
 export default function TopBar() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate          = useNavigate()
 
   const [notifications,  setNotifications]  = useState([])
@@ -178,29 +191,69 @@ export default function TopBar() {
   }, [])
 
   const runSearch = useCallback(async (q) => {
-    const trimmed = q.trim().toUpperCase()
+    const trimmed = q.trim()
     if (trimmed.length < 3) { setSearchResults([]); setSearchOpen(false); return }
-
-    // Check if it looks like a code
-    const isCode = /^[A-Z]{2,3}-?\d*/.test(trimmed)
-    if (!isCode) { setSearchResults([]); return }
 
     setSearchLoading(true)
     setSearchOpen(true)
+
     try {
-      // Query each table in parallel for txn_code ILIKE pattern
-      const queries = SEARCH_TABLES.map(({ table, label, prefix }) =>
-        supabase
+      const upper = trimmed.toUpperCase()
+
+      // ── Txn code search (only when query looks like a code) ──
+      const isCode = /^[A-Z]{2,3}-?\d*/.test(upper)
+      let txnResults = []
+      if (isCode) {
+        const txnQueries = SEARCH_TABLES.map(({ table, label, prefix }) =>
+          supabase
+            .from(table)
+            .select('txn_code, status')
+            .ilike('txn_code', `${upper}%`)
+            .limit(5)
+            .then(({ data }) =>
+              (data || []).map(row => ({
+                id:     `txn_${table}_${row.txn_code}`,
+                type:   'txn',
+                code:   row.txn_code,
+                status: row.status,
+                label,
+                prefix,
+              }))
+            )
+        )
+        txnResults = (await Promise.all(txnQueries)).flat().filter(r => r.code)
+      }
+
+      // ── Entity name search ───────────────────────────────────
+      const entityQueries = ENTITY_SEARCH_TABLES.map(async ({ table, nameCol, codeCol, icon, label, route }) => {
+        let q = supabase
           .from(table)
-          .select('txn_code, status')
-          .ilike('txn_code', `${trimmed}%`)
-          .limit(5)
-          .then(({ data }) =>
-            (data || []).map(row => ({ code: row.txn_code, status: row.status, label, prefix }))
-          )
-      )
-      const nested = await Promise.all(queries)
-      setSearchResults(nested.flat().filter(r => r.code))
+          .select(`id, ${nameCol}${codeCol ? `, ${codeCol}` : ''}`)
+          .ilike(nameCol, `%${trimmed}%`)
+          .limit(4)
+        const { data } = await q
+        return (data || []).map(row => ({
+          id:    `entity_${table}_${row.id}`,
+          type:  'entity',
+          label,
+          name:  row[nameCol],
+          code:  codeCol ? row[codeCol] : null,
+          icon,
+          route,
+        }))
+      })
+      const entityResults = (await Promise.all(entityQueries)).flat()
+
+      // Merge and deduplicate by id
+      const combined = [...entityResults, ...txnResults]
+      const seen = new Set()
+      const deduped = combined.filter(r => {
+        if (seen.has(r.id)) return false
+        seen.add(r.id)
+        return true
+      })
+
+      setSearchResults(deduped)
     } finally {
       setSearchLoading(false)
     }
@@ -218,6 +271,10 @@ export default function TopBar() {
     setSearchOpen(false)
     setSearchQuery('')
   }
+
+  // Derive grouped results for rendering
+  const entityResults = searchResults.filter(r => r.type === 'entity')
+  const txnResults    = searchResults.filter(r => r.type === 'txn')
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -239,7 +296,7 @@ export default function TopBar() {
             value={searchQuery}
             onChange={handleSearchChange}
             onFocus={() => searchQuery.length >= 3 && setSearchOpen(true)}
-            placeholder="Search transaction codes…"
+            placeholder="Search records, codes…"
             style={{ width: '100%', padding: '7px 10px 7px 34px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 20, color: 'var(--text)', fontSize: 12, outline: 'none' }}
           />
 
@@ -252,26 +309,54 @@ export default function TopBar() {
                 <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-dim)' }}>No results for "{searchQuery}"</div>
               ) : (
                 <>
-                  <div style={{ padding: '8px 12px 4px', fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, textTransform: 'uppercase' }}>
-                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-                  </div>
-                  {searchResults.map(r => (
-                    <div
-                      key={r.code}
-                      onClick={() => handleSearchSelect(r)}
-                      style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', borderTop: '1px solid var(--border)', transition: 'background .1s' }}
-                      onMouseOver={e => { e.currentTarget.style.background = 'var(--surface2)' }}
-                      onMouseOut={e  => { e.currentTarget.style.background = 'transparent' }}
-                    >
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>{r.code}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>{r.label}</span>
-                      {r.status && (
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 10 }}>
-                          {r.status}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                  {/* Records group */}
+                  {entityResults.length > 0 && (
+                    <>
+                      <div style={{ padding: '6px 14px 2px', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dim)' }}>Records</div>
+                      {entityResults.map(result => (
+                        <div
+                          key={result.id}
+                          onClick={() => { navigate(result.route); setSearchOpen(false); setSearchQuery('') }}
+                          style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', borderTop: '1px solid var(--border)', transition: 'background .1s' }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'var(--surface2)' }}
+                          onMouseOut={e  => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <span className="material-icons" style={{ fontSize: 18, color: 'var(--text-dim)', flexShrink: 0 }}>{result.icon}</span>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{result.name}</div>
+                            {result.code
+                              ? <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{result.label} · {result.code}</div>
+                              : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{result.label}</div>
+                            }
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Transaction Codes group */}
+                  {txnResults.length > 0 && (
+                    <>
+                      <div style={{ padding: '6px 14px 2px', fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dim)' }}>Transaction Codes</div>
+                      {txnResults.map(r => (
+                        <div
+                          key={r.id}
+                          onClick={() => handleSearchSelect(r)}
+                          style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', borderTop: '1px solid var(--border)', transition: 'background .1s' }}
+                          onMouseOver={e => { e.currentTarget.style.background = 'var(--surface2)' }}
+                          onMouseOut={e  => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--gold)' }}>{r.code}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: 1 }}>{r.label}</span>
+                          {r.status && (
+                            <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 10 }}>
+                              {r.status}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -290,6 +375,18 @@ export default function TopBar() {
         </button>
 
         <div style={{ flex: 1 }} />
+
+        {/* ── Theme toggle ──────────────────────────────────── */}
+        <button
+          onClick={toggleTheme}
+          className="btn btn-secondary btn-sm"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          style={{ padding: '4px 8px', display: 'flex', alignItems: 'center' }}
+        >
+          <span className="material-icons" style={{ fontSize: 18 }}>
+            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+          </span>
+        </button>
 
         {/* ── Notification bell ─────────────────────────────── */}
         <div ref={dropdownRef} style={{ position: 'relative' }}>

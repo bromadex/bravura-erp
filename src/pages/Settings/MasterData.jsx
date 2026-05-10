@@ -6,21 +6,37 @@ import { PageHeader, ModalDialog, ModalActions, StatusBadge } from '../../compon
 import toast from 'react-hot-toast'
 
 const TABS = [
-  { id: 'departments',  label: 'Departments',  icon: 'corporate_fare' },
-  { id: 'designations', label: 'Designations', icon: 'badge' },
-  { id: 'suppliers',    label: 'Suppliers',    icon: 'local_shipping' },
-  { id: 'cost_centers', label: 'Cost Centers', icon: 'account_balance' },
-  { id: 'sites',        label: 'Sites',        icon: 'location_on' },
+  { id: 'departments',    label: 'Departments',    icon: 'corporate_fare' },
+  { id: 'designations',  label: 'Designations',   icon: 'badge' },
+  { id: 'suppliers',     label: 'Suppliers',      icon: 'local_shipping' },
+  { id: 'cost_centers',  label: 'Cost Centers',   icon: 'account_balance' },
+  { id: 'sites',         label: 'Sites',          icon: 'location_on' },
+  { id: 'statuses',      label: 'Statuses',       icon: 'label' },
+  { id: 'notif_tpls',   label: 'Notifications',  icon: 'notifications' },
 ]
+
+const BADGE_CLASS_OPTIONS = [
+  'badge-success', 'badge-warning', 'badge-danger', 'badge-info',
+  'badge-dim', 'badge-purple', 'badge-orange',
+]
+
+const MODULE_OPTIONS = [
+  'global', 'hr', 'procurement', 'fleet', 'campsite', 'payroll', 'governance', 'accounts',
+]
+
+const NOTIF_TYPE_OPTIONS = ['info', 'success', 'warning', 'error']
 
 export default function MasterData() {
   const {
-    departments, designations, suppliers, costCenters, sites, loading,
+    departments, designations, suppliers, costCenters, sites,
+    statuses, notificationTemplates, loading,
     addDepartment, updateDepartment, deleteDepartment,
     addDesignation, updateDesignation, deleteDesignation,
     addSupplier, updateSupplier, deleteSupplier,
     addCostCenter, updateCostCenter, deleteCostCenter,
     addSite, updateSite, deleteSite,
+    addStatus, updateStatus, deleteStatus,
+    addNotificationTemplate, updateNotificationTemplate, deleteNotificationTemplate,
   } = useMasterData()
   const canEdit = useCanEdit('settings', 'master-data')
   const [tab, setTab] = useState('departments')
@@ -221,6 +237,86 @@ export default function MasterData() {
         </div>
       )}
 
+      {/* ── STATUSES ──────────────────────────────── */}
+      {tab === 'statuses' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <strong>Status Definitions <span className="badge badge-dim">{(statuses || []).length}</span></strong>
+            {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'status' })}><span className="material-icons">add</span> Add</button>}
+          </div>
+          <div className="table-wrap">
+            <table className="stock-table">
+              <thead><tr><th>Key</th><th>Label</th><th>Badge</th><th>Module</th><th>Sort</th><th>Active</th><th>Actions</th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan="7" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                : !(statuses?.length) ? <tr><td colSpan="7" className="empty-state">No status definitions yet</td></tr>
+                : [...(statuses || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(s => (
+                  <tr key={s.key}>
+                    <td className="td-mono" style={{ color: 'var(--gold)', fontSize: 12 }}>{s.key}</td>
+                    <td style={{ fontWeight: 600 }}>{s.label}</td>
+                    <td><span className={`badge ${s.badge_class || 'badge-dim'}`}>{s.label}</span></td>
+                    <td><span className="badge badge-dim">{s.module || 'global'}</span></td>
+                    <td className="td-mono">{s.sort_order ?? 0}</td>
+                    <td>
+                      {s.active
+                        ? <span className="badge badge-success">Active</span>
+                        : <span className="badge badge-dim">Inactive</span>}
+                    </td>
+                    <td className="td-actions">
+                      {canEdit && <>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'status', data: s })}>Edit</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(deleteStatus, s.key, 'status')}>Delete</button>
+                      </>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── NOTIFICATION TEMPLATES ──────────────────────────────── */}
+      {tab === 'notif_tpls' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <strong>Notification Templates <span className="badge badge-dim">{(notificationTemplates || []).length}</span></strong>
+            {canEdit && <button className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'notif' })}><span className="material-icons">add</span> Add</button>}
+          </div>
+          <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-dim)', borderBottom: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
+            Use <code style={{ background: 'var(--surface)', padding: '1px 4px', borderRadius: 3 }}>{'{{variable}}'}</code> placeholders in titles and messages. They are replaced at send time.
+          </div>
+          <div className="table-wrap">
+            <table className="stock-table">
+              <thead><tr><th>Event Type</th><th>Type</th><th>Title</th><th>Message</th><th>Enabled</th><th>Actions</th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan="6" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                : !(notificationTemplates?.length) ? <tr><td colSpan="6" className="empty-state">No templates yet</td></tr>
+                : (notificationTemplates || []).map(t => (
+                  <tr key={t.id}>
+                    <td className="td-mono" style={{ color: 'var(--gold)', fontSize: 12 }}>{t.event_type}</td>
+                    <td><span className={`badge badge-${t.type === 'success' ? 'success' : t.type === 'warning' ? 'warning' : t.type === 'error' ? 'danger' : 'info'}`}>{t.type}</span></td>
+                    <td style={{ fontWeight: 600, maxWidth: 180 }} className="truncate">{t.title}</td>
+                    <td style={{ color: 'var(--text-dim)', fontSize: 12, maxWidth: 260 }} className="truncate">{t.message}</td>
+                    <td>
+                      {t.enabled
+                        ? <span className="badge badge-success">On</span>
+                        : <span className="badge badge-dim">Off</span>}
+                    </td>
+                    <td className="td-actions">
+                      {canEdit && <>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setModal({ type: 'notif', data: t })}>Edit</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(deleteNotificationTemplate, t.id, 'template')}>Delete</button>
+                      </>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── MODALS ──────────────────────────────────────── */}
 
       {/* Department modal */}
@@ -242,6 +338,14 @@ export default function MasterData() {
       {/* Site modal */}
       <SiteModal open={modal?.type === 'site'} data={modal?.data} onClose={close}
         onSave={(d) => handleSave(modal?.data ? (x) => updateSite(modal.data.id, x) : addSite, d, 'Site')} />
+
+      {/* Status modal */}
+      <StatusModal open={modal?.type === 'status'} data={modal?.data} onClose={close}
+        onSave={(d) => handleSave(modal?.data ? (x) => updateStatus(modal.data.key, x) : addStatus, d, 'Status')} />
+
+      {/* Notification Template modal */}
+      <NotifModal open={modal?.type === 'notif'} data={modal?.data} onClose={close}
+        onSave={(d) => handleSave(modal?.data ? (x) => updateNotificationTemplate(modal.data.id, x) : addNotificationTemplate, d, 'Template')} />
     </div>
   )
 }
@@ -374,6 +478,127 @@ function SiteModal({ open, data, onClose, onSave }) {
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
             Active
+          </label>
+        </div>
+        <ModalActions>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary">Save</button>
+        </ModalActions>
+      </form>
+    </ModalDialog>
+  )
+}
+
+function StatusModal({ open, data, onClose, onSave }) {
+  const isEdit = Boolean(data)
+  const [form, setForm] = useState({ key: '', label: '', badge_class: 'badge-dim', color: '', icon: '', module: 'global', sort_order: 0, active: true })
+  useEffect(() => {
+    if (open) setForm({
+      key: data?.key || '', label: data?.label || '', badge_class: data?.badge_class || 'badge-dim',
+      color: data?.color || '', icon: data?.icon || '', module: data?.module || 'global',
+      sort_order: data?.sort_order ?? 0, active: data?.active ?? true,
+    })
+  }, [open, data])
+  return (
+    <ModalDialog open={open} onClose={onClose} title={isEdit ? 'Edit Status' : 'Add Status'}>
+      <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Key * <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>(unique, e.g. pending_review)</span></label>
+            <input className="form-control" required disabled={isEdit}
+              placeholder="snake_case_key"
+              value={form.key}
+              onChange={e => setForm(f => ({ ...f, key: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} />
+            {isEdit && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Key cannot be changed after creation.</div>}
+          </div>
+          <div className="form-group"><label>Label *</label>
+            <input className="form-control" required value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} /></div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Badge Class</label>
+            <select className="form-control" value={form.badge_class} onChange={e => setForm(f => ({ ...f, badge_class: e.target.value }))}>
+              {BADGE_CLASS_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Module</label>
+            <select className="form-control" value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))}>
+              {MODULE_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="form-group"><label>Material Icon (optional)</label>
+            <input className="form-control" placeholder="e.g. check_circle" value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} /></div>
+          <div className="form-group"><label>Sort Order</label>
+            <input type="number" className="form-control" value={form.sort_order} onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))} /></div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <strong style={{ fontSize: 12, color: 'var(--text-dim)' }}>Preview: </strong>
+          <span className={`badge ${form.badge_class}`}>
+            {form.icon && <span className="material-icons" style={{ fontSize: 14 }}>{form.icon}</span>}
+            {form.label || 'Label'}
+          </span>
+        </div>
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+            Active
+          </label>
+        </div>
+        <ModalActions>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary">Save</button>
+        </ModalActions>
+      </form>
+    </ModalDialog>
+  )
+}
+
+function NotifModal({ open, data, onClose, onSave }) {
+  const isEdit = Boolean(data)
+  const [form, setForm] = useState({ event_type: '', type: 'info', title: '', message: '', link: '', enabled: true })
+  useEffect(() => {
+    if (open) setForm({
+      event_type: data?.event_type || '', type: data?.type || 'info',
+      title: data?.title || '', message: data?.message || '',
+      link: data?.link || '', enabled: data?.enabled ?? true,
+    })
+  }, [open, data])
+  return (
+    <ModalDialog open={open} onClose={onClose} title={isEdit ? 'Edit Template' : 'Add Template'} size="lg">
+      <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Event Type * <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>(unique key, e.g. sr_submitted)</span></label>
+            <input className="form-control" required disabled={isEdit}
+              placeholder="snake_case_event"
+              value={form.event_type}
+              onChange={e => setForm(f => ({ ...f, event_type: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} />
+            {isEdit && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Event type cannot be changed after creation.</div>}
+          </div>
+          <div className="form-group">
+            <label>Notification Type</label>
+            <select className="form-control" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+              {NOTIF_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-group"><label>Title * <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>({'{{variable}}'} supported)</span></label>
+          <input className="form-control" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            placeholder="e.g. New Requisition {{req_number}} Submitted" /></div>
+        <div className="form-group"><label>Message * <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>({'{{variable}}'} supported)</span></label>
+          <textarea className="form-control" rows="3" required value={form.message}
+            onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+            placeholder="e.g. {{requester_name}} submitted a requisition for your approval." /></div>
+        <div className="form-group"><label>Link (optional) <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>('/module/...' or {'{{id}}'})</span></label>
+          <input className="form-control" value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
+            placeholder="e.g. /module/procurement/sr/{{req_id}}" /></div>
+        <div className="form-group">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.enabled} onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />
+            Enabled (disabled templates are silently skipped)
           </label>
         </div>
         <ModalActions>

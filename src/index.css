@@ -640,3 +640,137 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   outline-offset: 2px;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME — applied when <html data-theme="light">
+   ════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --bg:       #f1f5f9;
+  --surface:  #ffffff;
+  --surface2: #f8fafc;
+  --surface3: #e2e8f0;
+  --border:   rgba(0,0,0,.08);
+  --border2:  rgba(0,0,0,.16);
+  --text:     #0f172a;
+  --text-mid: #475569;
+  --text-dim: #94a3b8;
+  --shadow:   0 4px 24px rgba(0,0,0,.12);
+
+  /* Darker accent tones for legibility on white */
+  --gold:   #b45309;
+  --teal:   #0d9488;
+  --blue:   #1d4ed8;
+  --green:  #15803d;
+  --red:    #b91c1c;
+  --yellow: #a16207;
+  --purple: #6d28d9;
+}
+
+/* Badges — adjust rgba bases for light backgrounds */
+[data-theme="light"] .badge-green  { background: rgba(21,128,61,.10);   color: #15803d; border-color: rgba(21,128,61,.25); }
+[data-theme="light"] .badge-red    { background: rgba(185,28,28,.10);   color: #b91c1c; border-color: rgba(185,28,28,.25); }
+[data-theme="light"] .badge-yellow { background: rgba(161,98,7,.10);    color: #a16207; border-color: rgba(161,98,7,.25); }
+[data-theme="light"] .badge-blue   { background: rgba(29,78,216,.10);   color: #1d4ed8; border-color: rgba(29,78,216,.25); }
+[data-theme="light"] .badge-purple { background: rgba(109,40,217,.10);  color: #6d28d9; border-color: rgba(109,40,217,.25); }
+[data-theme="light"] .badge-teal   { background: rgba(13,148,136,.10);  color: #0d9488; border-color: rgba(13,148,136,.25); }
+[data-theme="light"] .badge-gold   { background: rgba(180,83,9,.10);    color: #b45309; border-color: rgba(180,83,9,.25); }
+[data-theme="light"] .badge-dim    { background: rgba(0,0,0,.05);       color: #64748b; border-color: rgba(0,0,0,.12); }
+
+/* Cards — crisp white with subtle border on light */
+[data-theme="light"] .card {
+  background: var(--surface);
+  border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+/* Inputs — clear border on light */
+[data-theme="light"] .form-control {
+  background: var(--surface);
+  border-color: rgba(0,0,0,.20);
+  color: var(--text);
+}
+
+[data-theme="light"] .form-control:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(180,83,9,.15);
+}
+
+/* Sidebar */
+[data-theme="light"] .sidebar-desktop {
+  background: #1e293b;
+  /* Keep sidebar dark even in light mode — standard UX pattern */
+}
+
+/* TopBar */
+[data-theme="light"] .topbar,
+[data-theme="light"] [class*="topbar"] {
+  background: var(--surface);
+  border-bottom: 1px solid rgba(0,0,0,.10);
+}
+
+/* Breadcrumb bar */
+[data-theme="light"] .breadcrumb-bar {
+  background: var(--surface2);
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+/* Table */
+[data-theme="light"] .stock-table thead th {
+  background: var(--surface2);
+  color: var(--text-mid);
+}
+
+[data-theme="light"] .stock-table tbody tr:hover {
+  background: var(--surface2);
+}
+
+/* Overlay / Modal */
+[data-theme="light"] .overlay {
+  background: rgba(0,0,0,.35);
+}
+
+[data-theme="light"] .modal {
+  background: var(--surface);
+  border-color: rgba(0,0,0,.12);
+}
+
+/* Chart bars — visible on light background */
+[data-theme="light"] .kpi-card {
+  background: var(--surface);
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+/* Buttons */
+[data-theme="light"] .btn-secondary {
+  background: rgba(0,0,0,.05);
+  border-color: rgba(0,0,0,.15);
+  color: var(--text);
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: rgba(0,0,0,.10);
+}
+
+/* Recent pills */
+[data-theme="light"] .recent-pill {
+  background: var(--surface2);
+  border-color: rgba(0,0,0,.12);
+  color: var(--text-mid);
+}
+
+/* Scrollbars — lighter on light mode */
+[data-theme="light"]::-webkit-scrollbar-thumb { background: rgba(0,0,0,.20); }
+
+/* Command palette */
+[data-theme="light"] .cmd-palette {
+  background: var(--surface);
+  border-color: rgba(0,0,0,.12);
+  box-shadow: 0 20px 60px rgba(0,0,0,.20);
+}
+
+[data-theme="light"] .cmd-item:hover,
+[data-theme="light"] .cmd-item.selected { background: var(--surface2); }
+
+[data-theme="light"] .cmd-input { color: var(--text); }
+[data-theme="light"] .cmd-shortcut { background: var(--surface2); border-color: rgba(0,0,0,.15); }
+
