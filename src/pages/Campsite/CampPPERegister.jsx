@@ -107,7 +107,7 @@ export default function CampPPERegister() {
                       {emp?.employee_number && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{emp.employee_number}</div>}
                     </td>
                     <td>{p.item_name}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{p.qty}</td>
+                    <td className="td-mono">{p.qty}</td>
                     <td style={{ color: 'var(--text-dim)' }}>{p.size || '—'}</td>
                     <td>
                       <span style={{ padding: '2px 8px', borderRadius: 20, background: cs.bg, border: `1px solid ${cs.border}`, color: cs.color, fontSize: 11, fontWeight: 700 }}>

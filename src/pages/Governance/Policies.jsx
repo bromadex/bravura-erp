@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 export default function Policies() {
@@ -169,81 +170,62 @@ export default function Policies() {
       )}
 
       {/* Respond modal */}
-      {signing && (
-        <>
-          <div onClick={() => { setSigning(null); setSignComment('') }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 480, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, padding: 24 }}>
-            <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Respond to Policy</div>
-            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
-              <strong style={{ color: 'var(--text)' }}>{signing.title}</strong>
-            </div>
-            {signing.body && (
-              <div style={{ maxHeight: 150, overflowY: 'auto', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 14, whiteSpace: 'pre-wrap' }}>
-                {signing.body}
-              </div>
-            )}
-            <div className="form-group">
-              <label className="form-label">Comments (optional)</label>
-              <textarea rows={2} className="form-control" style={{ resize: 'vertical' }} value={signComment}
-                onChange={e => setSignComment(e.target.value)} placeholder="Add any comments or concerns…" />
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button className="btn btn-secondary" onClick={() => { setSigning(null); setSignComment('') }}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => handleRespond('rejected')} disabled={saving}>Reject</button>
-              <button className="btn btn-primary" onClick={() => handleRespond('accepted')} disabled={saving}>
-                {saving ? 'Saving…' : 'Accept'}
-              </button>
-            </div>
+      <ModalDialog open={!!signing} onClose={() => { setSigning(null); setSignComment('') }} title="Respond to Policy">
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
+          <strong style={{ color: 'var(--text)' }}>{signing?.title}</strong>
+        </div>
+        {signing?.body && (
+          <div style={{ maxHeight: 150, overflowY: 'auto', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text-mid)', lineHeight: 1.6, marginBottom: 14, whiteSpace: 'pre-wrap' }}>
+            {signing.body}
           </div>
-        </>
-      )}
+        )}
+        <div className="form-group">
+          <label className="form-label">Comments (optional)</label>
+          <textarea rows={2} className="form-control" style={{ resize: 'vertical' }} value={signComment}
+            onChange={e => setSignComment(e.target.value)} placeholder="Add any comments or concerns…" />
+        </div>
+        <ModalActions>
+          <button className="btn btn-secondary" onClick={() => { setSigning(null); setSignComment('') }}>Cancel</button>
+          <button className="btn btn-danger" onClick={() => handleRespond('rejected')} disabled={saving}>Reject</button>
+          <button className="btn btn-primary" onClick={() => handleRespond('accepted')} disabled={saving}>
+            {saving ? 'Saving…' : 'Accept'}
+          </button>
+        </ModalActions>
+      </ModalDialog>
 
       {/* Publish policy modal */}
-      {showForm && (
-        <>
-          <div onClick={() => setShowForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 560, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="material-icons" style={{ color: 'var(--yellow)' }}>description</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Publish Policy</div>
-              <div style={{ flex: 1 }} />
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Policy Title *</label>
-                <input required className="form-control" value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Category</label>
-                  <select className="form-control" value={form.category}
-                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                    {CATS.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Version</label>
-                  <input className="form-control" placeholder="1.0" value={form.version}
-                    onChange={e => setForm(f => ({ ...f, version: e.target.value }))} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Policy Text *</label>
-                <textarea required rows={8} className="form-control" style={{ resize: 'vertical' }} value={form.body}
-                  onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish Policy'}</button>
-              </div>
-            </form>
+      <ModalDialog open={showForm} onClose={() => setShowForm(false)} title="Publish Policy">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Policy Title *</label>
+            <input required className="form-control" value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
-        </>
-      )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select className="form-control" value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Version</label>
+              <input className="form-control" placeholder="1.0" value={form.version}
+                onChange={e => setForm(f => ({ ...f, version: e.target.value }))} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Policy Text *</label>
+            <textarea required rows={8} className="form-control" style={{ resize: 'vertical' }} value={form.body}
+              onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Publishing…' : 'Publish Policy'}</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

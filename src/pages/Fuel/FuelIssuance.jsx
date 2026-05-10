@@ -20,6 +20,7 @@ import { generateTxnCode } from '../../utils/txnCode'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 const FUEL_COLORS = { DIESEL: 'badge-yellow', PETROL: 'badge-green', PARAFFIN: 'badge-blue' }
 const today = new Date().toISOString().split('T')[0]
@@ -138,47 +139,24 @@ export default function FuelIssuance() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Fuel Issuance</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={handleExport}>
-            <span className="material-icons">table_chart</span> Export
+      <PageHeader title="Fuel Issuance">
+        <button className="btn btn-secondary" onClick={handleExport}>
+          <span className="material-icons">table_chart</span> Export
+        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={openNew}>
+            <span className="material-icons">local_gas_station</span> New Issuance
           </button>
-          {canEdit && (
-            <button className="btn btn-primary" onClick={openNew}>
-              <span className="material-icons">local_gas_station</span> New Issuance
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card">
-          <div className="kpi-label">Issued Today</div>
-          <div className="kpi-val" style={{ color: 'var(--yellow)' }}>{issuedToday.toLocaleString()}</div>
-          <div className="kpi-sub">litres</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Total Issued</div>
-          <div className="kpi-val">{totalIssued.toLocaleString()}</div>
-          <div className="kpi-sub">all time (L)</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Unique Vehicles</div>
-          <div className="kpi-val" style={{ color: 'var(--teal)' }}>{uniqueVehicles}</div>
-          <div className="kpi-sub">served</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Drivers</div>
-          <div className="kpi-val" style={{ color: 'var(--blue)' }}>{uniqueDrivers}</div>
-          <div className="kpi-sub">recorded</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Records</div>
-          <div className="kpi-val">{issuances.length}</div>
-          <div className="kpi-sub">total entries</div>
-        </div>
+        <KPICard label="Issued Today" value={issuedToday.toLocaleString()} sub="litres" color="yellow" />
+        <KPICard label="Total Issued" value={totalIssued.toLocaleString()} sub="all time (L)" />
+        <KPICard label="Unique Vehicles" value={uniqueVehicles} sub="served" color="teal" />
+        <KPICard label="Drivers" value={uniqueDrivers} sub="recorded" color="blue" />
+        <KPICard label="Records" value={issuances.length} sub="total entries" />
       </div>
 
       {/* Filters */}
@@ -235,7 +213,7 @@ export default function FuelIssuance() {
               {loading ? (
                 <tr><td colSpan="10" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="10" className="empty-state">No records match your filters</td></tr>
+                <tr><td colSpan="10"><EmptyState icon="local_gas_station" message="No records match your filters" /></td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id}>
                   <td>{r.txn_code ? <TxnCodeBadge code={r.txn_code} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
@@ -243,15 +221,17 @@ export default function FuelIssuance() {
                   <td style={{ color: 'var(--text-dim)' }}>{r.time || '—'}</td>
                   <td><span className={`badge ${FUEL_COLORS[r.fuel_type] || 'badge-gold'}`}>{r.fuel_type}</span></td>
                   <td style={{ fontWeight: 600 }}>{r.vehicle || '—'}</td>
-                  <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--yellow)' }}>{r.amount} L</td>
+                  <td className="td-mono" style={{ color: 'var(--yellow)' }}>{r.amount} L</td>
                   <td>{r.driver || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{r.odometer ? `${r.odometer} km` : '—'}</td>
                   <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{r.purpose || '—'}</td>
                   <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{r.authorized_by || '—'}</td>
                   {(canEdit || canDelete) && (
-                    <td style={{ display: 'flex', gap: 4 }}>
-                      {canEdit   && <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}><span className="material-icons" style={{ fontSize: 13 }}>edit</span></button>}
-                      {canDelete && <button className="btn btn-danger btn-sm"    onClick={() => handleDelete(r.id)}><span className="material-icons" style={{ fontSize: 13 }}>delete</span></button>}
+                    <td className="td-actions">
+                      <div className="btn-group-sm">
+                        {canEdit   && <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}><span className="material-icons" style={{ fontSize: 13 }}>edit</span></button>}
+                        {canDelete && <button className="btn btn-danger btn-sm"    onClick={() => handleDelete(r.id)}><span className="material-icons" style={{ fontSize: 13 }}>delete</span></button>}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -263,125 +243,122 @@ export default function FuelIssuance() {
 
       {/* Modal */}
       {showModal && (
-        <div className="overlay" onClick={() => { setShowModal(false); setEditRecord(null) }}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editRecord ? 'Edit' : 'New'} Fuel <span>Issuance</span></div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Date *</label>
-                  <input type="date" className="form-control" required value={form.date}
-                    onChange={e => setForm({ ...form, date: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Time</label>
-                  <input type="time" className="form-control" value={form.time}
-                    onChange={e => setForm({ ...form, time: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Fuel Type</label>
-                  <select className="form-control" value={form.fuel_type}
-                    onChange={e => setForm({ ...form, fuel_type: e.target.value })}>
-                    <option>DIESEL</option><option>PETROL</option><option>PARAFFIN</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Amount (L) *</label>
-                  <input type="number" className="form-control" required min="0.1" step="0.1"
-                    value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
-                </div>
-              </div>
-
+        <ModalDialog open onClose={() => { setShowModal(false); setEditRecord(null) }} title={`${editRecord ? 'Edit' : 'New'} Fuel Issuance`} size="lg">
+          <form onSubmit={handleSubmit}>
+            <div className="form-row">
               <div className="form-group">
-                <label>Equipment Type</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['vehicle', 'generator', 'earthmover'].map(t => (
-                    <button key={t} type="button"
-                      className={equipType === t ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-                      onClick={() => { setEquipType(t); setForm({ ...form, vehicle: '' }) }}>
-                      <span className="material-icons" style={{ fontSize: 14 }}>
-                        {t === 'vehicle' ? 'directions_car' : t === 'generator' ? 'bolt' : 'construction'}
-                      </span>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
+                <label>Date *</label>
+                <input type="date" className="form-control" required value={form.date}
+                  onChange={e => setForm({ ...form, date: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Time</label>
+                <input type="time" className="form-control" value={form.time}
+                  onChange={e => setForm({ ...form, time: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Fuel Type</label>
+                <select className="form-control" value={form.fuel_type}
+                  onChange={e => setForm({ ...form, fuel_type: e.target.value })}>
+                  <option>DIESEL</option><option>PETROL</option><option>PARAFFIN</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Amount (L) *</label>
+                <input type="number" className="form-control" required min="0.1" step="0.1"
+                  value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Equipment Type</label>
+              <div className="btn-group">
+                {['vehicle', 'generator', 'earthmover'].map(t => (
+                  <button key={t} type="button"
+                    className={equipType === t ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+                    onClick={() => { setEquipType(t); setForm({ ...form, vehicle: '' }) }}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>
+                      {t === 'vehicle' ? 'directions_car' : t === 'generator' ? 'bolt' : 'construction'}
+                    </span>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>{equipType === 'vehicle' ? 'Vehicle' : equipType === 'generator' ? 'Generator' : 'Equipment'} *</label>
+              <select className="form-control" required value={form.vehicle}
+                onChange={e => setForm({ ...form, vehicle: e.target.value })}>
+                <option value="">Select…</option>
+                {equipType === 'vehicle'    && vehicles.map(v    => <option key={v.reg}      value={`${v.reg} – ${v.description}`}>{v.reg} – {v.description}</option>)}
+                {equipType === 'generator'  && generators.map(g  => <option key={g.gen_code} value={`${g.gen_code} – ${g.gen_name}`}>{g.gen_code} – {g.gen_name}</option>)}
+                {equipType === 'earthmover' && earthmovers.map(e => <option key={e.reg}      value={`${e.reg} – ${e.description}`}>{e.reg} – {e.description}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Driver / Operator</label>
+              <select className="form-control" value={form.driver}
+                onChange={e => setForm({ ...form, driver: e.target.value })}>
+                <option value="">— Select driver —</option>
+                {employees.map(emp => {
+                  const onLeave = isOnLeave(emp.id)
+                  return (
+                    <option key={emp.id} value={emp.id} disabled={onLeave}>
+                      {emp.name}{onLeave ? ' (On Leave)' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+              {driverOnLeave && (
+                <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.3)', fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="material-icons" style={{ fontSize: 14 }}>event_busy</span>
+                  {selectedDriver?.name} is on approved leave — cannot be selected.
+                </div>
+              )}
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Odometer (km)</label>
+                <input type="number" className="form-control" min="0" value={form.odometer}
+                  onChange={e => setForm({ ...form, odometer: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Flowmeter Reading</label>
+                <input type="number" className="form-control" min="0" step="0.1" value={form.flowmeter}
+                  onChange={e => setForm({ ...form, flowmeter: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Authorized By</label>
+                <select className="form-control" value={form.authorized_by}
+                  onChange={e => setForm({ ...form, authorized_by: e.target.value })}>
+                  <option value="">— Select authoriser —</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>{emp.name}</option>
                   ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>{equipType === 'vehicle' ? 'Vehicle' : equipType === 'generator' ? 'Generator' : 'Equipment'} *</label>
-                <select className="form-control" required value={form.vehicle}
-                  onChange={e => setForm({ ...form, vehicle: e.target.value })}>
-                  <option value="">Select…</option>
-                  {equipType === 'vehicle'    && vehicles.map(v    => <option key={v.reg}      value={`${v.reg} – ${v.description}`}>{v.reg} – {v.description}</option>)}
-                  {equipType === 'generator'  && generators.map(g  => <option key={g.gen_code} value={`${g.gen_code} – ${g.gen_name}`}>{g.gen_code} – {g.gen_name}</option>)}
-                  {equipType === 'earthmover' && earthmovers.map(e => <option key={e.reg}      value={`${e.reg} – ${e.description}`}>{e.reg} – {e.description}</option>)}
                 </select>
               </div>
-
               <div className="form-group">
-                <label>Driver / Operator</label>
-                <select className="form-control" value={form.driver}
-                  onChange={e => setForm({ ...form, driver: e.target.value })}>
-                  <option value="">— Select driver —</option>
-                  {employees.map(emp => {
-                    const onLeave = isOnLeave(emp.id)
-                    return (
-                      <option key={emp.id} value={emp.id} disabled={onLeave}>
-                        {emp.name}{onLeave ? ' (On Leave)' : ''}
-                      </option>
-                    )
-                  })}
-                </select>
-                {driverOnLeave && (
-                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 6, background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.3)', fontSize: 12, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="material-icons" style={{ fontSize: 14 }}>event_busy</span>
-                    {selectedDriver?.name} is on approved leave — cannot be selected.
-                  </div>
-                )}
+                <label>Purpose</label>
+                <input className="form-control" value={form.purpose}
+                  onChange={e => setForm({ ...form, purpose: e.target.value })} />
               </div>
+            </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Odometer (km)</label>
-                  <input type="number" className="form-control" min="0" value={form.odometer}
-                    onChange={e => setForm({ ...form, odometer: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Flowmeter Reading</label>
-                  <input type="number" className="form-control" min="0" step="0.1" value={form.flowmeter}
-                    onChange={e => setForm({ ...form, flowmeter: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Authorized By</label>
-                  <select className="form-control" value={form.authorized_by}
-                    onChange={e => setForm({ ...form, authorized_by: e.target.value })}>
-                    <option value="">— Select authoriser —</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.name}>{emp.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Purpose</label>
-                  <input className="form-control" value={form.purpose}
-                    onChange={e => setForm({ ...form, purpose: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditRecord(null) }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={driverOnLeave}>
-                  <span className="material-icons">local_gas_station</span>
-                  {editRecord ? 'Save Changes' : 'Confirm Issuance'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <ModalActions>
+              <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditRecord(null) }}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={driverOnLeave}>
+                <span className="material-icons">local_gas_station</span>
+                {editRecord ? 'Save Changes' : 'Confirm Issuance'}
+              </button>
+            </ModalActions>
+          </form>
+        </ModalDialog>
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import { useFuel } from '../../contexts/FuelContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportMultiSheet } from '../../engine/reportingEngine'
+import { PageHeader, KPICard, EmptyState, TabNav, AlertBanner } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -63,46 +64,38 @@ export default function FuelTanks() {
   }
 
   const TABS = [
-    { id: 'overview',  label: 'Overview',       icon: 'water'     },
-    { id: 'analytics', label: 'Analytics',       icon: 'bar_chart' },
+    { id: 'overview',  label: 'Overview',  icon: 'water'     },
+    { id: 'analytics', label: 'Analytics', icon: 'bar_chart' },
   ]
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Fuel Tanks</h1>
+      <PageHeader title="Fuel Tanks">
         <button className="btn btn-secondary" onClick={handleExport}>
           <span className="material-icons">table_chart</span> Export
         </button>
-      </div>
+      </PageHeader>
 
       {/* ── Critical / Low alert banner ─────────────────────── */}
       {percentage < 20 && (
-        <div style={{ padding: '14px 18px', borderRadius: 12, marginBottom: 20, background: percentage < 10 ? 'rgba(248,113,113,.1)' : 'rgba(251,191,36,.08)', border: `1px solid ${percentage < 10 ? 'rgba(248,113,113,.4)' : 'rgba(251,191,36,.4)'}`, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span className="material-icons" style={{ fontSize: 32, color: levelColor, flexShrink: 0 }}>
-            {percentage < 10 ? 'error' : 'warning'}
-          </span>
-          <div>
-            <div style={{ fontWeight: 700, color: levelColor }}>
-              {percentage < 10 ? 'CRITICAL — Fuel tank nearly empty' : 'LOW FUEL — Place order soon'}
+        <AlertBanner
+          type={percentage < 10 ? 'danger' : 'warning'}
+          message={
+            <div>
+              <div style={{ fontWeight: 700, color: levelColor }}>
+                {percentage < 10 ? 'CRITICAL — Fuel tank nearly empty' : 'LOW FUEL — Place order soon'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                Main tank (ZUFTA10): <strong style={{ color: levelColor }}>{percentage.toFixed(0)}%</strong>
+                {' · '}{currentLevel.toLocaleString()} L remaining of {TANK_MAX_LITRES.toLocaleString()} L capacity
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-              Main tank (ZUFTA10): <strong style={{ color: levelColor }}>{percentage.toFixed(0)}%</strong>
-              {' · '}{currentLevel.toLocaleString()} L remaining of {TANK_MAX_LITRES.toLocaleString()} L capacity
-            </div>
-          </div>
-        </div>
+          }
+        />
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === t.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-icons" style={{ fontSize: 16 }}>{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
+      <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
 
       {/* ── OVERVIEW TAB ────────────────────────────────────── */}
       {activeTab === 'overview' && (
@@ -145,31 +138,11 @@ export default function FuelTanks() {
 
           {/* KPIs */}
           <div className="kpi-grid" style={{ marginBottom: 20 }}>
-            <div className="kpi-card">
-              <div className="kpi-label">Current Level</div>
-              <div className="kpi-val" style={{ color: levelColor, fontSize: 22 }}>{currentLevel.toLocaleString()} L</div>
-              <div className="kpi-sub">{percentage.toFixed(1)}% full</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Issued Today</div>
-              <div className="kpi-val" style={{ color: 'var(--yellow)', fontSize: 22 }}>{issuedToday.toLocaleString()} L</div>
-              <div className="kpi-sub">{today}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Issued This Month</div>
-              <div className="kpi-val" style={{ fontSize: 22 }}>{issuedThisMonth.toLocaleString()} L</div>
-              <div className="kpi-sub">{today.slice(0, 7)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Total Delivered</div>
-              <div className="kpi-val" style={{ color: 'var(--green)', fontSize: 22 }}>{totalDelivered.toLocaleString()} L</div>
-              <div className="kpi-sub">{deliveries.length} deliveries</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Total Issued</div>
-              <div className="kpi-val" style={{ fontSize: 22 }}>{totalIssued.toLocaleString()} L</div>
-              <div className="kpi-sub">{issuances.length} transactions</div>
-            </div>
+            <KPICard label="Current Level" value={`${currentLevel.toLocaleString()} L`} sub={`${percentage.toFixed(1)}% full`} color="teal" />
+            <KPICard label="Issued Today" value={`${issuedToday.toLocaleString()} L`} sub={today} color="yellow" />
+            <KPICard label="Issued This Month" value={`${issuedThisMonth.toLocaleString()} L`} sub={today.slice(0, 7)} />
+            <KPICard label="Total Delivered" value={`${totalDelivered.toLocaleString()} L`} sub={`${deliveries.length} deliveries`} color="green" />
+            <KPICard label="Total Issued" value={`${totalIssued.toLocaleString()} L`} sub={`${issuances.length} transactions`} />
           </div>
 
           {/* Recent issuances */}
@@ -184,11 +157,13 @@ export default function FuelTanks() {
                       <td>{i.date}</td>
                       <td style={{ fontWeight: 600 }}>{i.vehicle || '—'}</td>
                       <td>{i.driver || '—'}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--yellow)', fontWeight: 700 }}>{i.amount} L</td>
+                      <td className="td-mono" style={{ color: 'var(--yellow)' }}>{i.amount} L</td>
                       <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{i.purpose || '—'}</td>
                     </tr>
                   ))}
-                  {issuances.length === 0 && <tr><td colSpan="5" className="empty-state">No issuances yet</td></tr>}
+                  {issuances.length === 0 && (
+                    <tr><td colSpan="5"><EmptyState icon="local_gas_station" message="No issuances yet" /></td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -205,12 +180,14 @@ export default function FuelTanks() {
                     <tr key={d.id}>
                       <td>{d.date}</td>
                       <td style={{ fontWeight: 600 }}>{d.supplier || '—'}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 700 }}>{d.qty?.toLocaleString()} L</td>
+                      <td className="td-mono" style={{ color: 'var(--green)' }}>{d.qty?.toLocaleString()} L</td>
                       <td><span className={`badge ${d.fuel_type === 'DIESEL' ? 'badge-yellow' : 'badge-green'}`}>{d.fuel_type}</span></td>
                       <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{d.delivery_note || '—'}</td>
                     </tr>
                   ))}
-                  {deliveries.length === 0 && <tr><td colSpan="5" className="empty-state">No deliveries yet</td></tr>}
+                  {deliveries.length === 0 && (
+                    <tr><td colSpan="5"><EmptyState icon="local_shipping" message="No deliveries yet" /></td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -252,7 +229,7 @@ export default function FuelTanks() {
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>By Vehicle</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Total litres issued per vehicle</div>
               {byVehicle.length === 0 ? (
-                <div className="empty-state" style={{ padding: 24 }}>No data yet</div>
+                <EmptyState icon="directions_car" message="No data yet" />
               ) : byVehicle.map(([vehicle, litres]) => {
                 const pct = (litres / maxVehicle) * 100
                 const pctTotal = totalIssued > 0 ? ((litres / totalIssued) * 100).toFixed(0) : 0
@@ -277,7 +254,7 @@ export default function FuelTanks() {
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>By Driver / Operator</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Total litres issued per driver</div>
               {byDriver.length === 0 ? (
-                <div className="empty-state" style={{ padding: 24 }}>No data yet</div>
+                <EmptyState icon="person" message="No data yet" />
               ) : byDriver.map(([driver, litres]) => {
                 const pct = (litres / maxDriver) * 100
                 const pctTotal = totalIssued > 0 ? ((litres / totalIssued) * 100).toFixed(0) : 0

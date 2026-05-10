@@ -315,7 +315,7 @@ export default function CampRooms() {
                 const purpose   = PURPOSE_OPTIONS.find(p => p.value === room.room_purpose) || PURPOSE_OPTIONS[0]
                 return (
                   <tr key={room.id}>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--gold)' }}>{room.code}</td>
+                    <td className="td-mono" style={{ color: 'var(--gold)' }}>{room.code}</td>
                     <td>{block?.name || '—'}</td>
                     <td>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>

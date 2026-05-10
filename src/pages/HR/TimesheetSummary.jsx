@@ -57,7 +57,7 @@ export default function TimesheetSummary() {
     return { emp, ...s, hourlyRate, pay }
   })
 
-  const exportXLSX = () => {
+  const handleExport = () => {
     if (!selectedPeriod) return
     const rows = summaries.map(r => ({
       'Employee':          r.emp.name,
@@ -100,7 +100,7 @@ export default function TimesheetSummary() {
   return (
     <div>
       <PageHeader title="Timesheet Summary">
-        <button className="btn btn-secondary" onClick={exportXLSX} disabled={!selectedPeriod}>
+        <button className="btn btn-secondary" onClick={handleExport} disabled={!selectedPeriod}>
           <span className="material-icons">table_chart</span> Export Excel
         </button>
         <button className="btn btn-secondary" onClick={printAll}>
@@ -188,17 +188,17 @@ export default function TimesheetSummary() {
                         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.emp.employee_number}</div>
                       </td>
                       <td style={{ fontSize: 12 }}>{getDeptName(r.emp.department_id)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{r.regularHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.saturdayHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.saturdayHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.overtimeHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtimeHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.publicHolidayHours > 0 ? 'var(--teal)' : 'inherit' }}>{r.publicHolidayHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{r.totalHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.absentWeekdays > 3 ? 'var(--red)' : r.absentWeekdays > 0 ? 'var(--yellow)' : 'var(--green)' }}>{r.absentWeekdays}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{r.leaveDays || 0}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)', fontSize: 11 }}>
+                      <td className="td-mono">{r.regularHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.saturdayHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.saturdayHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.overtimeHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtimeHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.publicHolidayHours > 0 ? 'var(--teal)' : 'inherit' }}>{r.publicHolidayHours.toFixed(1)}</td>
+                      <td className="td-mono">{r.totalHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.absentWeekdays > 3 ? 'var(--red)' : r.absentWeekdays > 0 ? 'var(--yellow)' : 'var(--green)' }}>{r.absentWeekdays}</td>
+                      <td className="td-mono">{r.leaveDays || 0}</td>
+                      <td className="td-mono" style={{ color: 'var(--text-dim)', fontSize: 11 }}>
                         {r.hourlyRate > 0 ? `$${r.hourlyRate.toFixed(2)}` : '—'}
                       </td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--teal)' }}>
+                      <td className="td-mono" style={{ color: 'var(--teal)' }}>
                         {r.pay ? `$${r.pay.totalPay.toFixed(2)}` : '—'}
                       </td>
                     </tr>
@@ -206,15 +206,15 @@ export default function TimesheetSummary() {
                   {/* Totals row */}
                   <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
                     <td colSpan="2">TOTALS ({summaries.length} employees)</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.regularHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.saturdayHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.overtimeHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.publicHolidayHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.totalHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>{totals.absentWeekdays}</td>
+                    <td className="td-mono">{totals.regularHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.saturdayHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.overtimeHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.publicHolidayHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.totalHours.toFixed(1)}</td>
+                    <td className="td-mono" style={{ color: 'var(--red)' }}>{totals.absentWeekdays}</td>
                     <td>—</td>
                     <td>—</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${totals.totalPay.toFixed(2)}</td>
+                    <td className="td-mono" style={{ color: 'var(--teal)' }}>${totals.totalPay.toFixed(2)}</td>
                   </tr>
                   {summaries.length === 0 && (
                     <tr><td colSpan="11" className="empty-state">No attendance records found for this period</td></tr>
@@ -311,10 +311,10 @@ export default function TimesheetSummary() {
                         <tr key={a.id}>
                           <td style={{ whiteSpace: 'nowrap' }}>{a.date}</td>
                           <td>{dow}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.clock_in || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.clock_out || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.total_hours?.toFixed(1) || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)', color: a.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{a.overtime_hours?.toFixed(1) || '—'}</td>
+                          <td className="td-mono">{a.clock_in || '—'}</td>
+                          <td className="td-mono">{a.clock_out || '—'}</td>
+                          <td className="td-mono">{a.total_hours?.toFixed(1) || '—'}</td>
+                          <td className="td-mono" style={{ color: a.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{a.overtime_hours?.toFixed(1) || '—'}</td>
                           <td>
                             {isPH
                               ? <span className="badge badge-teal">Public Holiday</span>

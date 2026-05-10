@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { generateTxnCode } from '../../utils/txnCode'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 const CATS = ['General', 'Operations', 'HR', 'Safety', 'Finance', 'Procurement']
@@ -202,52 +203,39 @@ export default function Memos() {
       )}
 
       {/* Form modal */}
-      {showForm && (
-        <>
-          <div onClick={closeForm} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '95%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
-              <span className="material-icons" style={{ color: 'var(--teal)' }}>mail</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{editing ? 'Edit' : 'Issue'} Memo</div>
-              {editing?.txn_code && (
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--gold)', background: 'rgba(251,191,36,.1)', padding: '2px 8px', borderRadius: 8 }}>{editing.txn_code}</span>
-              )}
-              <div style={{ flex: 1 }} />
-              <button onClick={closeForm} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Title / Subject *</label>
-                <input required className="form-control"
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select className="form-control"
-                  value={formCategory}
-                  onChange={e => setFormCategory(e.target.value)}>
-                  {CATS.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Content *</label>
-                <textarea required rows={8} className="form-control" style={{ resize: 'vertical' }}
-                  value={formBody}
-                  onChange={e => setFormBody(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-secondary" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving…' : editing ? 'Update Memo' : 'Issue Memo'}
-                </button>
-              </div>
-            </form>
+      <ModalDialog open={showForm} onClose={closeForm} title={`${editing ? 'Edit' : 'Issue'} Memo`}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {editing?.txn_code && (
+            <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--gold)', background: 'rgba(251,191,36,.1)', padding: '4px 10px', borderRadius: 8, display: 'inline-block' }}>{editing.txn_code}</div>
+          )}
+          <div className="form-group">
+            <label className="form-label">Title / Subject *</label>
+            <input required className="form-control"
+              value={formTitle}
+              onChange={e => setFormTitle(e.target.value)} />
           </div>
-        </>
-      )}
+          <div className="form-group">
+            <label className="form-label">Category</label>
+            <select className="form-control"
+              value={formCategory}
+              onChange={e => setFormCategory(e.target.value)}>
+              {CATS.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Content *</label>
+            <textarea required rows={8} className="form-control" style={{ resize: 'vertical' }}
+              value={formBody}
+              onChange={e => setFormBody(e.target.value)} />
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={closeForm}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Update Memo' : 'Issue Memo'}
+            </button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

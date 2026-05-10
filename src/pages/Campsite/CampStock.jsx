@@ -162,7 +162,7 @@ export default function CampStock() {
                   <tr key={i.id}>
                     <td style={{ fontWeight: 600 }}>{i.name}</td>
                     <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{i.category}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: b.color }}>{i.balance} {i.unit}</td>
+                    <td className="td-mono" style={{ color: b.color }}>{i.balance} {i.unit}</td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{i.reorder_level || '—'}</td>
                     <td>
                       <span style={{ padding: '2px 8px', borderRadius: 20, background: b.bg, border: `1px solid ${b.border}`, color: b.color, fontSize: 11, fontWeight: 700 }}>{b.label}</span>

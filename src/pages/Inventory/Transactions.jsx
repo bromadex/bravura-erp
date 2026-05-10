@@ -4,6 +4,7 @@ import { useCanDelete } from '../../hooks/usePermission'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import { TXN_CODE_REGEX } from '../../utils/txnCode'
 import toast from 'react-hot-toast'
+import { PageHeader, EmptyState } from '../../components/ui'
 
 const isTxnCode = (str) => str && new RegExp(`^${TXN_CODE_REGEX.source.replace('\\b', '')}$`).test(str.trim())
 
@@ -54,9 +55,7 @@ export default function Transactions() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Transactions</h1>
-      </div>
+      <PageHeader title="Transactions" />
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20, alignItems: 'flex-end' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: 200 }}>
@@ -123,8 +122,8 @@ export default function Transactions() {
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: 40 }}>
-                  No transactions found
+                <td colSpan="9">
+                  <EmptyState icon="receipt_long" message="No transactions found" />
                 </td>
               </tr>
             ) : (
