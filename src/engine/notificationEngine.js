@@ -23,7 +23,7 @@ import { supabase } from '../lib/supabase'
  * @param {string} [notif.link]   - route to navigate on click, e.g. '/module/hr/leave'
  * @param {object} [notif.metadata] - arbitrary extra data stored as JSON
  */
-export async function pushNotification(userId, { type, title, message, link = null, metadata = {} }) {
+export async function pushNotification(userId, { type, title, message, link = null, metadata = {}, category = 'general' }) {
   if (!userId) return
   try {
     await supabase.from('notifications').insert([{
@@ -34,6 +34,7 @@ export async function pushNotification(userId, { type, title, message, link = nu
       message,
       link,
       metadata,
+      category,
       is_read:    false,
       created_at: new Date().toISOString(),
     }])
@@ -135,7 +136,7 @@ export async function pushNotificationFromTemplate(eventType, variables = {}, re
     // 1. Fetch template
     const { data: tmpl, error } = await supabase
       .from('notification_templates')
-      .select('type, title, message, link, enabled')
+      .select('type, title, message, link, enabled, category')
       .eq('event_type', eventType)
       .maybeSingle()
 
@@ -156,6 +157,7 @@ export async function pushNotificationFromTemplate(eventType, variables = {}, re
         title:    interpolate(tmpl.title),
         message:  interpolate(tmpl.message),
         link:     tmpl.link || null,
+        category: tmpl.category || 'general',
         metadata: variables,
       }
     }
