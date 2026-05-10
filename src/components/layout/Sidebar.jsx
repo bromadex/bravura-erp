@@ -171,9 +171,18 @@ const ALL_MODULES = {
     label: 'Reports', icon: 'bar_chart', color: '#38bdf8',
     sections: [{
       label: 'Analytics', pages: [
-        { id: 'overview',  label: 'Overview',    icon: 'dashboard' },
-        { id: 'audit-log', label: 'Audit Trail', icon: 'history'   },
-        { id: 'drafts',    label: 'Drafts',      icon: 'drafts'    },
+        { id: 'overview',        label: 'Overview',         icon: 'dashboard'     },
+        { id: 'kpi-dashboards',  label: 'KPI Dashboards',   icon: 'insights'      },
+        { id: 'report-builder',  label: 'Report Builder',   icon: 'build_circle'  },
+      ],
+    }, {
+      label: 'Automation', pages: [
+        { id: 'scheduled',       label: 'Scheduled Reports', icon: 'schedule_send' },
+      ],
+    }, {
+      label: 'Logs', pages: [
+        { id: 'audit-log',       label: 'Audit Trail',       icon: 'history'       },
+        { id: 'drafts',          label: 'Drafts',            icon: 'drafts'        },
       ],
     }],
   },
