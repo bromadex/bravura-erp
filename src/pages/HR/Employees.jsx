@@ -15,7 +15,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
+import { useCanEdit, useCanDelete, useCanViewField } from '../../hooks/usePermission'
+import ProtectedField from '../../components/ProtectedField'
 import { useLeave } from '../../contexts/LeaveContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import { PageHeader, StatusBadge, EmptyState, TabNav } from '../../components/ui'
@@ -28,8 +29,10 @@ export default function Employees() {
     loading: hrLoading, fetchAll
   } = useHR()
 
-  const canEdit   = useCanEdit('hr', 'employees')
-  const canDelete = useCanDelete('hr', 'employees')
+  const canEdit      = useCanEdit('hr', 'employees')
+  const canDelete    = useCanDelete('hr', 'employees')
+  const canSeeSalary = useCanViewField('employee', 'basic_salary')
+  const canSeeBank   = useCanViewField('employee', 'bank_account')
   const { isOnLeave } = useLeave()
 
   const [modalOpen,         setModalOpen]         = useState(false)
@@ -369,6 +372,12 @@ export default function Employees() {
 
     return (
       <div>
+        {!canSeeSalary ? (
+          <div className="alert alert-warning" style={{ borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }}>lock</span>
+            You don't have permission to view compensation details.
+          </div>
+        ) : (<>
         {/* Summary banner */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
           {[
@@ -424,6 +433,7 @@ export default function Employees() {
             </button>
           </div>
         )}
+        </>)}
       </div>
     )
   }
@@ -836,7 +846,7 @@ export default function Employees() {
               <div style={{ marginTop: 12 }}>
                 {emp.department_id   && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>business</span> {getDepartmentName(emp.department_id)}</div>}
                 {emp.phone           && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>phone</span> {emp.phone}</div>}
-                {emp.basic_salary > 0 && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>payments</span> ${emp.basic_salary.toLocaleString()}/mo</div>}
+                {emp.basic_salary > 0 && canSeeSalary && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>payments</span> ${emp.basic_salary.toLocaleString()}/mo</div>}
                 {emp.system_username  && <div style={{ fontSize: 12 }}><span className="material-icons" style={{ fontSize: 12 }}>account_circle</span> {emp.system_username}</div>}
               </div>
               <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

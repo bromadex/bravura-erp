@@ -67,6 +67,31 @@ export const useCanManagePermissions = () => {
   return canManagePermissions()
 }
 
+/**
+ * Returns true if the current user has the named action permission.
+ * Action keys are defined in src/constants/permissions.js (ACTIONS enum).
+ * Example: useHasPermission(ACTIONS.ISSUE_FUEL)
+ * @param {string} actionKey - e.g. 'ISSUE_FUEL'
+ * @returns {boolean}
+ */
+export const useHasPermission = (actionKey) => {
+  const { hasPermission } = usePermission()
+  return hasPermission(actionKey)
+}
+
+/**
+ * Returns true if the current user can view the given field on the given entity.
+ * Entities and fields are defined in src/constants/fieldPermissions.js (FIELD_RULES).
+ * Example: useCanViewField('employee', 'basic_salary')
+ * @param {string} entity - e.g. 'employee'
+ * @param {string} field  - e.g. 'basic_salary'
+ * @returns {boolean}
+ */
+export const useCanViewField = (entity, field) => {
+  const { canViewField } = usePermission()
+  return canViewField(entity, field)
+}
+
 // Named default export for convenience
 export default {
   useCanView,
@@ -74,4 +99,6 @@ export default {
   useCanDelete,
   useCanApprove,
   useCanManagePermissions,
+  useHasPermission,
+  useCanViewField,
 }

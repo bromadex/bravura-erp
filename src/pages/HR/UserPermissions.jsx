@@ -10,6 +10,8 @@ import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { useCanManagePermissions } from '../../hooks/usePermission'
+import { ACTION_LABELS, DEFAULT_ROLE_ACTIONS } from '../../constants/permissions'
+import { ROLE_LABELS } from '../../constants/roles'
 
 const MODULES = [
   { name: 'dashboard',   pages: ['overview'] },
@@ -198,10 +200,11 @@ export default function UserPermissions() {
   }
 
   const TABS = [
-    { id: 'individual', label: 'Individual',  icon: 'person'            },
-    { id: 'bulk',       label: 'Bulk Assign', icon: 'group'             },
-    { id: 'templates',  label: 'Templates',   icon: 'layers'            },
-    { id: 'reset',      label: 'Reset Password', icon: 'lock_reset'     },
+    { id: 'individual', label: 'Individual',        icon: 'person'         },
+    { id: 'bulk',       label: 'Bulk Assign',        icon: 'group'          },
+    { id: 'templates',  label: 'Templates',          icon: 'layers'         },
+    { id: 'reset',      label: 'Reset Password',     icon: 'lock_reset'     },
+    { id: 'actions',    label: 'Action Permissions', icon: 'verified_user'  },
   ]
 
   const PermTable = ({ state, onCheck, onToggleModule }) => (
@@ -447,6 +450,60 @@ export default function UserPermissions() {
               {templates.length === 0 && <div className="empty-state">No templates found. Add them to the permission_templates table in Supabase.</div>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── ACTION PERMISSIONS TAB ─────────────────────────────── */}
+      {activeTab === 'actions' && (
+        <div>
+          <div className="alert alert-info" style={{ borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+            <strong>Action Permissions</strong> — fine-grained operations each role can perform. Run the SQL migration in <code>supabase/migrations/rbac_enhancements.sql</code> to activate DB-driven overrides. Until then, defaults below apply.
+          </div>
+
+          {/* Group by module */}
+          {Object.entries(
+            Object.entries(ACTION_LABELS).reduce((groups, [key, meta]) => {
+              if (!groups[meta.module]) groups[meta.module] = []
+              groups[meta.module].push({ key, ...meta })
+              return groups
+            }, {})
+          ).map(([module, actions]) => (
+            <div key={module} className="card" style={{ marginBottom: 16 }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 13, color: 'var(--gold)' }}>
+                {module}
+              </div>
+              <div className="table-wrap">
+                <table className="stock-table" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      {Object.entries(ROLE_LABELS).map(([roleId, label]) => (
+                        <th key={roleId} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {actions.map(action => (
+                      <tr key={action.key}>
+                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)' }}>{action.label}</td>
+                        {Object.keys(ROLE_LABELS).map(roleId => {
+                          const hasIt = roleId === 'role_super_admin' || (DEFAULT_ROLE_ACTIONS[roleId] || []).includes(action.key)
+                          return (
+                            <td key={roleId} style={{ textAlign: 'center' }}>
+                              {hasIt
+                                ? <span className="material-icons" style={{ fontSize: 16, color: 'var(--green)' }}>check_circle</span>
+                                : <span className="material-icons" style={{ fontSize: 16, color: 'var(--border2)' }}>radio_button_unchecked</span>
+                              }
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
