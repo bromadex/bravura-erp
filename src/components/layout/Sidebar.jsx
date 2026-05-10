@@ -11,12 +11,25 @@ const ALL_MODULES = {
   procurement: {
     label: 'Procurement', icon: 'shopping_cart', color: '#a78bfa',
     sections: [{
-      label: 'Purchasing', pages: [
-        { id: 'suppliers',             label: 'Suppliers',             icon: 'store'         },
-        { id: 'store-requisitions',    label: 'Store Requisitions',    icon: 'assignment'    },
-        { id: 'purchase-requisitions', label: 'Purchase Requisitions', icon: 'request_quote' },
-        { id: 'purchase-orders',       label: 'Purchase Orders',       icon: 'shopping_bag'  },
-        { id: 'goods-received',        label: 'Goods Received',        icon: 'move_to_inbox' },
+      label: 'Overview', pages: [
+        { id: 'dashboard',            label: 'Dashboard',            icon: 'dashboard'      },
+      ],
+    }, {
+      label: 'Purchasing Lifecycle', pages: [
+        { id: 'store-requisitions',    label: 'Store Requisitions',   icon: 'assignment'     },
+        { id: 'purchase-requisitions', label: 'Purchase Requisitions',icon: 'request_quote'  },
+        { id: 'rfq',                   label: 'Request for Quotation',icon: 'send'           },
+        { id: 'quotations',            label: 'Supplier Quotations',  icon: 'format_quote'   },
+        { id: 'quotation-comparison',  label: 'Quote Comparison',     icon: 'compare'        },
+        { id: 'purchase-orders',       label: 'Purchase Orders',      icon: 'shopping_bag'   },
+        { id: 'goods-received',        label: 'Goods Received (GRN)', icon: 'move_to_inbox'  },
+        { id: 'invoices',              label: 'Purchase Invoices',    icon: 'receipt_long'   },
+      ],
+    }, {
+      label: 'Controls & Analytics', pages: [
+        { id: 'budget-control',        label: 'Budget Control',       icon: 'account_balance'},
+        { id: 'supplier-performance',  label: 'Supplier Performance', icon: 'star_rate'      },
+        { id: 'suppliers',             label: 'Suppliers',            icon: 'store'          },
       ],
     }],
   },

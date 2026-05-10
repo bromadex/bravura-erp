@@ -21,25 +21,39 @@ export function ProcurementProvider({ children }) {
   const [purchaseRequisitions, setPurchaseRequisitions] = useState([])
   const [purchaseOrders,       setPurchaseOrders]       = useState([])
   const [goodsReceived,        setGoodsReceived]        = useState([])
+  const [rfqs,                 setRfqs]                 = useState([])
+  const [rfqQuotations,        setRfqQuotations]        = useState([])
+  const [purchaseInvoices,     setPurchaseInvoices]     = useState([])
+  const [budgets,              setBudgets]              = useState([])
   const [loading,              setLoading]              = useState(true)
 
   const generateId = () => crypto.randomUUID()
 
+  const safe = (q) => q.catch(() => ({ data: [] }))
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [supRes, srRes, prRes, poRes, grRes] = await Promise.all([
+      const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*').order('order_date', { ascending: false }),
         supabase.from('goods_received').select('*').order('date', { ascending: false }),
+        safe(supabase.from('rfq').select('*').order('created_at', { ascending: false })),
+        safe(supabase.from('rfq_quotations').select('*').order('created_at', { ascending: false })),
+        safe(supabase.from('purchase_invoices').select('*').order('invoice_date', { ascending: false })),
+        safe(supabase.from('procurement_budgets').select('*').order('department')),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
       if (prRes.data)  setPurchaseRequisitions(prRes.data)
       if (poRes.data)  setPurchaseOrders(poRes.data)
       if (grRes.data)  setGoodsReceived(grRes.data)
+      if (rfqRes.data)  setRfqs(rfqRes.data)
+      if (quotRes.data) setRfqQuotations(quotRes.data)
+      if (piRes.data)   setPurchaseInvoices(piRes.data)
+      if (budRes.data)  setBudgets(budRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -349,15 +363,129 @@ export function ProcurementProvider({ children }) {
     return id
   }
 
+  // ── RFQ ───────────────────────────────────────────────────
+  const createRFQ = async (rfq) => {
+    const id = generateId()
+    const rfqNumber = await generateTxnCode('RFQ')
+    const { error } = await supabase.from('rfq').insert([{
+      id, rfq_number: rfqNumber, ...rfq, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'rfq', entityId: id, entityName: rfqNumber })
+    await fetchAll(); return id
+  }
+
+  const updateRFQ = async (id, updates) => {
+    const { error } = await supabase.from('rfq').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ── Quotations ────────────────────────────────────────────
+  const addQuotation = async (quot) => {
+    const id = generateId()
+    const { error } = await supabase.from('rfq_quotations').insert([{ id, ...quot, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll(); return id
+  }
+
+  const selectQuotation = async (quotId, rfqId, reason = '') => {
+    await supabase.from('rfq_quotations').update({ status: 'Selected', selected_reason: reason }).eq('id', quotId)
+    await supabase.from('rfq_quotations').update({ status: 'Rejected' }).eq('rfq_id', rfqId).neq('id', quotId)
+    await supabase.from('rfq').update({ status: 'Closed', updated_at: new Date().toISOString() }).eq('id', rfqId)
+    await fetchAll()
+  }
+
+  const deleteQuotation = async (id) => {
+    const { error } = await supabase.from('rfq_quotations').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ── Purchase Invoices ─────────────────────────────────────
+  const createPurchaseInvoice = async (pi) => {
+    const id = generateId()
+    const piNumber = await generateTxnCode('PI')
+    const { error } = await supabase.from('purchase_invoices').insert([{
+      id, pi_number: piNumber, ...pi,
+      outstanding: (pi.total_amount || 0) - (pi.paid_amount || 0),
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'purchase_invoice', entityId: id, entityName: piNumber })
+    await fetchAll(); return id
+  }
+
+  const updatePurchaseInvoice = async (id, updates) => {
+    const { error } = await supabase.from('purchase_invoices').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const recordPayment = async (id, { amount, method, reference, date }) => {
+    const inv = purchaseInvoices.find(p => p.id === id)
+    if (!inv) throw new Error('Invoice not found')
+    const newPaid = (inv.paid_amount || 0) + amount
+    const newStatus = newPaid >= inv.total_amount ? 'Paid' : 'Partially Paid'
+    const { error } = await supabase.from('purchase_invoices').update({
+      paid_amount: newPaid, status: newStatus,
+      payment_method: method, payment_reference: reference, payment_date: date,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    auditLog({ module: 'procurement', action: 'PAYMENT', entityType: 'purchase_invoice', entityId: id, entityName: inv.pi_number })
+    await fetchAll()
+  }
+
+  // ── Budgets ───────────────────────────────────────────────
+  const createBudget = async (budget) => {
+    const id = generateId()
+    const { error } = await supabase.from('procurement_budgets').insert([{ id, ...budget, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll(); return id
+  }
+
+  const updateBudget = async (id, updates) => {
+    const { error } = await supabase.from('procurement_budgets').update(updates).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteBudget = async (id) => {
+    const { error } = await supabase.from('procurement_budgets').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ── Budget helper: check if PO is within budget ───────────
+  const checkBudget = (department, amount, fiscalYear = new Date().getFullYear()) => {
+    const deptBudgets = budgets.filter(b => b.department === department && b.fiscal_year === fiscalYear)
+    if (!deptBudgets.length) return { ok: true, warning: false, message: 'No budget configured' }
+    const annual = deptBudgets.find(b => b.period === 'annual') || deptBudgets[0]
+    const spent  = purchaseOrders
+      .filter(p => p.department === department && p.status !== 'Cancelled')
+      .reduce((s, p) => s + (p.total_amount || 0), 0)
+    const remaining = (annual.budget_amount || 0) - spent
+    const pctUsed   = (annual.budget_amount || 0) > 0 ? (spent + amount) / annual.budget_amount * 100 : 0
+    if (spent + amount > annual.budget_amount) return { ok: false, warning: true, message: `Over budget by $${((spent + amount - annual.budget_amount)).toFixed(2)}`, pctUsed }
+    if (pctUsed > (annual.alert_threshold || 80)) return { ok: true, warning: true, message: `Budget at ${pctUsed.toFixed(0)}% — only $${remaining.toFixed(2)} remaining`, pctUsed }
+    return { ok: true, warning: false, message: `$${remaining.toFixed(2)} remaining (${(100 - pctUsed).toFixed(0)}%)`, pctUsed }
+  }
+
   return (
     <ProcurementContext.Provider value={{
-      suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived, loading,
+      suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived,
+      rfqs, rfqQuotations, purchaseInvoices, budgets, loading,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
       approveStoreRequisition, rejectStoreRequisition, fulfillStoreRequisition,
       approvePurchaseRequisition, rejectPurchaseRequisition,
       createPurchaseOrder, updatePurchaseOrderStatus,
       createGoodsReceived,
+      createRFQ, updateRFQ,
+      addQuotation, selectQuotation, deleteQuotation,
+      createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
+      createBudget, updateBudget, deleteBudget, checkBudget,
       fetchAll,
     }}>
       {children}
