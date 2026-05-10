@@ -1,11 +1,13 @@
 // src/contexts/PermissionContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
+import { FIELD_RULES } from '../constants/fieldPermissions'
+import { DEFAULT_ROLE_ACTIONS } from '../constants/permissions'
 
 const PermissionContext = createContext(null)
 
 export function PermissionProvider({ children }) {
-  const { user, permissions } = useAuth()
+  const { user, permissions, actionPermissions } = useAuth()
   const [cachedPermissions, setCachedPermissions] = useState({})
 
   useEffect(() => {
@@ -85,9 +87,29 @@ export function PermissionProvider({ children }) {
     return pages.some(page => canView(moduleName, page.id))
   }
 
+  // Check a named action permission (from action_permissions table)
+  const hasPermission = (actionKey) => {
+    if (!user) return false
+    if (user.role_id === 'role_super_admin') return true
+    const fromDB = actionPermissions?.[actionKey]
+    if (fromDB !== undefined) return fromDB === true
+    const defaults = DEFAULT_ROLE_ACTIONS[user.role_id] || []
+    return defaults.includes(actionKey)
+  }
+
+  // Check field-level visibility
+  const canViewField = (entity, field) => {
+    if (!user) return false
+    if (user.role_id === 'role_super_admin') return true
+    const rule = FIELD_RULES[entity]?.[field]
+    if (!rule) return true  // no rule = visible to all
+    return rule.allowedRoles?.includes(user.role_id) ?? false
+  }
+
   return (
     <PermissionContext.Provider value={{
       canView, canEdit, canDelete, canApprove, canManagePermissions,
+      hasPermission, canViewField,
       getVisiblePages, hasAnyVisiblePage, permissions: cachedPermissions,
     }}>
       {children}
