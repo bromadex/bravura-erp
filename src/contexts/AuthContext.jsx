@@ -18,9 +18,10 @@ const WARNING_MS      = 25 * 60 * 1000   // warn at 25 minutes
 const EVENTS          = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
 
 export function AuthProvider({ children }) {
-  const [user,        setUser]        = useState(null)
-  const [permissions, setPermissions] = useState([])
-  const [loading,     setLoading]     = useState(true)
+  const [user,              setUser]              = useState(null)
+  const [permissions,       setPermissions]       = useState([])
+  const [actionPermissions, setActionPermissions] = useState({})
+  const [loading,           setLoading]           = useState(true)
 
   const timeoutRef = useRef(null)
   const warnRef    = useRef(null)
@@ -76,24 +77,42 @@ export function AuthProvider({ children }) {
 
       const cache = {}
       merged.forEach(p => { cache[`${p.module_name}|${p.page_name || ''}`] = { can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete, can_approve: p.can_approve } })
-      localStorage.setItem('user_permissions_cache', JSON.stringify(cache))
 
-      return merged
+      // Load action permissions (3-tier: designation → role → user)
+      const [roleActRes, userActRes, desigActRes] = await Promise.all([
+        supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'role').eq('scope_id', userData.role_id).catch(() => ({ data: [] })),
+        supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'user').eq('scope_id', userId).catch(() => ({ data: [] })),
+        designationId ? supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'designation').eq('scope_id', designationId).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+      ])
+
+      const actionMap = {}
+      const applyActions = (rows) => { (rows || []).forEach(r => { actionMap[r.action_key] = r.granted }) }
+      applyActions(desigActRes.data)
+      applyActions(roleActRes.data)
+      applyActions(userActRes.data)  // user overrides win
+
+      // Store in cache alongside page permissions
+      const fullCache = { ...cache, __actions__: actionMap }
+      localStorage.setItem('user_permissions_cache', JSON.stringify(fullCache))
+
+      return { permissions: merged, actions: actionMap }
     } catch (err) {
       console.error('Error fetching permissions:', err)
-      return []
+      return { permissions: [], actions: {} }
     }
   }, [])
 
   const refreshPermissions = useCallback(async (userId) => {
-    const perms = await fetchUserPermissions(userId)
-    setPermissions(perms)
+    const result = await fetchUserPermissions(userId)
+    setPermissions(result.permissions || [])
+    setActionPermissions(result.actions || {})
   }, [fetchUserPermissions])
 
   // ── Session timeout ─────────────────────────────────────────
   const doLogout = useCallback((reason = '') => {
     setUser(null)
     setPermissions([])
+    setActionPermissions({})
     localStorage.removeItem('bravura_session')
     sessionStorage.removeItem('bravura_session')
     localStorage.removeItem('user_permissions_cache')
@@ -141,7 +160,10 @@ export function AuthProvider({ children }) {
       try {
         const parsed = JSON.parse(saved)
         setUser(parsed)
-        fetchUserPermissions(parsed.id).then(setPermissions)
+        fetchUserPermissions(parsed.id).then(result => {
+          setPermissions(result.permissions || [])
+          setActionPermissions(result.actions || {})
+        })
       } catch {}
     }
     setLoading(false)
@@ -175,8 +197,9 @@ export function AuthProvider({ children }) {
     }
 
     setUser(session)
-    const userPerms = await fetchUserPermissions(data.id)
-    setPermissions(userPerms)
+    const result = await fetchUserPermissions(data.id)
+    setPermissions(result.permissions || [])
+    setActionPermissions(result.actions || {})
     ;(rememberMe ? localStorage : sessionStorage).setItem('bravura_session', JSON.stringify(session))
     return session
   }
