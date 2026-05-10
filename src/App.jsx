@@ -105,9 +105,12 @@ import JournalEntries   from './pages/Accounting/JournalEntries'
 import FinancialReports from './pages/Accounting/FinancialReports'
 
 // ── Reports ───────────────────────────────────────────────────
-import ReportsOverview from './pages/Reports/ReportsOverview'
-import AuditTrail      from './pages/Reports/AuditTrail'
-import Drafts          from './pages/Reports/Drafts'
+import ReportsOverview   from './pages/Reports/ReportsOverview'
+import AuditTrail        from './pages/Reports/AuditTrail'
+import Drafts            from './pages/Reports/Drafts'
+import ReportBuilder     from './pages/Reports/ReportBuilder'
+import KpiDashboards     from './pages/Reports/KpiDashboards'
+import ScheduledReports  from './pages/Reports/ScheduledReports'
 
 // ── Logistics ─────────────────────────────────────────────────
 import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
@@ -407,10 +410,13 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index           element={<ReportsOverview />} />
-        <Route path="overview" element={<ReportsOverview />} />
-        <Route path="audit-log" element={<AuditTrail />}    />
-        <Route path="drafts"    element={<Drafts />}         />
+        <Route index                  element={<ReportsOverview />}  />
+        <Route path="overview"        element={<ReportsOverview />}  />
+        <Route path="kpi-dashboards"  element={<KpiDashboards />}   />
+        <Route path="report-builder"  element={<ReportBuilder />}   />
+        <Route path="scheduled"       element={<ScheduledReports />} />
+        <Route path="audit-log"       element={<AuditTrail />}      />
+        <Route path="drafts"          element={<Drafts />}           />
       </Route>
 
       {/* ── CONNECT ──────────────────────────────────────── */}

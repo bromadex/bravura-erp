@@ -79,3 +79,60 @@ export const fmtNum = (n) =>
  */
 export const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+
+/**
+ * Export rows as a UTF-8 CSV file (BOM-prefixed for Excel compatibility).
+ */
+export function exportCSV(rows, filename) {
+  if (!rows?.length) return
+  const headers = Object.keys(rows[0])
+  const escape  = (v) => {
+    if (v == null) return ''
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => escape(r[h])).join(',')),
+  ].join('\r\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename.endsWith('.csv') ? filename : filename + '.csv' })
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Print / Save-as-PDF the given rows in a new browser window.
+ * Opens a minimal HTML page with a styled table, then calls window.print().
+ */
+export function exportPDF(rows, title = 'Report', columns = null) {
+  if (!rows?.length) return
+  const cols = columns || Object.keys(rows[0])
+  const thead = `<tr>${cols.map(c => `<th>${c.replace(/_/g,' ')}</th>`).join('')}</tr>`
+  const tbody = rows.map(r =>
+    `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`
+  ).join('')
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>${title}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#111}
+      h2{font-size:15px;margin-bottom:4px}
+      .sub{font-size:10px;color:#666;margin-bottom:16px}
+      table{border-collapse:collapse;width:100%}
+      th{background:#1a1a2e;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+      td{border-bottom:1px solid #e5e7eb;padding:6px 10px}
+      tr:nth-child(even) td{background:#f9fafb}
+      @media print{body{padding:0}}
+    </style>
+  </head><body>
+    <h2>${title}</h2>
+    <div class="sub">Generated ${new Date().toLocaleString('en-GB')} — ${rows.length} records</div>
+    <table><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+    <script>window.onload=()=>window.print()<\/script>
+  </body></html>`
+  const w = window.open('', '_blank', 'width=900,height=700')
+  w.document.write(html)
+  w.document.close()
+}
