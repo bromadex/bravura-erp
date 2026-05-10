@@ -54,12 +54,18 @@ const ALL_MODULES = {
   fuel: {
     label: 'Fuel Management', icon: 'local_gas_station', color: '#fbbf24',
     sections: [{
-      label: 'Fuel Operations', pages: [
-        { id: 'tanks',      label: 'Fuel Tanks',    icon: 'water'             },
-        { id: 'dipstick',   label: 'Dipstick Log',  icon: 'straighten'        },
-        { id: 'issuance',   label: 'Fuel Issuance', icon: 'local_gas_station' },
-        { id: 'deliveries', label: 'Deliveries',    icon: 'local_shipping'    },
-        { id: 'reports',    label: 'Fuel Reports',  icon: 'bar_chart'         },
+      label: 'Operations', pages: [
+        { id: 'tanks',           label: 'Fuel Tanks',       icon: 'water'              },
+        { id: 'dipstick',        label: 'Dipstick Log',     icon: 'straighten'         },
+        { id: 'issuance',        label: 'Fuel Issuance',    icon: 'local_gas_station'  },
+        { id: 'deliveries',      label: 'Deliveries',       icon: 'local_shipping'     },
+      ],
+    }, {
+      label: 'Analytics', pages: [
+        { id: 'reconciliation',  label: 'Reconciliation',   icon: 'balance'            },
+        { id: 'consumption',     label: 'Vehicle Consumption', icon: 'speed'            },
+        { id: 'forecasting',     label: 'Forecasting',      icon: 'trending_up'        },
+        { id: 'reports',         label: 'Fuel Reports',     icon: 'bar_chart'          },
       ],
     }],
   },

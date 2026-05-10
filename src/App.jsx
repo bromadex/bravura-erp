@@ -74,7 +74,10 @@ import FuelTanks      from './pages/Fuel/FuelTanks'
 import FuelIssuance   from './pages/Fuel/FuelIssuance'
 import FuelDeliveries from './pages/Fuel/FuelDeliveries'
 import DipstickLog    from './pages/Fuel/DipstickLog'
-import FuelReports    from './pages/Fuel/FuelReports'
+import FuelReports          from './pages/Fuel/FuelReports'
+import TankReconciliation   from './pages/Fuel/TankReconciliation'
+import VehicleConsumption   from './pages/Fuel/VehicleConsumption'
+import FuelForecasting      from './pages/Fuel/FuelForecasting'
 
 // ── Fleet ─────────────────────────────────────────────────────
 import FleetDashboard    from './pages/Fleet/FleetDashboard'
@@ -244,11 +247,14 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index              element={<FuelTanks />} />
-        <Route path="tanks"       element={<FuelTanks />} />
-        <Route path="issuance"    element={<FuelIssuance />} />
-        <Route path="deliveries"  element={<FuelDeliveries />} />
-        <Route path="dipstick"    element={<DipstickLog />} />
-        <Route path="reports"     element={<FuelReports />} />
+        <Route path="tanks"          element={<FuelTanks />}          />
+        <Route path="issuance"       element={<FuelIssuance />}       />
+        <Route path="deliveries"     element={<FuelDeliveries />}     />
+        <Route path="dipstick"       element={<DipstickLog />}        />
+        <Route path="reconciliation" element={<TankReconciliation />} />
+        <Route path="consumption"    element={<VehicleConsumption />} />
+        <Route path="forecasting"    element={<FuelForecasting />}    />
+        <Route path="reports"        element={<FuelReports />}        />
       </Route>
 
       {/* ── FLEET ────────────────────────────────────────── */}
