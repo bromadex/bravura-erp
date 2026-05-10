@@ -1,5 +1,5 @@
 // src/pages/Settings/MasterData.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMasterData } from '../../contexts/MasterDataContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { PageHeader, ModalDialog, ModalActions, StatusBadge } from '../../components/ui'
@@ -248,8 +248,7 @@ export default function MasterData() {
 
 function DeptModal({ open, data, onClose, onSave }) {
   const [form, setForm] = useState({ name: '', code: '' })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { if (open) setForm({ name: data?.name || '', code: data?.code || '' }) })
+  useEffect(() => { if (open) setForm({ name: data?.name || '', code: data?.code || '' }) }, [open, data])
   return (
     <ModalDialog open={open} onClose={onClose} title={data ? 'Edit Department' : 'Add Department'}>
       <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
@@ -270,8 +269,7 @@ function DeptModal({ open, data, onClose, onSave }) {
 
 function DesModal({ open, data, onClose, onSave }) {
   const [form, setForm] = useState({ title: '', grade: '' })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { if (open) setForm({ title: data?.title || '', grade: data?.grade || '' }) })
+  useEffect(() => { if (open) setForm({ title: data?.title || '', grade: data?.grade || '' }) }, [open, data])
   return (
     <ModalDialog open={open} onClose={onClose} title={data ? 'Edit Designation' : 'Add Designation'}>
       <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
@@ -292,10 +290,9 @@ function DesModal({ open, data, onClose, onSave }) {
 
 function SupModal({ open, data, onClose, onSave }) {
   const [form, setForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', category: '' })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => {
+  useEffect(() => {
     if (open) setForm({ name: data?.name || '', contact_person: data?.contact_person || '', phone: data?.phone || '', email: data?.email || '', address: data?.address || '', category: data?.category || '' })
-  })
+  }, [open, data])
   return (
     <ModalDialog open={open} onClose={onClose} title={data ? 'Edit Supplier' : 'Add Supplier'} size="lg">
       <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
@@ -328,8 +325,7 @@ function SupModal({ open, data, onClose, onSave }) {
 
 function CCModal({ open, data, onClose, onSave }) {
   const [form, setForm] = useState({ code: '', name: '', description: '', active: true })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { if (open) setForm({ code: data?.code || '', name: data?.name || '', description: data?.description || '', active: data?.active ?? true }) })
+  useEffect(() => { if (open) setForm({ code: data?.code || '', name: data?.name || '', description: data?.description || '', active: data?.active ?? true }) }, [open, data])
   return (
     <ModalDialog open={open} onClose={onClose} title={data ? 'Edit Cost Center' : 'Add Cost Center'}>
       <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
@@ -358,8 +354,7 @@ function CCModal({ open, data, onClose, onSave }) {
 
 function SiteModal({ open, data, onClose, onSave }) {
   const [form, setForm] = useState({ code: '', name: '', location: '', manager: '', active: true })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { if (open) setForm({ code: data?.code || '', name: data?.name || '', location: data?.location || '', manager: data?.manager || '', active: data?.active ?? true }) })
+  useEffect(() => { if (open) setForm({ code: data?.code || '', name: data?.name || '', location: data?.location || '', manager: data?.manager || '', active: data?.active ?? true }) }, [open, data])
   return (
     <ModalDialog open={open} onClose={onClose} title={data ? 'Edit Site' : 'Add Site'}>
       <form onSubmit={e => { e.preventDefault(); onSave(form) }}>
