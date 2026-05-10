@@ -39,4 +39,4 @@ export async function generateTxnCode(prefix) {
 }
 
 // Regex that matches any valid transaction code (e.g. SR-2026-00034)
-export const TXN_CODE_REGEX = /\b([A-Z]{2,3}-\d{4}-\d{5})\b/g
+export const TXN_CODE_REGEX = /\b([A-Z]{2,4}-\d{4}-\d{5})\b/g

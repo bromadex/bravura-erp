@@ -27,6 +27,7 @@ import toast from 'react-hot-toast'
 import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtils'
 import { auditLog } from '../engine/auditEngine'
 import { pushNotification } from '../engine/notificationEngine'
+import { generateTxnCode } from '../engine/transactionEngine'
 
 const HRContext = createContext(null)
 
@@ -50,19 +51,11 @@ export function HRProvider({ children }) {
 
   // ── Employee number generator ──────────────────────────────────
   const generateEmployeeNumber = async () => {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('employee_number')
-      .ilike('employee_number', 'BRA%')
-    if (error) return `BRA${Date.now().toString().slice(-6)}`
-    let maxNum = 160
-    data?.forEach(emp => {
-      if (emp.employee_number) {
-        const num = parseInt(emp.employee_number.replace(/^BRA/i, ''), 10)
-        if (!isNaN(num) && num > maxNum) maxNum = num
-      }
-    })
-    return `BRA${maxNum + 1}`
+    try {
+      return await generateTxnCode('EMP')
+    } catch {
+      return `EMP-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`
+    }
   }
 
   // ── Audit log helper — thin wrapper around auditEngine ────────

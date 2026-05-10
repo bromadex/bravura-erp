@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { pushNotificationToHOD, pushNotificationToRoles } from '../engine/notificationEngine'
 import { auditLog } from '../engine/auditEngine'
+import { generateTxnCode } from '../engine/transactionEngine'
 
 const ProcurementContext = createContext(null)
 
@@ -75,7 +76,7 @@ export function ProcurementProvider({ children }) {
   // ── Store Requisitions ────────────────────────────────────
   const createStoreRequisition = async (req) => {
     const id = generateId()
-    const srNumber = `SR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const srNumber = await generateTxnCode('SR')
     const { error } = await supabase.from('store_requisitions').insert([{
       id,
       req_number: srNumber,
@@ -139,7 +140,7 @@ export function ProcurementProvider({ children }) {
     // Auto-create PRs for items with insufficient stock
     for (const deficit of deficits) {
       const prId     = generateId()
-      const prNumber = `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+      const prNumber = await generateTxnCode('PR')
       await supabase.from('purchase_requisitions').insert([{
         id: prId, pr_number: prNumber,
         date:           new Date().toISOString().split('T')[0],
@@ -287,7 +288,7 @@ export function ProcurementProvider({ children }) {
   // ── Purchase Orders ───────────────────────────────────────
   const createPurchaseOrder = async (po) => {
     const id       = generateId()
-    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const poNumber = await generateTxnCode('PO')
     const { error } = await supabase.from('purchase_orders').insert([{
       id, po_number: poNumber, ...po, created_at: new Date().toISOString(),
     }])
@@ -307,7 +308,7 @@ export function ProcurementProvider({ children }) {
   // ── Goods Received ────────────────────────────────────────
   const createGoodsReceived = async (grn) => {
     const id        = generateId()
-    const grnNumber = `GRN-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const grnNumber = await generateTxnCode('GRN')
     const { error } = await supabase.from('goods_received').insert([{
       id, grn_number: grnNumber, ...grn, created_at: new Date().toISOString(),
     }])

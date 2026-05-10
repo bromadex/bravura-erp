@@ -13,6 +13,7 @@ import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
 import { AccountingProvider }      from './contexts/AccountingContext'
+import { MasterDataProvider }     from './contexts/MasterDataContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
@@ -40,6 +41,7 @@ import CampHeadcount     from './pages/Campsite/CampHeadcount'
 
 import WorkflowAdmin from './components/workflow/WorkflowAdmin'
 import WorkflowBuilder from './components/workflow/WorkflowBuilder'
+import MasterData    from './pages/Settings/MasterData'
 
 // ── Connect ───────────────────────────────────────────────────
 import ConnectPage from './pages/Connect/ConnectPage'
@@ -386,11 +388,15 @@ function AppRoutes() {
       </Route>
 
       {/* ── REPORTS ──────────────────────────────────────── */}
-      <Route path="/module/settings/workflows" element={
-        <Layout module="settings" />
+      <Route path="/module/settings" element={
+        <ProtectedRoute>
+          <Layout module="settings" />
+        </ProtectedRoute>
       }>
-        <Route index element={<WorkflowBuilder />} />
-        <Route path="admin" element={<WorkflowAdmin />} />
+        <Route index element={<MasterData />} />
+        <Route path="master-data" element={<MasterData />} />
+        <Route path="workflows" element={<WorkflowBuilder />} />
+        <Route path="workflows/admin" element={<WorkflowAdmin />} />
       </Route>
 
       <Route path="/module/reports" element={
@@ -425,16 +431,18 @@ export default function App() {
   return (
     <AuthProvider>
       <PermissionProvider>
-        <LeaveProvider>
-          <BrowserRouter>
-            <AppRoutes />
-            <Toaster position="top-right" toastOptions={{
-              style: { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border2)' },
-              success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
-              error:   { iconTheme: { primary: 'var(--red)',   secondary: 'var(--surface)' } },
-            }} />
-          </BrowserRouter>
-        </LeaveProvider>
+        <MasterDataProvider>
+          <LeaveProvider>
+            <BrowserRouter>
+              <AppRoutes />
+              <Toaster position="top-right" toastOptions={{
+                style: { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border2)' },
+                success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
+                error:   { iconTheme: { primary: 'var(--red)',   secondary: 'var(--surface)' } },
+              }} />
+            </BrowserRouter>
+          </LeaveProvider>
+        </MasterDataProvider>
       </PermissionProvider>
     </AuthProvider>
   )

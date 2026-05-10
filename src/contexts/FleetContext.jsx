@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
+import { generateTxnCode } from '../engine/transactionEngine'
 
 const FleetContext = createContext(null)
 
@@ -60,7 +61,8 @@ export function FleetProvider({ children }) {
   // ---- Vehicle CRUD ----
   const addVehicle = async (vehicle) => {
     const id = generateId()
-    const { error } = await supabase.from('fleet').insert([{ id, ...vehicle, created_at: new Date().toISOString() }])
+    const fleet_code = await generateTxnCode('FL').catch(() => null)
+    const { error } = await supabase.from('fleet').insert([{ id, fleet_code, ...vehicle, created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'vehicle', entityId: id, entityName: vehicle.reg || id })
     await fetchAll()
@@ -110,7 +112,8 @@ export function FleetProvider({ children }) {
   // ---- Earth Mover CRUD ----
   const addEarthMover = async (equipment) => {
     const id = generateId()
-    const { error } = await supabase.from('earth_movers').insert([{ id, ...equipment, created_at: new Date().toISOString() }])
+    const fleet_code = await generateTxnCode('EM').catch(() => null)
+    const { error } = await supabase.from('earth_movers').insert([{ id, fleet_code, ...equipment, created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'heavy_equipment', entityId: id, entityName: equipment.reg || id })
     await fetchAll()

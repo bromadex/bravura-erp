@@ -46,6 +46,13 @@ export const PREFIX_REGISTRY = {
   AT:  { label: 'Attendance Record',    module: 'hr',          table: 'employee_attendance',   numCol: 'txn_code', route: '/module/hr/attendance'                        },
   OT:  { label: 'Overtime Request',     module: 'hr',          table: 'ot_requests',           numCol: 'txn_code', route: '/module/hr/attendance'                        },
 
+  // ── Employees ─────────────────────────────────────────────
+  EMP: { label: 'Employee',             module: 'hr',          table: 'employees',             numCol: 'employee_number', route: '/module/hr/employees'                  },
+
+  // ── Fleet Master Records ───────────────────────────────────
+  FL:  { label: 'Fleet Vehicle',        module: 'fleet',       table: 'fleet',                 numCol: 'fleet_code',  route: '/module/fleet/vehicles'                   },
+  EM:  { label: 'Earth Mover',          module: 'fleet',       table: 'earth_movers',          numCol: 'fleet_code',  route: '/module/fleet/vehicles'                   },
+
   // ── Campsite ──────────────────────────────────────────────
   CA:  { label: 'Camp Assignment',      module: 'campsite',    table: 'room_assignments',      numCol: 'txn_code', route: '/module/campsite/assignments'                  },
   CT:  { label: 'Camp Transfer',        module: 'campsite',    table: 'room_assignments',      numCol: 'txn_code', route: '/module/campsite/assignments'                  },
@@ -54,6 +61,10 @@ export const PREFIX_REGISTRY = {
 
   // ── Governance ────────────────────────────────────────────
   MO:  { label: 'Internal Memo',        module: 'governance',  table: 'governance_documents',  numCol: 'txn_code', route: '/module/governance/memos'                     },
+
+  // ── Governance Documents ───────────────────────────────────
+  AN:  { label: 'Announcement',         module: 'governance',  table: 'governance_documents',  numCol: 'txn_code', route: '/module/governance/announcements'              },
+  PL:  { label: 'Policy',               module: 'governance',  table: 'governance_documents',  numCol: 'txn_code', route: '/module/governance/policies'                  },
 
   // ── Accounting ────────────────────────────────────────────
   JE:  { label: 'Journal Entry',        module: 'accounting',  table: 'journal_entries',       numCol: 'reference', route: '/module/accounting/journal-entries'          },

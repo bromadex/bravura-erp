@@ -180,6 +180,10 @@ const ALL_MODULES = {
   settings: {
     label: 'Settings & Admin', icon: 'admin_panel_settings', color: '#a78bfa',
     sections: [{
+      label: 'Master Data', pages: [
+        { id: 'master-data', label: 'Master Data',      icon: 'database' },
+      ],
+    }, {
       label: 'System Configuration', pages: [
         { id: 'workflows', label: 'Workflow Builder', icon: 'account_tree' },
       ],
