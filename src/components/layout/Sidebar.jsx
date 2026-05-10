@@ -93,6 +93,16 @@ const ALL_MODULES = {
         { id: 'maintenance-alerts', label: 'Maintenance Alerts', icon: 'notifications_active' },
         { id: 'asset-issues',       label: 'Asset Issues',       icon: 'bug_report'           },
       ],
+    }, {
+      label: 'Maintenance', pages: [
+        { id: 'preventive-maintenance', label: 'Preventive Maintenance', icon: 'event_available'  },
+        { id: 'tyre-management',        label: 'Tyre Management',        icon: 'tire_repair'      },
+      ],
+    }, {
+      label: 'Analytics', pages: [
+        { id: 'downtime-analytics', label: 'Downtime Analytics',  icon: 'timer_off'            },
+        { id: 'cost-analysis',      label: 'Cost Analysis (TCO)', icon: 'price_check'          },
+      ],
     }],
   },
   hr: {
