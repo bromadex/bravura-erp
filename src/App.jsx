@@ -87,12 +87,16 @@ import VehicleConsumption   from './pages/Fuel/VehicleConsumption'
 import FuelForecasting      from './pages/Fuel/FuelForecasting'
 
 // ── Fleet ─────────────────────────────────────────────────────
-import FleetDashboard    from './pages/Fleet/FleetDashboard'
-import Vehicles          from './pages/Fleet/Vehicles'
-import Generators        from './pages/Fleet/Generators'
-import HeavyEquipment    from './pages/Fleet/HeavyEquipment'
-import MaintenanceAlerts from './pages/Fleet/MaintenanceAlerts'
-import AssetIssues       from './pages/Fleet/AssetIssues'
+import FleetDashboard          from './pages/Fleet/FleetDashboard'
+import Vehicles                from './pages/Fleet/Vehicles'
+import Generators              from './pages/Fleet/Generators'
+import HeavyEquipment          from './pages/Fleet/HeavyEquipment'
+import MaintenanceAlerts       from './pages/Fleet/MaintenanceAlerts'
+import AssetIssues             from './pages/Fleet/AssetIssues'
+import PreventiveMaintenance   from './pages/Fleet/PreventiveMaintenance'
+import TyreManagement          from './pages/Fleet/TyreManagement'
+import DowntimeAnalytics       from './pages/Fleet/DowntimeAnalytics'
+import FleetCostAnalysis       from './pages/Fleet/FleetCostAnalysis'
 
 // ── HR ────────────────────────────────────────────────────────
 import HRDashboard     from './pages/HR/HRDashboard'
@@ -282,13 +286,17 @@ function AppRoutes() {
           </PermissionRoute>
         </ProtectedRoute>
       }>
-        <Route index                     element={<FleetDashboard />} />
-        <Route path="dashboard"          element={<FleetDashboard />} />
-        <Route path="vehicles"           element={<Vehicles />} />
-        <Route path="generators"         element={<Generators />} />
-        <Route path="heavy-equipment"    element={<HeavyEquipment />} />
-        <Route path="maintenance-alerts" element={<MaintenanceAlerts />} />
-        <Route path="asset-issues"       element={<AssetIssues />} />
+        <Route index                            element={<FleetDashboard />} />
+        <Route path="dashboard"               element={<FleetDashboard />} />
+        <Route path="vehicles"                element={<Vehicles />} />
+        <Route path="generators"              element={<Generators />} />
+        <Route path="heavy-equipment"         element={<HeavyEquipment />} />
+        <Route path="maintenance-alerts"      element={<MaintenanceAlerts />} />
+        <Route path="asset-issues"            element={<AssetIssues />} />
+        <Route path="preventive-maintenance"  element={<PreventiveMaintenance />} />
+        <Route path="tyre-management"         element={<TyreManagement />} />
+        <Route path="downtime-analytics"      element={<DowntimeAnalytics />} />
+        <Route path="cost-analysis"           element={<FleetCostAnalysis />} />
       </Route>
 
       {/* ── HR ───────────────────────────────────────────── */}
