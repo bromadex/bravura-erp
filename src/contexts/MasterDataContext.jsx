@@ -59,15 +59,16 @@ export function MasterDataProvider({ children }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    const safe = (q) => q.catch(() => ({ data: [] }))
     try {
       const [deptRes, desRes, supRes, ccRes, siteRes, statusRes, notifRes] = await Promise.all([
-        supabase.from('departments').select('*').order('name'),
-        supabase.from('designations').select('*').order('title'),
-        supabase.from('suppliers').select('*').order('name'),
-        supabase.from('cost_centers').select('*').order('code'),
-        supabase.from('sites').select('*').order('name'),
-        supabase.from('statuses').select('*').order('sort_order'),
-        supabase.from('notification_templates').select('*').order('event_type').catch(() => ({ data: [] })),
+        safe(supabase.from('departments').select('*').order('name')),
+        safe(supabase.from('designations').select('*').order('title')),
+        safe(supabase.from('suppliers').select('*').order('name')),
+        safe(supabase.from('cost_centers').select('*').order('code')),
+        safe(supabase.from('sites').select('*').order('name')),
+        safe(supabase.from('statuses').select('*').order('sort_order')),
+        safe(supabase.from('notification_templates').select('*').order('event_type')),
       ])
       if (deptRes.data)   setDepartments(deptRes.data)
       if (desRes.data)    setDesignations(desRes.data)
