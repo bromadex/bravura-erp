@@ -74,6 +74,7 @@ import GoodsReceived        from './pages/Procurement/GoodsReceived'
 import PurchaseInvoices     from './pages/Procurement/PurchaseInvoices'
 import SupplierPerformance  from './pages/Procurement/SupplierPerformance'
 import ProcurementDashboard from './pages/Procurement/ProcurementDashboard'
+import BudgetControl        from './pages/Procurement/BudgetControl'
 
 // ── Fuel ──────────────────────────────────────────────────────
 import FuelTanks      from './pages/Fuel/FuelTanks'
@@ -242,6 +243,7 @@ function AppRoutes() {
         <Route path="purchase-orders"       element={<PurchaseOrders />}        />
         <Route path="goods-received"        element={<GoodsReceived />}         />
         <Route path="invoices"              element={<PurchaseInvoices />}      />
+        <Route path="budget-control"        element={<BudgetControl />}         />
         <Route path="supplier-performance"  element={<SupplierPerformance />}   />
       </Route>
 
