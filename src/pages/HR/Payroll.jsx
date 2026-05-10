@@ -9,7 +9,8 @@
 
 import { useState, useEffect } from 'react'
 import { useHR } from '../../contexts/HRContext'
-import { useCanEdit, useCanApprove } from '../../hooks/usePermission'
+import { useCanEdit, useCanApprove, useCanViewField } from '../../hooks/usePermission'
+import ProtectedField from '../../components/ProtectedField'
 import { supabase } from '../../lib/supabase'
 import { getPayrollPeriod, buildTimesheetSummary, WORK_SCHEDULE } from '../../utils/attendanceUtils'
 import toast from 'react-hot-toast'
@@ -24,8 +25,9 @@ const calcPAYE = (gross, rate) => {
 
 export default function Payroll() {
   const { employees, attendance, departments, designations, leaveRequests } = useHR()
-  const canEdit    = useCanEdit('hr', 'payroll')
-  const canApprove = useCanApprove('hr', 'payroll')
+  const canEdit       = useCanEdit('hr', 'payroll')
+  const canApprove    = useCanApprove('hr', 'payroll')
+  const canSeeAmounts = useCanViewField('payroll', 'net_pay')
 
   const [periods,        setPeriods]        = useState([])
   const [selectedPeriod, setSelectedPeriod] = useState(null)
@@ -196,7 +198,16 @@ export default function Payroll() {
     const data = records.map(r => ({
       'Emp No': r.employee_number, 'Name': r.employee_name, 'Designation': r.designation, 'Department': r.department,
       'Reg Days': r.regular_days, 'Reg Hrs': r.regular_hours?.toFixed(1), 'OT Hrs': r.overtime_hours?.toFixed(1), 'Sat Hrs': r.saturday_hours?.toFixed(1),
-      'Basic': r.basic_salary, 'Gross': r.gross_pay?.toFixed(2), 'PAYE': r.paye?.toFixed(2), 'NSSA': r.nssa?.toFixed(2), 'Aids Levy': r.aids_levy?.toFixed(2), 'Other Ded': r.other_deductions?.toFixed(2), 'Total Ded': r.total_deductions?.toFixed(2), 'Net Pay': r.net_pay?.toFixed(2),
+      ...(canSeeAmounts ? {
+        'Basic': r.basic_salary,
+        'Gross': r.gross_pay?.toFixed(2),
+        'PAYE': r.paye?.toFixed(2),
+        'NSSA': r.nssa?.toFixed(2),
+        'Aids Levy': r.aids_levy?.toFixed(2),
+        'Other Ded': r.other_deductions?.toFixed(2),
+        'Total Ded': r.total_deductions?.toFixed(2),
+        'Net Pay': r.net_pay?.toFixed(2),
+      } : {}),
       'Absent': r.absent_days, 'Leave': r.leave_days,
     }))
     exportXLSX(data, `Payroll_${selectedPeriod?.period_label?.replace(/ /g,'_')}`, 'Payroll')
@@ -227,20 +238,20 @@ export default function Payroll() {
       <div class="row"><span>Department</span><span>${record.department || '—'}</span></div>
       <div class="row"><span>Pay Period</span><span>${period.start_date} → ${period.end_date}</span></div>
       <div class="section">Earnings</div>
-      <div class="row"><span>Basic Salary</span><span>$${(record.basic_salary||0).toFixed(2)}</span></div>
-      <div class="row"><span>Regular Pay (${record.regular_hours?.toFixed(1)} hrs)</span><span>$${(record.regular_pay||0).toFixed(2)}</span></div>
-      ${record.overtime_hours > 0 ? `<div class="row"><span>Overtime Pay (${record.overtime_hours?.toFixed(1)} hrs × 1.5)</span><span>$${(record.overtime_pay||0).toFixed(2)}</span></div>` : ''}
-      ${record.saturday_hours > 0 ? `<div class="row"><span>Saturday Pay (${record.saturday_hours?.toFixed(1)} hrs × 1.5)</span><span>$${(record.saturday_pay||0).toFixed(2)}</span></div>` : ''}
-      ${record.public_holiday_hours > 0 ? `<div class="row"><span>Public Holiday Pay (${record.public_holiday_hours?.toFixed(1)} hrs × 2.0)</span><span>$${(record.public_holiday_pay||0).toFixed(2)}</span></div>` : ''}
-      ${record.allowances > 0 ? `<div class="row"><span>Allowances</span><span>$${(record.allowances||0).toFixed(2)}</span></div>` : ''}
-      <div class="row bold"><span>GROSS PAY</span><span class="total">$${(record.gross_pay||0).toFixed(2)}</span></div>
+      ${canSeeAmounts ? `<div class="row"><span>Basic Salary</span><span>$${(record.basic_salary||0).toFixed(2)}</span></div>` : ''}
+      <div class="row"><span>Regular Pay (${record.regular_hours?.toFixed(1)} hrs)</span><span>${canSeeAmounts ? `$${(record.regular_pay||0).toFixed(2)}` : '—'}</span></div>
+      ${record.overtime_hours > 0 ? `<div class="row"><span>Overtime Pay (${record.overtime_hours?.toFixed(1)} hrs × 1.5)</span><span>${canSeeAmounts ? `$${(record.overtime_pay||0).toFixed(2)}` : '—'}</span></div>` : ''}
+      ${record.saturday_hours > 0 ? `<div class="row"><span>Saturday Pay (${record.saturday_hours?.toFixed(1)} hrs × 1.5)</span><span>${canSeeAmounts ? `$${(record.saturday_pay||0).toFixed(2)}` : '—'}</span></div>` : ''}
+      ${record.public_holiday_hours > 0 ? `<div class="row"><span>Public Holiday Pay (${record.public_holiday_hours?.toFixed(1)} hrs × 2.0)</span><span>${canSeeAmounts ? `$${(record.public_holiday_pay||0).toFixed(2)}` : '—'}</span></div>` : ''}
+      ${record.allowances > 0 ? `<div class="row"><span>Allowances</span><span>${canSeeAmounts ? `$${(record.allowances||0).toFixed(2)}` : '—'}</span></div>` : ''}
+      ${canSeeAmounts ? `<div class="row bold"><span>GROSS PAY</span><span class="total">$${(record.gross_pay||0).toFixed(2)}</span></div>` : ''}
       <div class="section">Deductions</div>
-      <div class="row"><span>PAYE</span><span>$${(record.paye||0).toFixed(2)}</span></div>
-      <div class="row"><span>NSSA (Employee)</span><span>$${(record.nssa||0).toFixed(2)}</span></div>
-      <div class="row"><span>Aids Levy</span><span>$${(record.aids_levy||0).toFixed(2)}</span></div>
-      ${record.other_deductions > 0 ? `<div class="row"><span>Other Deductions</span><span>$${(record.other_deductions||0).toFixed(2)}</span></div>` : ''}
-      <div class="row bold"><span>TOTAL DEDUCTIONS</span><span>$${(record.total_deductions||0).toFixed(2)}</span></div>
-      <br><div class="row bold" style="font-size:16px; padding: 10px 0; border-top: 2px solid #000;"><span>NET PAY</span><span style="color:#16a34a">$${(record.net_pay||0).toFixed(2)}</span></div>
+      ${canSeeAmounts ? `<div class="row"><span>PAYE</span><span>$${(record.paye||0).toFixed(2)}</span></div>` : ''}
+      ${canSeeAmounts ? `<div class="row"><span>NSSA (Employee)</span><span>$${(record.nssa||0).toFixed(2)}</span></div>` : ''}
+      ${canSeeAmounts ? `<div class="row"><span>Aids Levy</span><span>$${(record.aids_levy||0).toFixed(2)}</span></div>` : ''}
+      ${record.other_deductions > 0 ? `<div class="row"><span>Other Deductions</span><span>${canSeeAmounts ? `$${(record.other_deductions||0).toFixed(2)}` : '—'}</span></div>` : ''}
+      ${canSeeAmounts ? `<div class="row bold"><span>TOTAL DEDUCTIONS</span><span>$${(record.total_deductions||0).toFixed(2)}</span></div>` : ''}
+      <br>${canSeeAmounts ? `<div class="row bold" style="font-size:16px; padding: 10px 0; border-top: 2px solid #000;"><span>NET PAY</span><span style="color:#16a34a">$${(record.net_pay||0).toFixed(2)}</span></div>` : '<div class="row" style="padding: 10px 0; border-top: 2px solid #000;"><span>NET PAY</span><span style="color:#888">Restricted</span></div>'}
       <br><div style="font-size:10px; color:#999; margin-top:30px">Generated by Bravura ERP · ${new Date().toLocaleString()}</div>
       <script>window.onload = () => { window.print(); }</script>
       </body></html>
@@ -316,12 +327,12 @@ export default function Payroll() {
                         <td style={{ fontSize: 11 }}>{r.department}</td>
                         <td className="td-mono">{r.regular_hours?.toFixed(1)}</td>
                         <td className="td-mono" style={{ color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
-                        <td className="td-mono">${r.gross_pay?.toFixed(2) || '—'}</td>
-                        <td className="td-mono" style={{ fontSize: 11 }}>${r.paye?.toFixed(2) || '0'}</td>
-                        <td className="td-mono" style={{ fontSize: 11 }}>${r.nssa?.toFixed(2) || '0'}</td>
-                        <td className="td-mono" style={{ fontSize: 11 }}>${r.aids_levy?.toFixed(2) || '0'}</td>
-                        <td className="td-mono" style={{ color: 'var(--red)' }}>${r.total_deductions?.toFixed(2) || '0'}</td>
-                        <td className="td-mono" style={{ color: 'var(--green)' }}>${r.net_pay?.toFixed(2) || '—'}</td>
+                        <td className="td-mono"><ProtectedField entity="payroll" field="gross_pay">${r.gross_pay?.toFixed(2) || '—'}</ProtectedField></td>
+                        <td className="td-mono" style={{ fontSize: 11 }}><ProtectedField entity="payroll" field="paye">${r.paye?.toFixed(2) || '0'}</ProtectedField></td>
+                        <td className="td-mono" style={{ fontSize: 11 }}><ProtectedField entity="payroll" field="nssa">${r.nssa?.toFixed(2) || '0'}</ProtectedField></td>
+                        <td className="td-mono" style={{ fontSize: 11 }}><ProtectedField entity="payroll" field="aids_levy">${r.aids_levy?.toFixed(2) || '0'}</ProtectedField></td>
+                        <td className="td-mono" style={{ color: 'var(--red)' }}><ProtectedField entity="payroll" field="total_deductions">${r.total_deductions?.toFixed(2) || '0'}</ProtectedField></td>
+                        <td className="td-mono" style={{ color: 'var(--green)' }}><ProtectedField entity="payroll" field="net_pay">${r.net_pay?.toFixed(2) || '—'}</ProtectedField></td>
                         <td className="td-mono" style={{ color: r.absent_days > 0 ? 'var(--red)' : 'inherit' }}>{r.absent_days}</td>
                         <td className="td-actions">
                           <div className="btn-group-sm">
@@ -369,9 +380,9 @@ export default function Payroll() {
                     {historyRecords.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontWeight: 600 }}>{r.payroll_periods?.period_label || '—'}<div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.payroll_periods?.start_date} → {r.payroll_periods?.end_date}</div></td>
-                        <td className="td-mono">${(r.gross_pay || 0).toFixed(2)}</td>
-                        <td className="td-mono" style={{ color: 'var(--red)' }}>${(r.total_deductions || 0).toFixed(2)}</td>
-                        <td className="td-mono" style={{ color: 'var(--green)' }}>${(r.net_pay || 0).toFixed(2)}</td>
+                        <td className="td-mono"><ProtectedField entity="payroll" field="gross_pay">${(r.gross_pay || 0).toFixed(2)}</ProtectedField></td>
+                        <td className="td-mono" style={{ color: 'var(--red)' }}><ProtectedField entity="payroll" field="total_deductions">${(r.total_deductions || 0).toFixed(2)}</ProtectedField></td>
+                        <td className="td-mono" style={{ color: 'var(--green)' }}><ProtectedField entity="payroll" field="net_pay">${(r.net_pay || 0).toFixed(2)}</ProtectedField></td>
                         <td className="td-mono">{r.regular_hours?.toFixed(1)}</td>
                         <td className="td-mono" style={{ color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
                         <td>{statusBadge(r.payroll_periods?.status || 'open')}</td>
