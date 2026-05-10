@@ -111,3 +111,65 @@ export async function pushNotificationToRoles(roleIds, notif) {
     console.error('[notificationEngine] roles push failed:', err?.message || err)
   }
 }
+
+/**
+ * Push a notification using a DB-stored template.
+ * Looks up the template by event_type, interpolates {{variable}} placeholders,
+ * then routes to recipients based on recipientSpec.
+ *
+ * Falls back silently if the template is not found or disabled.
+ *
+ * @param {string} eventType     - key from notification_templates.event_type, e.g. 'sr_submitted'
+ * @param {object} variables     - substitution values, e.g. { requester_name: 'John', req_number: 'SR-2026-00001' }
+ * @param {object} recipientSpec - one of:
+ *   { userId: string }            — single user
+ *   { userIds: string[] }         — multiple users
+ *   { role: string }              — all users with this role_id
+ *   { roles: string[] }           — all users with any of these role_ids
+ *   { department: string }        — HOD of this department name
+ * @param {object} [fallback]    - optional default notif if template not in DB yet:
+ *   { type, title, message, link }
+ */
+export async function pushNotificationFromTemplate(eventType, variables = {}, recipientSpec = {}, fallback = null) {
+  try {
+    // 1. Fetch template
+    const { data: tmpl, error } = await supabase
+      .from('notification_templates')
+      .select('type, title, message, link, enabled')
+      .eq('event_type', eventType)
+      .maybeSingle()
+
+    let notif
+    if (error || !tmpl || !tmpl.enabled) {
+      if (fallback) {
+        notif = fallback
+      } else {
+        return  // no template and no fallback — skip silently
+      }
+    } else {
+      // 2. Interpolate {{variable}} placeholders
+      const interpolate = (str = '') =>
+        str.replace(/\{\{(\w+)\}\}/g, (_, k) => (variables[k] !== undefined ? String(variables[k]) : `{{${k}}}`))
+
+      notif = {
+        type:     tmpl.type,
+        title:    interpolate(tmpl.title),
+        message:  interpolate(tmpl.message),
+        link:     tmpl.link || null,
+        metadata: variables,
+      }
+    }
+
+    // 3. Route to recipients
+    const { userId, userIds, role, roles, department } = recipientSpec
+
+    if (userId)     await pushNotification(userId, notif)
+    if (userIds)    await pushNotificationToGroup(userIds, notif)
+    if (role)       await pushNotificationToRole(role, notif)
+    if (roles)      await pushNotificationToRoles(roles, notif)
+    if (department) await pushNotificationToHOD(department, notif)
+
+  } catch (err) {
+    console.error('[notificationEngine] template push failed:', err?.message || err)
+  }
+}

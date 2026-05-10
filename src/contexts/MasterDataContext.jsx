@@ -51,25 +51,31 @@ export function MasterDataProvider({ children }) {
   const [suppliers,    setSuppliers]    = useState([])
   const [costCenters,  setCostCenters]  = useState([])
   const [sites,        setSites]        = useState([])
-  const [loading,      setLoading]      = useState(true)
+  const [statuses,               setStatuses]               = useState([])
+  const [notificationTemplates,  setNotificationTemplates]  = useState([])
+  const [loading,                setLoading]                = useState(true)
 
   const generateId = () => crypto.randomUUID()
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [deptRes, desRes, supRes, ccRes, siteRes] = await Promise.all([
+      const [deptRes, desRes, supRes, ccRes, siteRes, statusRes, notifRes] = await Promise.all([
         supabase.from('departments').select('*').order('name'),
         supabase.from('designations').select('*').order('title'),
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('cost_centers').select('*').order('code'),
         supabase.from('sites').select('*').order('name'),
+        supabase.from('statuses').select('*').order('sort_order'),
+        supabase.from('notification_templates').select('*').order('event_type').catch(() => ({ data: [] })),
       ])
-      if (deptRes.data) setDepartments(deptRes.data)
-      if (desRes.data)  setDesignations(desRes.data)
-      if (supRes.data)  setSuppliers(supRes.data)
-      if (ccRes.data)   setCostCenters(ccRes.data)
-      if (siteRes.data) setSites(siteRes.data)
+      if (deptRes.data)   setDepartments(deptRes.data)
+      if (desRes.data)    setDesignations(desRes.data)
+      if (supRes.data)    setSuppliers(supRes.data)
+      if (ccRes.data)     setCostCenters(ccRes.data)
+      if (siteRes.data)   setSites(siteRes.data)
+      if (statusRes.data) setStatuses(statusRes.data)
+      if (notifRes.data)  setNotificationTemplates(notifRes.data)
     } catch (err) {
       console.error('MasterData fetch error:', err)
       toast.error('Failed to load master data')
@@ -175,6 +181,50 @@ export function MasterDataProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Statuses ─────────────────────────────────────────────
+  const addStatus = async (status) => {
+    const { error } = await supabase.from('statuses').insert([{ ...status, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const updateStatus = async (key, updates) => {
+    const { error } = await supabase.from('statuses').update(updates).eq('key', key)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteStatus = async (key) => {
+    const { error } = await supabase.from('statuses').delete().eq('key', key)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  // ── Notification Templates ───────────────────────────────
+  const addNotificationTemplate = async (tpl) => {
+    const id = generateId()
+    const { error } = await supabase.from('notification_templates').insert([{ id, ...tpl, created_at: new Date().toISOString() }])
+    if (error) throw error
+    auditLog({ module: 'settings', action: 'CREATE', entityType: 'notification_template', entityId: id, entityName: tpl.event_type })
+    await fetchAll()
+    return id
+  }
+
+  const updateNotificationTemplate = async (id, updates) => {
+    const { error } = await supabase.from('notification_templates').update(updates).eq('id', id)
+    if (error) throw error
+    auditLog({ module: 'settings', action: 'UPDATE', entityType: 'notification_template', entityId: id, entityName: updates.event_type })
+    await fetchAll()
+  }
+
+  const deleteNotificationTemplate = async (id) => {
+    const tpl = notificationTemplates.find(t => t.id === id)
+    const { error } = await supabase.from('notification_templates').delete().eq('id', id)
+    if (error) throw error
+    auditLog({ module: 'settings', action: 'DELETE', entityType: 'notification_template', entityId: id, entityName: tpl?.event_type })
+    await fetchAll()
+  }
+
   // ── Sites ────────────────────────────────────────────────
   const addSite = async (site) => {
     const id = generateId()
@@ -199,12 +249,14 @@ export function MasterDataProvider({ children }) {
 
   return (
     <MasterDataContext.Provider value={{
-      departments, designations, suppliers, costCenters, sites, loading,
+      departments, designations, suppliers, costCenters, sites, statuses, notificationTemplates, loading,
       addDepartment, updateDepartment, deleteDepartment,
       addDesignation, updateDesignation, deleteDesignation,
       addSupplier, updateSupplier, deleteSupplier,
       addCostCenter, updateCostCenter, deleteCostCenter,
       addSite, updateSite, deleteSite,
+      addStatus, updateStatus, deleteStatus,
+      addNotificationTemplate, updateNotificationTemplate, deleteNotificationTemplate,
       refresh: fetchAll,
     }}>
       {children}

@@ -9,7 +9,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
-import { pushNotificationToHOD, pushNotificationToRoles } from '../engine/notificationEngine'
+import { pushNotificationToHOD, pushNotificationToRoles, pushNotificationFromTemplate } from '../engine/notificationEngine'
 import { auditLog } from '../engine/auditEngine'
 import { generateTxnCode } from '../engine/transactionEngine'
 
@@ -24,10 +24,6 @@ export function ProcurementProvider({ children }) {
   const [loading,              setLoading]              = useState(true)
 
   const generateId = () => crypto.randomUUID()
-
-  // Engine aliases kept for internal readability
-  const notifyHOD        = (departmentName, notif) => pushNotificationToHOD(departmentName, notif)
-  const notifyStorekeepers = (notif) => pushNotificationToRoles(['role_storekeeper', 'role_store_manager'], notif)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -88,7 +84,10 @@ export function ProcurementProvider({ children }) {
     if (error) throw error
 
     // Notify HOD that a requisition needs approval
-    await notifyHOD(req.department, {
+    await pushNotificationFromTemplate('sr_submitted', {
+      requester_name: req.requester_name || 'Someone',
+      req_number:     srNumber,
+    }, { department: req.department }, {
       type:    'requisition_submitted',
       title:   'Store Requisition Pending Approval',
       message: `${req.requester_name || 'Someone'} submitted ${srNumber} for your approval.`,
@@ -171,10 +170,12 @@ export function ProcurementProvider({ children }) {
 
     // Notify storekeepers that a requisition is ready to fulfil
     const srNum = req?.sr_number || req?.req_number || id
-    await notifyStorekeepers({
+    await pushNotificationFromTemplate('sr_ready_to_fulfil', {
+      req_number: srNum,
+    }, { roles: ['role_storekeeper', 'role_store_manager'] }, {
       type:    'requisition_approved',
       title:   'Store Requisition Ready to Fulfil',
-      message: `${srNum} has been approved and is awaiting fulfilment.`,
+      message: `SR ${srNum} is ready to fulfil from store.`,
       link:    '/module/procurement/store-requisitions',
     })
 
