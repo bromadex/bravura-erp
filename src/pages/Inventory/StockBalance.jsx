@@ -15,6 +15,7 @@ import { useInventory } from '../../contexts/InventoryContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -79,97 +80,92 @@ function ItemModal({ item, categories, onClose, onSave }) {
   const allCats = [...new Set([...categories.filter(c => c !== 'ALL'), form.category].filter(Boolean))]
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">
-          {isEdit ? 'Edit' : 'Add New'} <span>Inventory Item</span>
+    <ModalDialog open onClose={onClose} title={`${isEdit ? 'Edit' : 'Add New'} Inventory Item`} size="lg">
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Item Name *</label>
+          <input className="form-control" required placeholder="e.g. Portland Cement, Safety Boots"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         </div>
-        <form onSubmit={handleSubmit}>
+
+        <div className="form-row">
           <div className="form-group">
-            <label>Item Name *</label>
-            <input className="form-control" required placeholder="e.g. Portland Cement, Safety Boots"
-              value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            <label>Category *</label>
+            {addingCat ? (
+              <div className="btn-group-sm">
+                <input className="form-control" placeholder="New category name" autoFocus
+                  value={newCategory} onChange={e => setNewCategory(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } } }} />
+                <button type="button" className="btn btn-primary btn-sm"
+                  onClick={() => { if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } }}>
+                  OK
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAddingCat(false)}>×</button>
+              </div>
+            ) : (
+              <div className="btn-group-sm">
+                <select className="form-control" required value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })} style={{ flex: 1 }}>
+                  <option value="">Select category</option>
+                  {allCats.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button type="button" className="btn btn-secondary btn-sm" title="Add new category"
+                  onClick={() => setAddingCat(true)}>
+                  <span className="material-icons" style={{ fontSize: 16 }}>add</span>
+                </button>
+              </div>
+            )}
           </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Category *</label>
-              {addingCat ? (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input className="form-control" placeholder="New category name" autoFocus
-                    value={newCategory} onChange={e => setNewCategory(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } } }} />
-                  <button type="button" className="btn btn-primary btn-sm"
-                    onClick={() => { if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } }}>
-                    OK
-                  </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAddingCat(false)}>×</button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <select className="form-control" required value={form.category}
-                    onChange={e => setForm({ ...form, category: e.target.value })} style={{ flex: 1 }}>
-                    <option value="">Select category</option>
-                    {allCats.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <button type="button" className="btn btn-secondary btn-sm" title="Add new category"
-                    onClick={() => setAddingCat(true)}>
-                    <span className="material-icons" style={{ fontSize: 16 }}>add</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Unit of Measure</label>
-              <select className="form-control" value={form.unit}
-                onChange={e => setForm({ ...form, unit: e.target.value })}>
-                {['pcs','kg','g','L','mL','m','cm','bags','boxes','rolls','pairs','sets','drums','tons'].map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Unit Cost ($/unit)</label>
-              <input type="number" min="0" step="0.01" className="form-control"
-                value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Reorder Level (Low stock alert)</label>
-              <input type="number" min="0" className="form-control"
-                value={form.threshold} onChange={e => setForm({ ...form, threshold: e.target.value })} />
-              <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Alert fires when balance ≤ this number</small>
-            </div>
-          </div>
-
-          {!isEdit && (
-            <div className="form-group">
-              <label>Opening Stock Quantity</label>
-              <input type="number" min="0" className="form-control"
-                value={form.openingStock} onChange={e => setForm({ ...form, openingStock: e.target.value })} />
-              <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Starting balance (will appear as a Stock In transaction)</small>
-            </div>
-          )}
 
           <div className="form-group">
-            <label>Notes / Description</label>
-            <textarea className="form-control" rows="2" placeholder="Storage location, specifications, etc."
-              value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            <label>Unit of Measure</label>
+            <select className="form-control" value={form.unit}
+              onChange={e => setForm({ ...form, unit: e.target.value })}>
+              {['pcs','kg','g','L','mL','m','cm','bags','boxes','rolls','pairs','sets','drums','tons'].map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
           </div>
+        </div>
 
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              <span className="material-icons">{isEdit ? 'save' : 'add'}</span>
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Inventory'}
-            </button>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Unit Cost ($/unit)</label>
+            <input type="number" min="0" step="0.01" className="form-control"
+              value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} />
           </div>
-        </form>
-      </div>
-    </div>
+          <div className="form-group">
+            <label>Reorder Level (Low stock alert)</label>
+            <input type="number" min="0" className="form-control"
+              value={form.threshold} onChange={e => setForm({ ...form, threshold: e.target.value })} />
+            <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Alert fires when balance ≤ this number</small>
+          </div>
+        </div>
+
+        {!isEdit && (
+          <div className="form-group">
+            <label>Opening Stock Quantity</label>
+            <input type="number" min="0" className="form-control"
+              value={form.openingStock} onChange={e => setForm({ ...form, openingStock: e.target.value })} />
+            <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Starting balance (will appear as a Stock In transaction)</small>
+          </div>
+        )}
+
+        <div className="form-group">
+          <label>Notes / Description</label>
+          <textarea className="form-control" rows="2" placeholder="Storage location, specifications, etc."
+            value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+        </div>
+
+        <ModalActions>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            <span className="material-icons">{isEdit ? 'save' : 'add'}</span>
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Inventory'}
+          </button>
+        </ModalActions>
+      </form>
+    </ModalDialog>
   )
 }
 
@@ -225,43 +221,27 @@ export default function StockBalance() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Stock Balance</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={handleExport}>
-            <span className="material-icons">table_chart</span> Export
+      <PageHeader title="Stock Balance">
+        <button className="btn btn-secondary" onClick={handleExport}>
+          <span className="material-icons">table_chart</span> Export
+        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowAddModal(true) }}>
+            <span className="material-icons">add</span> Add Item
           </button>
-          {canEdit && (
-            <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowAddModal(true) }}>
-              <span className="material-icons">add</span> Add Item
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card">
-          <div className="kpi-label">Total Items</div>
-          <div className="kpi-val">{totalItems}</div>
-          <div className="kpi-sub">in inventory</div>
-        </div>
-        <div className="kpi-card" style={{ cursor: 'pointer', borderLeft: outOfStock > 0 ? '3px solid var(--red)' : undefined }}
-          onClick={() => setStatusFilter(statusFilter === 'OUT' ? 'ALL' : 'OUT')}>
-          <div className="kpi-label">Out of Stock</div>
-          <div className="kpi-val" style={{ color: outOfStock > 0 ? 'var(--red)' : 'var(--green)' }}>{outOfStock}</div>
-          <div className="kpi-sub">{outOfStock > 0 ? 'needs restock' : 'none'}</div>
-        </div>
-        <div className="kpi-card" onClick={() => setStatusFilter(statusFilter === 'LOW' ? 'ALL' : 'LOW')} style={{ cursor: 'pointer', borderLeft: lowStock > 0 ? '3px solid var(--yellow)' : undefined }}>
-          <div className="kpi-label">Low Stock</div>
-          <div className="kpi-val" style={{ color: lowStock > 0 ? 'var(--yellow)' : 'var(--green)' }}>{lowStock}</div>
-          <div className="kpi-sub">below reorder level</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Total Stock Value</div>
-          <div className="kpi-val" style={{ color: 'var(--teal)', fontSize: 20 }}>${totalValue.toFixed(0)}</div>
-          <div className="kpi-sub">at cost price</div>
-        </div>
+        <KPICard label="Total Items" value={totalItems} sub="in inventory" color="teal" />
+        <KPICard label="Out of Stock" value={outOfStock} sub={outOfStock > 0 ? 'needs restock' : 'none'}
+          color={outOfStock > 0 ? 'red' : 'green'}
+          onClick={() => setStatusFilter(statusFilter === 'OUT' ? 'ALL' : 'OUT')} />
+        <KPICard label="Low Stock" value={lowStock} sub="below reorder level"
+          color={lowStock > 0 ? 'yellow' : 'green'}
+          onClick={() => setStatusFilter(statusFilter === 'LOW' ? 'ALL' : 'LOW')} />
+        <KPICard label="Total Stock Value" value={`$${totalValue.toFixed(0)}`} sub="at cost price" color="teal" />
       </div>
 
       {/* Filters */}
@@ -322,10 +302,8 @@ export default function StockBalance() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan="12">
-                    <div className="empty-state">
-                      <span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>inventory_2</span>
-                      <span>{search || catFilter !== 'ALL' || statusFilter !== 'ALL' ? 'No items match your filters' : 'No items yet — click Add Item to get started'}</span>
-                    </div>
+                    <EmptyState icon="inventory_2"
+                      message={search || catFilter !== 'ALL' || statusFilter !== 'ALL' ? 'No items match your filters' : 'No items yet — click Add Item to get started'} />
                   </td>
                 </tr>
               ) : filtered.map((item, idx) => {
@@ -347,28 +325,30 @@ export default function StockBalance() {
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--green)' }}>{item.total_in || 0}</td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>{item.total_out || 0}</td>
                     <td>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 15, color: s.color }}>{item.balance}</div>
+                      <div className="td-mono" style={{ fontSize: 15, color: s.color }}>{item.balance}</div>
                       <div style={{ height: 3, background: 'var(--border2)', borderRadius: 2, marginTop: 4, width: 48, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: s.color, borderRadius: 2, transition: 'width .4s' }} />
                       </div>
                     </td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{item.threshold || 5}</td>
                     <td style={{ fontFamily: 'var(--mono)' }}>${(item.cost || 0).toFixed(2)}</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)', fontWeight: 700 }}>${val.toFixed(2)}</td>
+                    <td className="td-mono" style={{ color: 'var(--teal)' }}>${val.toFixed(2)}</td>
                     <td><span className={`badge ${s.cls}`}>{s.label}</span></td>
                     {(canEdit || canDelete) && (
-                      <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4 }}>
-                        {canEdit && (
-                          <button className="btn btn-secondary btn-sm"
-                            onClick={() => { setEditingItem(item); setShowAddModal(true) }}>
-                            <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
-                            <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
-                          </button>
-                        )}
+                      <td onClick={e => e.stopPropagation()} className="td-actions">
+                        <div className="btn-group-sm">
+                          {canEdit && (
+                            <button className="btn btn-secondary btn-sm"
+                              onClick={() => { setEditingItem(item); setShowAddModal(true) }}>
+                              <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item)}>
+                              <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -381,26 +361,23 @@ export default function StockBalance() {
 
       {/* Item detail modal */}
       {viewItem && (
-        <div className="overlay" onClick={() => setViewItem(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{viewItem.name}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13, marginBottom: 16 }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Category:</span> {viewItem.category}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Unit:</span> {viewItem.unit || 'pcs'}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Balance:</span> <strong style={{ color: getStatus(viewItem.balance, viewItem.threshold).color }}>{viewItem.balance}</strong></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Reorder at:</span> {viewItem.threshold || 5}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Total In:</span> <span style={{ color: 'var(--green)' }}>{viewItem.total_in || 0}</span></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Total Out:</span> <span style={{ color: 'var(--red)' }}>{viewItem.total_out || 0}</span></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Unit Cost:</span> ${(viewItem.cost || 0).toFixed(2)}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Total Value:</span> <strong style={{ color: 'var(--teal)' }}>${((viewItem.balance || 0) * (viewItem.cost || 0)).toFixed(2)}</strong></div>
-            </div>
-            {viewItem.notes && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{viewItem.notes}</div>}
-            <div className="modal-actions">
-              {canEdit && <button className="btn btn-secondary" onClick={() => { setEditingItem(viewItem); setShowAddModal(true); setViewItem(null) }}><span className="material-icons">edit</span> Edit</button>}
-              <button className="btn btn-secondary" onClick={() => setViewItem(null)}>Close</button>
-            </div>
+        <ModalDialog open onClose={() => setViewItem(null)} title={viewItem.name}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13, marginBottom: 16 }}>
+            <div><span style={{ color: 'var(--text-dim)' }}>Category:</span> {viewItem.category}</div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Unit:</span> {viewItem.unit || 'pcs'}</div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Balance:</span> <strong style={{ color: getStatus(viewItem.balance, viewItem.threshold).color }}>{viewItem.balance}</strong></div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Reorder at:</span> {viewItem.threshold || 5}</div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Total In:</span> <span style={{ color: 'var(--green)' }}>{viewItem.total_in || 0}</span></div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Total Out:</span> <span style={{ color: 'var(--red)' }}>{viewItem.total_out || 0}</span></div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Unit Cost:</span> ${(viewItem.cost || 0).toFixed(2)}</div>
+            <div><span style={{ color: 'var(--text-dim)' }}>Total Value:</span> <strong style={{ color: 'var(--teal)' }}>${((viewItem.balance || 0) * (viewItem.cost || 0)).toFixed(2)}</strong></div>
           </div>
-        </div>
+          {viewItem.notes && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{viewItem.notes}</div>}
+          <ModalActions>
+            {canEdit && <button className="btn btn-secondary" onClick={() => { setEditingItem(viewItem); setShowAddModal(true); setViewItem(null) }}><span className="material-icons">edit</span> Edit</button>}
+            <button className="btn btn-secondary" onClick={() => setViewItem(null)}>Close</button>
+          </ModalActions>
+        </ModalDialog>
       )}
 
       {/* Add/Edit modal */}

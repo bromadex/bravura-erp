@@ -6,6 +6,7 @@ import { useFleet } from '../../contexts/FleetContext'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { PageHeader, StatusBadge, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function Generators() {
   const { generators, addGenerator, updateGenerator, deleteGenerator, addGenRunLog, genRunLogs, loading, fetchAll } = useFleet()
@@ -84,33 +85,25 @@ export default function Generators() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const statusColor = { Running: 'var(--green)', Stopped: 'var(--text-dim)', Maintenance: 'var(--yellow)', Offline: 'var(--red)' }
-
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Generators</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canEdit && (
-            <>
-              <button className="btn btn-secondary" onClick={() => setRunModalOpen(true)}>
-                <span className="material-icons">timer</span> Log Run
-              </button>
-              <button className="btn btn-primary" onClick={() => openEdit()}>
-                <span className="material-icons">add</span> Add Generator
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Generators">
+        {canEdit && (
+          <div className="btn-group">
+            <button className="btn btn-secondary" onClick={() => setRunModalOpen(true)}>
+              <span className="material-icons">timer</span> Log Run
+            </button>
+            <button className="btn btn-primary" onClick={() => openEdit()}>
+              <span className="material-icons">add</span> Add Generator
+            </button>
+          </div>
+        )}
+      </PageHeader>
 
       {loading ? (
-        <div className="empty-state">Loading generators…</div>
+        <EmptyState icon="hourglass_empty" message="Loading generators…" />
       ) : generators.length === 0 ? (
-        <div className="empty-state">
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>bolt</span>
-          <p>No generators added yet</p>
-        </div>
+        <EmptyState icon="bolt" message="No generators added yet" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {generators.map(g => {
@@ -120,7 +113,7 @@ export default function Generators() {
               <div key={g.id} className="card" style={{ padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span className="material-icons" style={{ fontSize: 32, color: 'var(--yellow)' }}>bolt</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor[g.status] || 'var(--text-dim)', background: `${statusColor[g.status]}18`, padding: '2px 8px', borderRadius: 10, border: `1px solid ${statusColor[g.status]}44` }}>{g.status}</span>
+                  <StatusBadge status={g.status} />
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{g.gen_code}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{g.gen_name || '—'}</div>
@@ -133,7 +126,7 @@ export default function Generators() {
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>⏱ Total hours: {totalHours.toFixed(1)}</div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                <div className="btn-group-sm" style={{ justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}><span className="material-icons">edit</span></button>}
                   {canDelete && <button className="btn btn-danger btn-sm" onClick={async () => { if (window.confirm(`Delete ${g.gen_code}?`)) { await deleteGenerator(g.id); toast.success('Deleted') } }}><span className="material-icons">delete</span></button>}
                 </div>
@@ -144,84 +137,74 @@ export default function Generators() {
       )}
 
       {/* Edit/Add Modal */}
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-            <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Generator</span></div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group"><label>Generator Code *</label><input className="form-control" required value={form.gen_code} onChange={e => setForm({...form, gen_code: e.target.value})} placeholder="e.g. GEN-01" /></div>
-                <div className="form-group"><label>Name / Model</label><input className="form-control" value={form.gen_name} onChange={e => setForm({...form, gen_name: e.target.value})} placeholder="e.g. Cummins C500" /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Location</label><input className="form-control" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
-                <div className="form-group"><label>Capacity (kVA)</label><input type="number" className="form-control" value={form.capacity} onChange={e => setForm({...form, capacity: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Status</label>
-                  <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
-                    <option>Running</option><option>Stopped</option><option>Maintenance</option><option>Offline</option>
-                  </select>
-                </div>
-                <div className="form-group"><label>Last Service Date</label><input type="date" className="form-control" value={form.service_date} onChange={e => setForm({...form, service_date: e.target.value})} /></div>
-              </div>
-              <div className="form-group">
-                <label>Assigned Operator</label>
-                <select className="form-control" value={form.assigned_operator_id} onChange={e => setForm(f => { const emp = employees.find(x => x.id === e.target.value); return { ...f, assigned_operator_id: e.target.value, assigned_operator_name: emp?.name || '' } })}>
-                  <option value="">— Select employee —</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>)}
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Generator</button>
-              </div>
-            </form>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title={`${editing ? 'Edit' : 'Add'} Generator`}>
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group"><label>Generator Code *</label><input className="form-control" required value={form.gen_code} onChange={e => setForm({...form, gen_code: e.target.value})} placeholder="e.g. GEN-01" /></div>
+            <div className="form-group"><label>Name / Model</label><input className="form-control" value={form.gen_name} onChange={e => setForm({...form, gen_name: e.target.value})} placeholder="e.g. Cummins C500" /></div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group"><label>Location</label><input className="form-control" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
+            <div className="form-group"><label>Capacity (kVA)</label><input type="number" className="form-control" value={form.capacity} onChange={e => setForm({...form, capacity: e.target.value})} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Status</label>
+              <select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                <option>Running</option><option>Stopped</option><option>Maintenance</option><option>Offline</option>
+              </select>
+            </div>
+            <div className="form-group"><label>Last Service Date</label><input type="date" className="form-control" value={form.service_date} onChange={e => setForm({...form, service_date: e.target.value})} /></div>
+          </div>
+          <div className="form-group">
+            <label>Assigned Operator</label>
+            <select className="form-control" value={form.assigned_operator_id} onChange={e => setForm(f => { const emp = employees.find(x => x.id === e.target.value); return { ...f, assigned_operator_id: e.target.value, assigned_operator_name: emp?.name || '' } })}>
+              <option value="">— Select employee —</option>
+              {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>)}
+            </select>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save Generator</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
 
       {/* Run Log Modal */}
-      {runModalOpen && (
-        <div className="overlay" onClick={() => setRunModalOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
-            <div className="modal-title">Log <span>Generator Run</span></div>
-            <form onSubmit={handleRunLog}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Generator *</label>
-                  <select className="form-control" required value={runForm.gen_id} onChange={e => setRunForm({...runForm, gen_id: e.target.value})}>
-                    <option value="">Select generator</option>
-                    {generators.map(g => <option key={g.id} value={g.id}>{g.gen_code} — {g.gen_name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group"><label>Date</label><input type="date" className="form-control" required value={runForm.date} onChange={e => setRunForm({...runForm, date: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Start Time</label><input type="time" className="form-control" value={runForm.start_time} onChange={e => setRunForm({...runForm, start_time: e.target.value})} /></div>
-                <div className="form-group"><label>Stop Time</label><input type="time" className="form-control" value={runForm.stop_time} onChange={e => setRunForm({...runForm, stop_time: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Run Hours</label><input type="number" step="0.1" className="form-control" value={runForm.run_hours} onChange={e => setRunForm({...runForm, run_hours: e.target.value})} /></div>
-                <div className="form-group"><label>Fuel Used (L)</label><input type="number" step="0.1" className="form-control" value={runForm.fuel_used} onChange={e => setRunForm({...runForm, fuel_used: e.target.value})} /></div>
-              </div>
-              <div className="form-group">
-                <label>Operator</label>
-                <select className="form-control" value={runForm.operator_id} onChange={e => { const emp = employees.find(x => x.id === e.target.value); setRunForm(f => ({ ...f, operator_id: e.target.value, operator_name: emp?.name || '' })) }}>
-                  <option value="">— Select employee —</option>
-                  {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>)}
-                </select>
-              </div>
-              <div className="form-group"><label>Notes</label><textarea className="form-control" rows={2} value={runForm.notes} onChange={e => setRunForm({...runForm, notes: e.target.value})} /></div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setRunModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Log</button>
-              </div>
-            </form>
+      <ModalDialog open={runModalOpen} onClose={() => setRunModalOpen(false)} title="Log Generator Run">
+        <form onSubmit={handleRunLog}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Generator *</label>
+              <select className="form-control" required value={runForm.gen_id} onChange={e => setRunForm({...runForm, gen_id: e.target.value})}>
+                <option value="">Select generator</option>
+                {generators.map(g => <option key={g.id} value={g.id}>{g.gen_code} — {g.gen_name}</option>)}
+              </select>
+            </div>
+            <div className="form-group"><label>Date</label><input type="date" className="form-control" required value={runForm.date} onChange={e => setRunForm({...runForm, date: e.target.value})} /></div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group"><label>Start Time</label><input type="time" className="form-control" value={runForm.start_time} onChange={e => setRunForm({...runForm, start_time: e.target.value})} /></div>
+            <div className="form-group"><label>Stop Time</label><input type="time" className="form-control" value={runForm.stop_time} onChange={e => setRunForm({...runForm, stop_time: e.target.value})} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Run Hours</label><input type="number" step="0.1" className="form-control" value={runForm.run_hours} onChange={e => setRunForm({...runForm, run_hours: e.target.value})} /></div>
+            <div className="form-group"><label>Fuel Used (L)</label><input type="number" step="0.1" className="form-control" value={runForm.fuel_used} onChange={e => setRunForm({...runForm, fuel_used: e.target.value})} /></div>
+          </div>
+          <div className="form-group">
+            <label>Operator</label>
+            <select className="form-control" value={runForm.operator_id} onChange={e => { const emp = employees.find(x => x.id === e.target.value); setRunForm(f => ({ ...f, operator_id: e.target.value, operator_name: emp?.name || '' })) }}>
+              <option value="">— Select employee —</option>
+              {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_number})</option>)}
+            </select>
+          </div>
+          <div className="form-group"><label>Notes</label><textarea className="form-control" rows={2} value={runForm.notes} onChange={e => setRunForm({...runForm, notes: e.target.value})} /></div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setRunModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save Log</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

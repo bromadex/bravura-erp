@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { PageHeader, StatusBadge, EmptyState } from '../../components/ui'
 
 export default function Departments() {
   const { departments, employees, addDepartment, updateDepartment, deleteDepartment, loading, fetchAll } = useHR()
@@ -62,14 +63,13 @@ export default function Departments() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Departments</h1>
+      <PageHeader title="Departments">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => openModal()}>
             <span className="material-icons">add</span> Add Department
           </button>
         )}
-      </div>
+      </PageHeader>
 
       <div className="table-wrap">
         <table className="stock-table">
@@ -106,7 +106,7 @@ export default function Departments() {
             })}
             {departments.length === 0 && (
               <tr>
-                <td colSpan="7" className="empty-state">No departments</td>
+                <td colSpan="7"><EmptyState icon="business" message="No departments" /></td>
               </tr>
             )}
           </tbody>
@@ -131,7 +131,7 @@ export default function Departments() {
                       <td style={{ fontWeight: 600 }}>{emp.name}</td>
                       <td>{emp.employee_number || '—'}</td>
                       <td>—</td>
-                      <td><span className={`badge ${emp.status === 'Active' ? 'bg-green' : 'bg-red'}`}>{emp.status || 'Active'}</span></td>
+                      <td><StatusBadge status={emp.status || 'Active'} /></td>
                     </tr>
                   ))}
                   {getEmployeesInDept(viewEmployeesDept.id).length === 0 && (

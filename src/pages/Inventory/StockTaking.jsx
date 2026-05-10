@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { PageHeader, EmptyState, AlertBanner } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -64,28 +65,22 @@ export default function StockTaking() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Stock Taking</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
-          {canEdit && (
-            <button className="btn btn-primary" onClick={() => setTabActive(tabActive === 'new' ? 'history' : 'new')}>
-              <span className="material-icons">{tabActive === 'new' ? 'history' : 'fact_check'}</span>
-              {tabActive === 'new' ? 'View History' : 'New Stock Take'}
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Stock Taking">
+        <button className="btn btn-secondary" onClick={handleExport}><span className="material-icons">table_chart</span> Export</button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => setTabActive(tabActive === 'new' ? 'history' : 'new')}>
+            <span className="material-icons">{tabActive === 'new' ? 'history' : 'fact_check'}</span>
+            {tabActive === 'new' ? 'View History' : 'New Stock Take'}
+          </button>
+        )}
+      </PageHeader>
 
       {/* Warning */}
-      <div style={{ padding: '10px 16px', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 10, marginBottom: 20, fontSize: 12, color: 'var(--yellow)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="material-icons" style={{ fontSize: 16 }}>warning</span>
-        Stock taking overrides the system balance with physically counted quantities. This creates an adjustment transaction.
-      </div>
+      <AlertBanner type="warning" message="Stock taking overrides the system balance with physically counted quantities. This creates an adjustment transaction." />
 
       {/* ── NEW STOCK TAKE ──────────────────────────────────── */}
       {tabActive === 'new' && canEdit && (
-        <div>
+        <div style={{ marginTop: 16 }}>
           <div className="card" style={{ padding: 16, marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <div className="form-group">
@@ -104,7 +99,7 @@ export default function StockTaking() {
           </div>
 
           {/* Category filter */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div className="btn-group" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
             {categories.map(c => (
               <button key={c} className={filterCat === c ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
                 onClick={() => setFilterCat(c)}>{c === 'ALL' ? 'All Categories' : c}</button>
@@ -139,7 +134,7 @@ export default function StockTaking() {
                         <td style={{ fontWeight: 600 }}>{item.name}</td>
                         <td style={{ fontSize: 12 }}>{item.category}</td>
                         <td style={{ color: 'var(--text-dim)' }}>{item.unit || 'pcs'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{item.balance}</td>
+                        <td className="td-mono">{item.balance}</td>
                         <td>
                           <input
                             type="number" min="0"
@@ -150,7 +145,7 @@ export default function StockTaking() {
                             style={{ maxWidth: 120, padding: '6px 10px', fontSize: 14, fontFamily: 'var(--mono)', fontWeight: 700, background: hasCount ? (variance === 0 ? 'rgba(52,211,153,.1)' : 'rgba(251,191,36,.1)') : 'var(--surface2)', borderColor: hasCount ? (variance === 0 ? 'rgba(52,211,153,.3)' : 'rgba(251,191,36,.3)') : 'var(--border2)' }}
                           />
                         </td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: variance === null ? 'transparent' : variance > 0 ? 'var(--green)' : variance < 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                        <td className="td-mono" style={{ color: variance === null ? 'transparent' : variance > 0 ? 'var(--green)' : variance < 0 ? 'var(--red)' : 'var(--text-dim)' }}>
                           {variance === null ? '—' : `${variance > 0 ? '+' : ''}${variance}`}
                         </td>
                       </tr>
@@ -161,7 +156,7 @@ export default function StockTaking() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }} className="btn-group">
             <button className="btn btn-secondary" onClick={() => { setCounts({}); setTabActive('history') }}>Cancel</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving || itemsWithCounts.length === 0}>
               <span className="material-icons">fact_check</span>
@@ -173,7 +168,7 @@ export default function StockTaking() {
 
       {/* ── HISTORY ─────────────────────────────────────────── */}
       {tabActive === 'history' && (
-        <div className="card">
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="table-wrap">
             <table className="stock-table">
               <thead>
@@ -182,14 +177,14 @@ export default function StockTaking() {
               <tbody>
                 {loading ? <tr><td colSpan="7" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
                 : stockTakes.length === 0 ? (
-                  <tr><td colSpan="7"><div className="empty-state"><span className="material-icons" style={{ fontSize: 36, opacity: 0.3 }}>fact_check</span><span>No stock takes recorded. Click "New Stock Take" to begin.</span></div></td></tr>
+                  <tr><td colSpan="7"><EmptyState icon="fact_check" message='No stock takes recorded. Click "New Stock Take" to begin.' /></td></tr>
                 ) : stockTakes.map(st => (
                   <tr key={st.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>{st.date}</td>
                     <td style={{ fontWeight: 600 }}>{st.item_name}</td>
                     <td style={{ fontFamily: 'var(--mono)' }}>{st.system_qty}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{st.counted}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: st.variance > 0 ? 'var(--green)' : st.variance < 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                    <td className="td-mono">{st.counted}</td>
+                    <td className="td-mono" style={{ color: st.variance > 0 ? 'var(--green)' : st.variance < 0 ? 'var(--red)' : 'var(--text-dim)' }}>
                       {st.variance > 0 ? '+' : ''}{st.variance}
                     </td>
                     <td style={{ fontSize: 12 }}>{st.done_by || '—'}</td>

@@ -4,6 +4,7 @@ import { useLogistics } from '../../contexts/LogisticsContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 const TODAY = new Date().toISOString().split('T')[0]
@@ -52,9 +53,7 @@ export default function CampPPERegister() {
     } catch (err) { toast.error(err.message) }
   }
 
-  const modalWrap = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 500 }
-  const modalBox  = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 480, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, overflow: 'hidden' }
-  const grid2     = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
+  const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
 
   return (
     <div style={{ padding: 24 }}>
@@ -108,7 +107,7 @@ export default function CampPPERegister() {
                       {emp?.employee_number && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{emp.employee_number}</div>}
                     </td>
                     <td>{p.item_name}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{p.qty}</td>
+                    <td className="td-mono">{p.qty}</td>
                     <td style={{ color: 'var(--text-dim)' }}>{p.size || '—'}</td>
                     <td>
                       <span style={{ padding: '2px 8px', borderRadius: 20, background: cs.bg, border: `1px solid ${cs.border}`, color: cs.color, fontSize: 11, fontWeight: 700 }}>
@@ -126,88 +125,75 @@ export default function CampPPERegister() {
       </div>
 
       {/* Issue PPE modal */}
-      {ppeModal && (
-        <>
-          <div onClick={() => setPpeModal(false)} style={modalWrap} />
-          <div style={modalBox}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span className="material-icons" style={{ color: 'var(--teal)' }}>security</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Issue PPE</div>
-              <div style={{ flex: 1 }} />
-              <button onClick={() => setPpeModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-                <span className="material-icons">close</span>
-              </button>
-            </div>
-            <form onSubmit={handlePPE} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Employee *</label>
-                <select required className="form-control" value={ppeForm.employee_id}
-                  onChange={e => setPpeForm(f => ({ ...f, employee_id: e.target.value }))}>
-                  <option value="">Select employee…</option>
-                  {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name} {e.employee_number ? `(${e.employee_number})` : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">PPE Item *</label>
-                  <select required className="form-control" value={ppeForm.item_id}
-                    onChange={e => { const itm = items.find(i => i.id === e.target.value); setPpeForm(f => ({ ...f, item_id: e.target.value, item_name: itm?.name || '' })) }}>
-                    <option value="">Select item…</option>
-                    {ppeItems.map(i => (
-                      <option key={i.id} value={i.id}>{i.name} — {i.balance} available</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Quantity</label>
-                  <input type="number" min="1" className="form-control" value={ppeForm.qty}
-                    onChange={e => setPpeForm(f => ({ ...f, qty: parseInt(e.target.value) || 1 }))} />
-                </div>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Size</label>
-                  <input className="form-control" placeholder="Size 9, L, XL…" value={ppeForm.size}
-                    onChange={e => setPpeForm(f => ({ ...f, size: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date</label>
-                  <input type="date" className="form-control" value={ppeForm.date}
-                    onChange={e => setPpeForm(f => ({ ...f, date: e.target.value }))} />
-                </div>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Condition</label>
-                  <select className="form-control" value={ppeForm.condition}
-                    onChange={e => setPpeForm(f => ({ ...f, condition: e.target.value }))}>
-                    <option>New</option>
-                    <option>Good</option>
-                    <option>Fair</option>
-                    <option>Replacement</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Reason</label>
-                  <select className="form-control" value={ppeForm.reason}
-                    onChange={e => setPpeForm(f => ({ ...f, reason: e.target.value }))}>
-                    <option>New issue</option>
-                    <option>Replacement - Worn</option>
-                    <option>Replacement - Damaged</option>
-                    <option>Replacement - Lost</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setPpeModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Issue PPE</button>
-              </div>
-            </form>
+      <ModalDialog open={ppeModal} onClose={() => setPpeModal(false)} title="Issue PPE">
+        <form onSubmit={handlePPE} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Employee *</label>
+            <select required className="form-control" value={ppeForm.employee_id}
+              onChange={e => setPpeForm(f => ({ ...f, employee_id: e.target.value }))}>
+              <option value="">Select employee…</option>
+              {employees.map(e => (
+                <option key={e.id} value={e.id}>{e.name} {e.employee_number ? `(${e.employee_number})` : ''}</option>
+              ))}
+            </select>
           </div>
-        </>
-      )}
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">PPE Item *</label>
+              <select required className="form-control" value={ppeForm.item_id}
+                onChange={e => { const itm = items.find(i => i.id === e.target.value); setPpeForm(f => ({ ...f, item_id: e.target.value, item_name: itm?.name || '' })) }}>
+                <option value="">Select item…</option>
+                {ppeItems.map(i => (
+                  <option key={i.id} value={i.id}>{i.name} — {i.balance} available</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Quantity</label>
+              <input type="number" min="1" className="form-control" value={ppeForm.qty}
+                onChange={e => setPpeForm(f => ({ ...f, qty: parseInt(e.target.value) || 1 }))} />
+            </div>
+          </div>
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Size</label>
+              <input className="form-control" placeholder="Size 9, L, XL…" value={ppeForm.size}
+                onChange={e => setPpeForm(f => ({ ...f, size: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input type="date" className="form-control" value={ppeForm.date}
+                onChange={e => setPpeForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+          </div>
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Condition</label>
+              <select className="form-control" value={ppeForm.condition}
+                onChange={e => setPpeForm(f => ({ ...f, condition: e.target.value }))}>
+                <option>New</option>
+                <option>Good</option>
+                <option>Fair</option>
+                <option>Replacement</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Reason</label>
+              <select className="form-control" value={ppeForm.reason}
+                onChange={e => setPpeForm(f => ({ ...f, reason: e.target.value }))}>
+                <option>New issue</option>
+                <option>Replacement - Worn</option>
+                <option>Replacement - Damaged</option>
+                <option>Replacement - Lost</option>
+              </select>
+            </div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setPpeModal(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Issue PPE</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

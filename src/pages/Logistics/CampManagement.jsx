@@ -109,9 +109,9 @@ export default function CampManagement() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
+      <div className="tab-nav" style={{ marginBottom: 20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: '8px 14px', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === t.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button key={t.id} className={`tab-btn${activeTab === t.id ? ' active' : ''}`} onClick={() => setActiveTab(t.id)}>
             <span className="material-icons" style={{ fontSize: 15 }}>{t.icon}</span>{t.label}
           </button>
         ))}

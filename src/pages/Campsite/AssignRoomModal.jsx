@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCampsite } from '../../contexts/CampsiteContext'
 import { supabase } from '../../lib/supabase'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 
 const S = {
@@ -124,20 +125,8 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
   const lbl = (x) => `${x.name} (${x.employee_number || '—'})`
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 400 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '95%', maxWidth: 500, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 401, maxHeight: '92vh', overflowY: 'auto' }}>
-
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
-          <span className="material-icons" style={{ color: 'var(--green)' }}>person_add</span>
-          <span style={{ fontWeight: 800, fontSize: 15 }}>Assign Room</span>
-          <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
-            <span className="material-icons">close</span>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <ModalDialog open title="Assign Room" onClose={onClose}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {errors.map((m, i) => (
             <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', color: 'var(--red)', fontSize: 12, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
@@ -244,14 +233,13 @@ export default function AssignRoomModal({ onClose, prefillEmployee = null, prefi
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+          <ModalActions>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving || !!errors.length || !emp1 || !roomId}>
               {saving ? 'Assigning…' : `Assign Room${emp2 ? ' (2 people)' : ''}`}
             </button>
-          </div>
+          </ModalActions>
         </form>
-      </div>
-    </>
+    </ModalDialog>
   )
 }

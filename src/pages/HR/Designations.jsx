@@ -11,6 +11,7 @@ import { useHR } from '../../contexts/HRContext'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete, useCanManagePermissions } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { PageHeader, EmptyState } from '../../components/ui'
 
 const MODULES = [
   { name: 'dashboard',   pages: ['overview'] },
@@ -149,14 +150,13 @@ export default function Designations() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Designations</h1>
+      <PageHeader title="Designations">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => openModal()}>
             <span className="material-icons">add</span> Add Designation
           </button>
         )}
-      </div>
+      </PageHeader>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
@@ -176,31 +176,33 @@ export default function Designations() {
                   <tr key={des.id} style={{ background: permPanel?.id === des.id ? 'rgba(251,191,36,.06)' : 'transparent' }}>
                     <td style={{ fontWeight: 600 }}>{des.title}</td>
                     <td>{des.level || 1}</td>
-                    <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {canEdit && (
-                        <button className="btn btn-secondary btn-sm" onClick={() => openModal(des)}>
-                          <span className="material-icons">edit</span>
-                        </button>
-                      )}
-                      {canManage && (
-                        <button
-                          className={`btn btn-sm ${permPanel?.id === des.id ? 'btn-primary' : 'btn-secondary'}`}
-                          onClick={() => setPermPanel(permPanel?.id === des.id ? null : des)}
-                          title="Set permissions for this designation"
-                        >
-                          <span className="material-icons">admin_panel_settings</span>
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(des.id, des.title)}>
-                          <span className="material-icons">delete</span>
-                        </button>
-                      )}
+                    <td className="td-actions">
+                      <div className="btn-group-sm">
+                        {canEdit && (
+                          <button className="btn btn-secondary btn-sm" onClick={() => openModal(des)}>
+                            <span className="material-icons">edit</span>
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            className={`btn btn-sm ${permPanel?.id === des.id ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setPermPanel(permPanel?.id === des.id ? null : des)}
+                            title="Set permissions for this designation"
+                          >
+                            <span className="material-icons">admin_panel_settings</span>
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(des.id, des.title)}>
+                            <span className="material-icons">delete</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {designations.length === 0 && (
-                  <tr><td colSpan="3" className="empty-state">No designations</td></tr>
+                  <tr><td colSpan="3"><EmptyState icon="work" message="No designations" /></td></tr>
                 )}
               </tbody>
             </table>

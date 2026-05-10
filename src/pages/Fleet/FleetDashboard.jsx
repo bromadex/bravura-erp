@@ -1,6 +1,7 @@
 import { useFleet } from '../../contexts/FleetContext'
 import { useNavigate } from 'react-router-dom'
 import { useCanView } from '../../hooks/usePermission'
+import { PageHeader, KPICard, EmptyState } from '../../components/ui'
 
 export default function FleetDashboard() {
   const navigate = useNavigate()
@@ -24,23 +25,24 @@ export default function FleetDashboard() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Fleet Intelligence Dashboard</h1>
+      <PageHeader title="Fleet Intelligence Dashboard">
         <button className="btn btn-primary" onClick={() => navigate('/module/fleet/maintenance-alerts')}>
           <span className="material-icons">notifications_active</span> Alerts ({alerts.length})
         </button>
-      </div>
+      </PageHeader>
 
       <div className="kpi-grid">
-        <div className="kpi-card"><div className="kpi-label">Total Vehicles</div><div className="kpi-val">{totalVehicles}</div><div className="kpi-sub">Active: {activeVehicles}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Generators</div><div className="kpi-val">{totalGenerators}</div><div className="kpi-sub">Heavy Equipment: {totalEquipment}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Avg Fuel Efficiency</div><div className="kpi-val">{avgVehicleEfficiency.toFixed(1)} km/L</div><div className="kpi-sub">Fleet average</div></div>
-        <div className="kpi-card"><div className="kpi-label">Critical Health</div><div className="kpi-val">{criticalHealth}</div><div className="kpi-sub">Assets needing attention</div></div>
+        <KPICard label="Total Vehicles" value={totalVehicles} sub={`Active: ${activeVehicles}`} icon="directions_car" color="gold" />
+        <KPICard label="Generators" value={totalGenerators} sub={`Heavy Equipment: ${totalEquipment}`} icon="bolt" color="yellow" />
+        <KPICard label="Avg Fuel Efficiency" value={`${avgVehicleEfficiency.toFixed(1)} km/L`} sub="Fleet average" icon="local_gas_station" color="teal" />
+        <KPICard label="Critical Health" value={criticalHealth} sub="Assets needing attention" icon="warning" color="red" />
       </div>
 
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>🔔 Overdue Maintenance Alerts</h3>
-        {alerts.length === 0 ? <div className="empty-state">No overdue maintenance</div> : alerts.map((a, i) => (
+        {alerts.length === 0 ? (
+          <EmptyState icon="check_circle" message="No overdue maintenance" />
+        ) : alerts.map((a, i) => (
           <div key={i} style={{ padding: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span><span className="material-icons" style={{ color: 'var(--red)', fontSize: 16 }}>warning</span> {a.asset} – {a.message}</span>
             <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/module/fleet/${a.type}s`)}>View</button>
@@ -50,7 +52,7 @@ export default function FleetDashboard() {
 
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>⚙️ Quick Actions</h3>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div className="btn-group" style={{ flexWrap: 'wrap' }}>
           {canViewVehicles && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/vehicles')}>Manage Vehicles</button>}
           {canViewGenerators && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/generators')}>Manage Generators</button>}
           {canViewHeavyEquipment && <button className="btn btn-primary" onClick={() => navigate('/module/fleet/heavy-equipment')}>Manage Heavy Equipment</button>}

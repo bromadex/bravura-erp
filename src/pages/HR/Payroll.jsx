@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase'
 import { getPayrollPeriod, buildTimesheetSummary, WORK_SCHEDULE } from '../../utils/attendanceUtils'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { PageHeader, KPICard, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
 // Zimbabwe PAYE brackets 2024/2025 (rough progressive estimate)
 const calcPAYE = (gross, rate) => {
@@ -253,34 +254,26 @@ export default function Payroll() {
 
   const isLocked = selectedPeriod?.status === 'approved' || selectedPeriod?.status === 'paid'
 
-  const statusBadge = (s) => {
-    const map = { open: 'badge-blue', processing: 'badge-yellow', approved: 'badge-green', paid: 'badge-green' }
-    return <span className={`badge ${map[s] || 'badge-gold'}`}>{s}</span>
-  }
+  const statusBadge = (s) => <StatusBadge status={s} />
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Payroll</h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={createPeriod}><span className="material-icons">add</span> New Period</button>
-          {selectedPeriod && !isLocked && canEdit && <button className="btn btn-secondary" onClick={generateRecords} disabled={generating}><span className="material-icons">autorenew</span>{generating ? 'Generating…' : 'Generate'}</button>}
-          {records.length > 0 && <button className="btn btn-secondary" onClick={exportToExcel}><span className="material-icons">table_chart</span> Export</button>}
-          {selectedPeriod && !isLocked && canApprove && records.length > 0 && <button className="btn btn-primary" onClick={approvePeriod}><span className="material-icons">check_circle</span> Approve</button>}
-        </div>
-      </div>
+      <PageHeader title="Payroll">
+        <button className="btn btn-secondary" onClick={createPeriod}><span className="material-icons">add</span> New Period</button>
+        {selectedPeriod && !isLocked && canEdit && <button className="btn btn-secondary" onClick={generateRecords} disabled={generating}><span className="material-icons">autorenew</span>{generating ? 'Generating…' : 'Generate'}</button>}
+        {records.length > 0 && <button className="btn btn-secondary" onClick={exportToExcel}><span className="material-icons">table_chart</span> Export</button>}
+        {selectedPeriod && !isLocked && canApprove && records.length > 0 && <button className="btn btn-primary" onClick={approvePeriod}><span className="material-icons">check_circle</span> Approve</button>}
+      </PageHeader>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {[
+      <TabNav
+        tabs={[
           { id: 'payroll', label: 'Payroll Runs', icon: 'payments' },
           { id: 'history', label: 'Pay History',  icon: 'history'  },
-        ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === t.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === t.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-icons" style={{ fontSize: 16 }}>{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+      />
 
       {activeTab === 'payroll' && (
         <>
@@ -295,19 +288,19 @@ export default function Payroll() {
 
           {records.length > 0 && (
             <div className="kpi-grid" style={{ marginBottom: 20 }}>
-              <div className="kpi-card"><div className="kpi-label">Employees</div><div className="kpi-val">{records.length}</div></div>
-              <div className="kpi-card"><div className="kpi-label">Gross Pay</div><div className="kpi-val" style={{ fontSize: 18 }}>${totals.gross.toFixed(0)}</div></div>
-              <div className="kpi-card"><div className="kpi-label">Deductions</div><div className="kpi-val" style={{ fontSize: 18, color: 'var(--red)' }}>${totals.deduct.toFixed(0)}</div></div>
-              <div className="kpi-card"><div className="kpi-label">Net Pay</div><div className="kpi-val" style={{ fontSize: 18, color: 'var(--green)' }}>${totals.net.toFixed(0)}</div></div>
+              <KPICard label="Employees" value={records.length} icon="people" color="blue" />
+              <KPICard label="Gross Pay" value={`$${totals.gross.toFixed(0)}`} icon="payments" color="teal" />
+              <KPICard label="Deductions" value={`$${totals.deduct.toFixed(0)}`} icon="remove_circle" color="red" />
+              <KPICard label="Net Pay" value={`$${totals.net.toFixed(0)}`} icon="account_balance_wallet" color="green" />
             </div>
           )}
 
           {loading ? (
             <div className="card" style={{ padding: 40, textAlign: 'center' }}>Loading…</div>
           ) : !selectedPeriod ? (
-            <div className="empty-state"><span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>payments</span><span>Select or create a payroll period</span></div>
+            <EmptyState icon="payments" message="Select or create a payroll period" />
           ) : records.length === 0 ? (
-            <div className="empty-state"><span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>autorenew</span><span>No records yet — click Generate to create them from attendance data</span></div>
+            <EmptyState icon="autorenew" message="No records yet — click Generate to create them from attendance data" />
           ) : (
             <div className="card">
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
@@ -321,24 +314,26 @@ export default function Payroll() {
                       <tr key={r.id}>
                         <td><div style={{ fontWeight: 600 }}>{r.employee_name}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.employee_number} · {r.designation}</div></td>
                         <td style={{ fontSize: 11 }}>{r.department}</td>
-                        <td style={{ fontFamily: 'var(--mono)' }}>{r.regular_hours?.toFixed(1)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>${r.gross_pay?.toFixed(2) || '—'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>${r.paye?.toFixed(2) || '0'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>${r.nssa?.toFixed(2) || '0'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>${r.aids_levy?.toFixed(2) || '0'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>${r.total_deductions?.toFixed(2) || '0'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--green)' }}>${r.net_pay?.toFixed(2) || '—'}</td>
-                        <td style={{ color: r.absent_days > 0 ? 'var(--red)' : 'inherit', fontFamily: 'var(--mono)' }}>{r.absent_days}</td>
-                        <td style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-secondary btn-sm" title="Print Payslip" onClick={() => printPayslip(r)}>
-                            <span className="material-icons" style={{ fontSize: 13 }}>print</span>
-                          </button>
-                          {!isLocked && canEdit && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => { setEditingRecord(r); setSalaryForm({ basic_salary: r.basic_salary, regular_pay: r.regular_pay, overtime_pay: r.overtime_pay, saturday_pay: r.saturday_pay, public_holiday_pay: r.public_holiday_pay, allowances: r.allowances, paye: r.paye, nssa: r.nssa, aids_levy: r.aids_levy, other_deductions: r.other_deductions, notes: r.notes }) }}>
-                              <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
+                        <td className="td-mono">{r.regular_hours?.toFixed(1)}</td>
+                        <td className="td-mono" style={{ color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
+                        <td className="td-mono">${r.gross_pay?.toFixed(2) || '—'}</td>
+                        <td className="td-mono" style={{ fontSize: 11 }}>${r.paye?.toFixed(2) || '0'}</td>
+                        <td className="td-mono" style={{ fontSize: 11 }}>${r.nssa?.toFixed(2) || '0'}</td>
+                        <td className="td-mono" style={{ fontSize: 11 }}>${r.aids_levy?.toFixed(2) || '0'}</td>
+                        <td className="td-mono" style={{ color: 'var(--red)' }}>${r.total_deductions?.toFixed(2) || '0'}</td>
+                        <td className="td-mono" style={{ color: 'var(--green)' }}>${r.net_pay?.toFixed(2) || '—'}</td>
+                        <td className="td-mono" style={{ color: r.absent_days > 0 ? 'var(--red)' : 'inherit' }}>{r.absent_days}</td>
+                        <td className="td-actions">
+                          <div className="btn-group-sm">
+                            <button className="btn btn-secondary btn-sm" title="Print Payslip" onClick={() => printPayslip(r)}>
+                              <span className="material-icons" style={{ fontSize: 13 }}>print</span>
                             </button>
-                          )}
+                            {!isLocked && canEdit && (
+                              <button className="btn btn-secondary btn-sm" onClick={() => { setEditingRecord(r); setSalaryForm({ basic_salary: r.basic_salary, regular_pay: r.regular_pay, overtime_pay: r.overtime_pay, saturday_pay: r.saturday_pay, public_holiday_pay: r.public_holiday_pay, allowances: r.allowances, paye: r.paye, nssa: r.nssa, aids_levy: r.aids_levy, other_deductions: r.other_deductions, notes: r.notes }) }}>
+                                <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -362,9 +357,9 @@ export default function Payroll() {
             </div>
           </div>
           {!historyEmployee ? (
-            <div className="empty-state"><span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>person_search</span><span>Select an employee to view pay history</span></div>
+            <EmptyState icon="person_search" message="Select an employee to view pay history" />
           ) : historyRecords.length === 0 ? (
-            <div className="empty-state"><span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>payments</span><span>No payroll records found for this employee</span></div>
+            <EmptyState icon="payments" message="No payroll records found for this employee" />
           ) : (
             <div className="card">
               <div className="table-wrap">
@@ -374,11 +369,11 @@ export default function Payroll() {
                     {historyRecords.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontWeight: 600 }}>{r.payroll_periods?.period_label || '—'}<div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.payroll_periods?.start_date} → {r.payroll_periods?.end_date}</div></td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>${(r.gross_pay || 0).toFixed(2)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>${(r.total_deductions || 0).toFixed(2)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--green)' }}>${(r.net_pay || 0).toFixed(2)}</td>
-                        <td style={{ fontFamily: 'var(--mono)' }}>{r.regular_hours?.toFixed(1)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
+                        <td className="td-mono">${(r.gross_pay || 0).toFixed(2)}</td>
+                        <td className="td-mono" style={{ color: 'var(--red)' }}>${(r.total_deductions || 0).toFixed(2)}</td>
+                        <td className="td-mono" style={{ color: 'var(--green)' }}>${(r.net_pay || 0).toFixed(2)}</td>
+                        <td className="td-mono">{r.regular_hours?.toFixed(1)}</td>
+                        <td className="td-mono" style={{ color: r.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtime_hours?.toFixed(1)}</td>
                         <td>{statusBadge(r.payroll_periods?.status || 'open')}</td>
                         <td><button className="btn btn-secondary btn-sm" onClick={() => { setSelectedPeriod(periods.find(p => p.id === r.payroll_period_id)); printPayslip(r) }}><span className="material-icons" style={{ fontSize: 13 }}>print</span></button></td>
                       </tr>

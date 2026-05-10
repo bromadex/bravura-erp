@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { buildTimesheetSummary, getPayrollPeriod, WORK_SCHEDULE, calculateAttendancePay } from '../../utils/attendanceUtils'
 import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
+import { PageHeader, KPICard, EmptyState } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -56,7 +57,7 @@ export default function TimesheetSummary() {
     return { emp, ...s, hourlyRate, pay }
   })
 
-  const exportXLSX = () => {
+  const handleExport = () => {
     if (!selectedPeriod) return
     const rows = summaries.map(r => ({
       'Employee':          r.emp.name,
@@ -98,17 +99,14 @@ export default function TimesheetSummary() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Timesheet Summary</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={exportXLSX} disabled={!selectedPeriod}>
-            <span className="material-icons">table_chart</span> Export Excel
-          </button>
-          <button className="btn btn-secondary" onClick={printAll}>
-            <span className="material-icons">print</span> Print All
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Timesheet Summary">
+        <button className="btn btn-secondary" onClick={handleExport} disabled={!selectedPeriod}>
+          <span className="material-icons">table_chart</span> Export Excel
+        </button>
+        <button className="btn btn-secondary" onClick={printAll}>
+          <span className="material-icons">print</span> Print All
+        </button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="card" style={{ padding: 14, marginBottom: 20 }}>
@@ -142,36 +140,16 @@ export default function TimesheetSummary() {
       {/* KPIs */}
       {selectedPeriod && summaries.length > 0 && (
         <div className="kpi-grid" style={{ marginBottom: 20 }}>
-          <div className="kpi-card">
-            <div className="kpi-label">Employees</div>
-            <div className="kpi-val">{summaries.length}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total Reg Hours</div>
-            <div className="kpi-val">{totals.regularHours.toFixed(0)}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total OT Hours</div>
-            <div className="kpi-val" style={{ color: 'var(--yellow)' }}>{totals.overtimeHours.toFixed(1)}</div>
-            <div className="kpi-sub">at 1.5×</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total Absent Days</div>
-            <div className="kpi-val" style={{ color: totals.absentWeekdays > 0 ? 'var(--red)' : 'var(--green)' }}>{totals.absentWeekdays}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Est. Total Pay</div>
-            <div className="kpi-val" style={{ fontSize: 20, color: 'var(--teal)' }}>${totals.totalPay.toFixed(0)}</div>
-            <div className="kpi-sub">before deductions</div>
-          </div>
+          <KPICard label="Employees" value={summaries.length} icon="people" color="blue" />
+          <KPICard label="Total Reg Hours" value={totals.regularHours.toFixed(0)} icon="schedule" color="teal" />
+          <KPICard label="Total OT Hours" value={totals.overtimeHours.toFixed(1)} sub="at 1.5×" icon="more_time" color="yellow" />
+          <KPICard label="Total Absent Days" value={totals.absentWeekdays} icon="event_busy" color={totals.absentWeekdays > 0 ? 'red' : 'green'} />
+          <KPICard label="Est. Total Pay" value={`$${totals.totalPay.toFixed(0)}`} sub="before deductions" icon="payments" color="teal" />
         </div>
       )}
 
       {!selectedPeriod ? (
-        <div className="empty-state">
-          <span className="material-icons" style={{ fontSize: 48, opacity: 0.3 }}>calendar_today</span>
-          <span>Select a payroll period to view timesheet summaries</span>
-        </div>
+        <EmptyState icon="calendar_today" message="Select a payroll period to view timesheet summaries" />
       ) : (
         <>
           {/* Master table */}
@@ -210,17 +188,17 @@ export default function TimesheetSummary() {
                         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.emp.employee_number}</div>
                       </td>
                       <td style={{ fontSize: 12 }}>{getDeptName(r.emp.department_id)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{r.regularHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.saturdayHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.saturdayHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.overtimeHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtimeHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.publicHolidayHours > 0 ? 'var(--teal)' : 'inherit' }}>{r.publicHolidayHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{r.totalHours.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: r.absentWeekdays > 3 ? 'var(--red)' : r.absentWeekdays > 0 ? 'var(--yellow)' : 'var(--green)' }}>{r.absentWeekdays}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{r.leaveDays || 0}</td>
-                      <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)', fontSize: 11 }}>
+                      <td className="td-mono">{r.regularHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.saturdayHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.saturdayHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.overtimeHours > 0 ? 'var(--yellow)' : 'inherit' }}>{r.overtimeHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.publicHolidayHours > 0 ? 'var(--teal)' : 'inherit' }}>{r.publicHolidayHours.toFixed(1)}</td>
+                      <td className="td-mono">{r.totalHours.toFixed(1)}</td>
+                      <td className="td-mono" style={{ color: r.absentWeekdays > 3 ? 'var(--red)' : r.absentWeekdays > 0 ? 'var(--yellow)' : 'var(--green)' }}>{r.absentWeekdays}</td>
+                      <td className="td-mono">{r.leaveDays || 0}</td>
+                      <td className="td-mono" style={{ color: 'var(--text-dim)', fontSize: 11 }}>
                         {r.hourlyRate > 0 ? `$${r.hourlyRate.toFixed(2)}` : '—'}
                       </td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--teal)' }}>
+                      <td className="td-mono" style={{ color: 'var(--teal)' }}>
                         {r.pay ? `$${r.pay.totalPay.toFixed(2)}` : '—'}
                       </td>
                     </tr>
@@ -228,15 +206,15 @@ export default function TimesheetSummary() {
                   {/* Totals row */}
                   <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
                     <td colSpan="2">TOTALS ({summaries.length} employees)</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.regularHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.saturdayHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.overtimeHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.publicHolidayHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{totals.totalHours.toFixed(1)}</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>{totals.absentWeekdays}</td>
+                    <td className="td-mono">{totals.regularHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.saturdayHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.overtimeHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.publicHolidayHours.toFixed(1)}</td>
+                    <td className="td-mono">{totals.totalHours.toFixed(1)}</td>
+                    <td className="td-mono" style={{ color: 'var(--red)' }}>{totals.absentWeekdays}</td>
                     <td>—</td>
                     <td>—</td>
-                    <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${totals.totalPay.toFixed(2)}</td>
+                    <td className="td-mono" style={{ color: 'var(--teal)' }}>${totals.totalPay.toFixed(2)}</td>
                   </tr>
                   {summaries.length === 0 && (
                     <tr><td colSpan="11" className="empty-state">No attendance records found for this period</td></tr>
@@ -333,10 +311,10 @@ export default function TimesheetSummary() {
                         <tr key={a.id}>
                           <td style={{ whiteSpace: 'nowrap' }}>{a.date}</td>
                           <td>{dow}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.clock_in || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.clock_out || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)' }}>{a.total_hours?.toFixed(1) || '—'}</td>
-                          <td style={{ fontFamily: 'var(--mono)', color: a.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{a.overtime_hours?.toFixed(1) || '—'}</td>
+                          <td className="td-mono">{a.clock_in || '—'}</td>
+                          <td className="td-mono">{a.clock_out || '—'}</td>
+                          <td className="td-mono">{a.total_hours?.toFixed(1) || '—'}</td>
+                          <td className="td-mono" style={{ color: a.overtime_hours > 0 ? 'var(--yellow)' : 'inherit' }}>{a.overtime_hours?.toFixed(1) || '—'}</td>
                           <td>
                             {isPH
                               ? <span className="badge badge-teal">Public Holiday</span>

@@ -19,6 +19,7 @@ import { useCanEdit, useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { StatusBadge, PageHeader, ModalDialog, ModalActions } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -237,19 +238,16 @@ export default function StoreRequisitions() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Store Requisitions</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={handleExport}>
-            <span className="material-icons">table_chart</span> Export
+      <PageHeader title="Store Requisitions">
+        <button className="btn btn-secondary" onClick={handleExport}>
+          <span className="material-icons">table_chart</span> Export
+        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={openCreate}>
+            <span className="material-icons">add</span> New Requisition
           </button>
-          {canEdit && (
-            <button className="btn btn-primary" onClick={openCreate}>
-              <span className="material-icons">add</span> New Requisition
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </PageHeader>
 
       {/* Approval workflow guide */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, overflowX: 'auto' }}>
@@ -318,48 +316,49 @@ export default function StoreRequisitions() {
             : filtered.length === 0 ? <tr><td colSpan="8" className="empty-state">No requisitions found</td></tr>
             : filtered.map(r => {
               const items = parseItems(r.items)
-              const sc    = STATUS_CONFIG[r.status] || { cls: 'badge-gold', label: r.status }
               const srNum = r.sr_number || r.req_number
               return (
                 <tr key={r.id} onClick={() => setViewReq(r)} style={{ cursor: 'pointer' }}
                   onMouseOver={e => e.currentTarget.style.background = 'var(--surface2)'}
                   onMouseOut={e  => e.currentTarget.style.background = ''}>
-                  <td style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontWeight: 700 }}>{srNum || '—'}</td>
+                  <td className="td-mono" style={{ color: 'var(--gold)' }}>{srNum || '—'}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
                   <td style={{ fontWeight: 600 }}>{r.department}</td>
                   <td><span style={{ fontSize: 11, fontWeight: 700, color: PRIORITY_COLORS[r.priority] || 'var(--text-dim)', textTransform: 'uppercase' }}>{r.priority}</span></td>
                   <td>{r.requester_name || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
                   <td>
-                    <span className={`badge ${sc.cls}`}><span className="material-icons" style={{ fontSize: 10, marginRight: 3 }}>{sc.icon}</span>{sc.label}</span>
+                    <StatusBadge status={r.status} label={STATUS_CONFIG[r.status]?.label} />
                     <SlaIndicator r={r} />
                   </td>
-                  <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {/* HOD/Manager approves submitted requests */}
-                    {canApprove && r.status === 'submitted' && (
-                      <>
-                        <button className="btn btn-primary btn-sm" title="Approve" onClick={() => handleApprove(r.id)}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>check</span>
+                  <td onClick={e => e.stopPropagation()} className="td-actions">
+                    <div className="btn-group-sm">
+                      {/* HOD/Manager approves submitted requests */}
+                      {canApprove && r.status === 'submitted' && (
+                        <>
+                          <button className="btn btn-primary btn-sm" title="Approve" onClick={() => handleApprove(r.id)}>
+                            <span className="material-icons" style={{ fontSize: 14 }}>check</span>
+                          </button>
+                          <button className="btn btn-danger btn-sm" title="Reject" onClick={() => setRejectModal({ open: true, id: r.id, reason: '' })}>
+                            <span className="material-icons" style={{ fontSize: 14 }}>close</span>
+                          </button>
+                        </>
+                      )}
+                      {/* Storekeeper fulfills approved requests */}
+                      {canEdit && r.status === 'approved' && (
+                        <button className="btn btn-primary btn-sm" disabled={fulfilling === r.id}
+                          title="Issue from stock" onClick={() => handleFulfill(r)}>
+                          <span className="material-icons" style={{ fontSize: 14 }}>inventory</span>
+                          {fulfilling === r.id ? 'Issuing…' : 'Issue'}
                         </button>
-                        <button className="btn btn-danger btn-sm" title="Reject" onClick={() => setRejectModal({ open: true, id: r.id, reason: '' })}>
-                          <span className="material-icons" style={{ fontSize: 14 }}>close</span>
+                      )}
+                      {/* Edit own draft */}
+                      {canEdit && r.status === 'draft' && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
+                          <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
                         </button>
-                      </>
-                    )}
-                    {/* Storekeeper fulfills approved requests */}
-                    {canEdit && r.status === 'approved' && (
-                      <button className="btn btn-primary btn-sm" disabled={fulfilling === r.id}
-                        title="Issue from stock" onClick={() => handleFulfill(r)}>
-                        <span className="material-icons" style={{ fontSize: 14 }}>inventory</span>
-                        {fulfilling === r.id ? 'Issuing…' : 'Issue'}
-                      </button>
-                    )}
-                    {/* Edit own draft */}
-                    {canEdit && r.status === 'draft' && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(r)}>
-                        <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -369,18 +368,11 @@ export default function StoreRequisitions() {
       </div>
 
       {/* ── View Modal ──────────────────────────────────────── */}
-      {viewReq && (
-        <div className="overlay" onClick={() => setViewReq(null)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div className="modal-title" style={{ marginBottom: 4 }}>
-                  {viewReq.sr_number || viewReq.req_number || '—'} — <span>{viewReq.department}</span>
-                </div>
-                <span className={`badge ${STATUS_CONFIG[viewReq.status]?.cls || 'badge-gold'}`}>
-                  {STATUS_CONFIG[viewReq.status]?.label || viewReq.status}
-                </span>
-              </div>
+      <ModalDialog open={!!viewReq} onClose={() => setViewReq(null)} title={viewReq ? `${viewReq.sr_number || viewReq.req_number || '—'} — ${viewReq.department}` : ''} size="lg">
+        {viewReq && (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <StatusBadge status={viewReq.status} label={STATUS_CONFIG[viewReq.status]?.label} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 13 }}>
@@ -412,7 +404,7 @@ export default function StoreRequisitions() {
                       <tr key={i}>
                         <td style={{ fontWeight: 600 }}>{it.name}</td>
                         <td>{it.category}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{it.qty}</td>
+                        <td className="td-mono">{it.qty}</td>
                         <td>{it.unit || 'pcs'}</td>
                         <td style={{ fontFamily: 'var(--mono)', color: sufficient === null ? 'var(--text-dim)' : sufficient ? 'var(--green)' : 'var(--red)' }}>
                           {invItem ? `${invItem.balance} ${invItem.unit || 'pcs'}` : '—'}
@@ -431,7 +423,7 @@ export default function StoreRequisitions() {
               </table>
             </div>
 
-            <div className="modal-actions">
+            <ModalActions>
               {canApprove && viewReq.status === 'submitted' && (
                 <>
                   <button className="btn btn-primary" onClick={() => { handleApprove(viewReq.id); setViewReq(null) }}>
@@ -454,177 +446,167 @@ export default function StoreRequisitions() {
                 </button>
               )}
               <button className="btn btn-secondary" onClick={() => setViewReq(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+            </ModalActions>
+          </>
+        )}
+      </ModalDialog>
 
       {/* ── Create / Edit Modal ──────────────────────────────── */}
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editing ? 'Edit' : 'New'} Store <span>Requisition</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              <div className="form-group">
-                <label>Date</label>
-                <input type="date" className="form-control" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-              </div>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title={`${editing ? 'Edit' : 'New'} Store Requisition`} size="xl">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+          <div className="form-group">
+            <label>Date</label>
+            <input type="date" className="form-control" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+          </div>
 
-              <div className="form-group">
-                <label>Department *</label>
-                <select className="form-control" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
-                  <option value="">— Select Department —</option>
-                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
-              </div>
+          <div className="form-group">
+            <label>Department *</label>
+            <select className="form-control" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
+              <option value="">— Select Department —</option>
+              {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </select>
+          </div>
 
-              <div className="form-group">
-                <label>Priority</label>
-                <select className="form-control" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label>
-                Requested By
-                {isSuperAdmin && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>(Super Admin: can request on behalf of any employee)</span>}
-              </label>
-              {isSuperAdmin ? (
-                <select className="form-control" value={form.requester_id} onChange={e => selectRequester(e.target.value)}>
-                  <option value="">— Select Employee —</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                </select>
-              ) : (
-                <input className="form-control" value={form.requester_name} readOnly
-                  style={{ background: 'var(--surface2)', color: 'var(--text-dim)', cursor: 'not-allowed' }} />
-              )}
-            </div>
-
-            <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
-              Items Requested
-            </div>
-
-            {/* Items — stacked card per item, select from inventory */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-              {form.items.map((it, i) => {
-                const invItem = inventoryItems.find(inv => inv.id === it.item_id)
-                return (
-                  <div key={i} style={{ background: 'var(--surface2)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>ITEM {i + 1}</span>
-                      {form.items.length > 1 && (
-                        <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}>
-                          <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Select from inventory */}
-                    <div className="form-group" style={{ marginBottom: 10 }}>
-                      <label>Select from Inventory *</label>
-                      <select className="form-control" value={it.item_id}
-                        onChange={e => selectInventoryItem(i, e.target.value)}>
-                        <option value="">— Select item from store —</option>
-                        {inventoryItems.map(inv => (
-                          <option key={inv.id} value={inv.id}>
-                            {inv.item_code ? `[${inv.item_code}] ` : ''}{inv.name} — {inv.balance} {inv.unit || 'pcs'} available
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {invItem && (
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, padding: '6px 10px', background: 'rgba(45,212,191,.06)', borderRadius: 6, border: '1px solid rgba(45,212,191,.15)' }}>
-                        <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', color: 'var(--teal)', marginRight: 4 }}>inventory_2</span>
-                        Category: <strong>{invItem.category}</strong> ·
-                        Unit: <strong>{invItem.unit || 'pcs'}</strong> ·
-                        In Stock: <strong style={{ color: invItem.balance > 0 ? 'var(--green)' : 'var(--red)' }}>{invItem.balance}</strong>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 10 }}>
-                      <div className="form-group">
-                        <label>Quantity *</label>
-                        <input type="number" min="1" className="form-control" value={it.qty}
-                          onChange={e => setItem(i, 'qty', parseInt(e.target.value) || 1)}
-                          style={{ border: invItem && parseInt(it.qty) > invItem.balance ? '1.5px solid var(--yellow)' : '' }} />
-                        {invItem && parseInt(it.qty) > invItem.balance && (
-                          <small style={{ fontSize: 10, color: 'var(--yellow)' }}>⚠ Exceeds stock — PR will be auto-created for {parseInt(it.qty) - invItem.balance} {invItem.unit}</small>
-                        )}
-                      </div>
-                      <div className="form-group">
-                        <label>Unit</label>
-                        <input className="form-control" value={it.unit} readOnly style={{ background: 'var(--surface)', color: 'var(--text-dim)' }} />
-                      </div>
-                      <div className="form-group">
-                        <label>Notes / Specification</label>
-                        <input className="form-control" placeholder="Purpose, project code, etc." value={it.notes}
-                          onChange={e => setItem(i, 'notes', e.target.value)} />
-                      </div>
-                    </div>
-
-                    {/* Returnable toggle */}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, cursor: 'pointer', fontSize: 12 }}>
-                      <input type="checkbox" checked={!!it.is_returnable}
-                        onChange={e => setItem(i, 'is_returnable', e.target.checked)}
-                        style={{ width: 15, height: 15, accentColor: 'var(--gold)' }} />
-                      <span style={{ color: it.is_returnable ? 'var(--gold)' : 'var(--text-dim)' }}>
-                        <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 3 }}>assignment_return</span>
-                        Returnable item — will appear in employee In-Possession list
-                      </span>
-                    </label>
-                  </div>
-                )
-              })}
-            </div>
-
-            <button type="button" className="btn btn-secondary btn-sm" onClick={addItem} style={{ marginBottom: 16 }}>
-              <span className="material-icons">add</span> Add Item
-            </button>
-
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label>Notes / Justification</label>
-              <textarea className="form-control" rows="2" placeholder="Reason for request, project reference…"
-                value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-              {!editing && (
-                <button type="button" className="btn btn-secondary" onClick={() => handleSubmit('draft')}>
-                  <span className="material-icons">save</span> Save Draft
-                </button>
-              )}
-              <button type="button" className="btn btn-primary" onClick={() => handleSubmit(editing ? editing.status : 'submitted')}>
-                <span className="material-icons">send</span>
-                {editing ? 'Save Changes' : 'Submit for Approval'}
-              </button>
-            </div>
+          <div className="form-group">
+            <label>Priority</label>
+            <select className="form-control" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+              {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+            </select>
           </div>
         </div>
-      )}
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label>
+            Requested By
+            {isSuperAdmin && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>(Super Admin: can request on behalf of any employee)</span>}
+          </label>
+          {isSuperAdmin ? (
+            <select className="form-control" value={form.requester_id} onChange={e => selectRequester(e.target.value)}>
+              <option value="">— Select Employee —</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          ) : (
+            <input className="form-control" value={form.requester_name} readOnly
+              style={{ background: 'var(--surface2)', color: 'var(--text-dim)', cursor: 'not-allowed' }} />
+          )}
+        </div>
+
+        <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+          Items Requested
+        </div>
+
+        {/* Items — stacked card per item, select from inventory */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+          {form.items.map((it, i) => {
+            const invItem = inventoryItems.find(inv => inv.id === it.item_id)
+            return (
+              <div key={i} style={{ background: 'var(--surface2)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>ITEM {i + 1}</span>
+                  {form.items.length > 1 && (
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}>
+                      <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Select from inventory */}
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label>Select from Inventory *</label>
+                  <select className="form-control" value={it.item_id}
+                    onChange={e => selectInventoryItem(i, e.target.value)}>
+                    <option value="">— Select item from store —</option>
+                    {inventoryItems.map(inv => (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.item_code ? `[${inv.item_code}] ` : ''}{inv.name} — {inv.balance} {inv.unit || 'pcs'} available
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {invItem && (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, padding: '6px 10px', background: 'rgba(45,212,191,.06)', borderRadius: 6, border: '1px solid rgba(45,212,191,.15)' }}>
+                    <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', color: 'var(--teal)', marginRight: 4 }}>inventory_2</span>
+                    Category: <strong>{invItem.category}</strong> ·
+                    Unit: <strong>{invItem.unit || 'pcs'}</strong> ·
+                    In Stock: <strong style={{ color: invItem.balance > 0 ? 'var(--green)' : 'var(--red)' }}>{invItem.balance}</strong>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 10 }}>
+                  <div className="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" min="1" className="form-control" value={it.qty}
+                      onChange={e => setItem(i, 'qty', parseInt(e.target.value) || 1)}
+                      style={{ border: invItem && parseInt(it.qty) > invItem.balance ? '1.5px solid var(--yellow)' : '' }} />
+                    {invItem && parseInt(it.qty) > invItem.balance && (
+                      <small style={{ fontSize: 10, color: 'var(--yellow)' }}>⚠ Exceeds stock — PR will be auto-created for {parseInt(it.qty) - invItem.balance} {invItem.unit}</small>
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label>Unit</label>
+                    <input className="form-control" value={it.unit} readOnly style={{ background: 'var(--surface)', color: 'var(--text-dim)' }} />
+                  </div>
+                  <div className="form-group">
+                    <label>Notes / Specification</label>
+                    <input className="form-control" placeholder="Purpose, project code, etc." value={it.notes}
+                      onChange={e => setItem(i, 'notes', e.target.value)} />
+                  </div>
+                </div>
+
+                {/* Returnable toggle */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={!!it.is_returnable}
+                    onChange={e => setItem(i, 'is_returnable', e.target.checked)}
+                    style={{ width: 15, height: 15, accentColor: 'var(--gold)' }} />
+                  <span style={{ color: it.is_returnable ? 'var(--gold)' : 'var(--text-dim)' }}>
+                    <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 3 }}>assignment_return</span>
+                    Returnable item — will appear in employee In-Possession list
+                  </span>
+                </label>
+              </div>
+            )
+          })}
+        </div>
+
+        <button type="button" className="btn btn-secondary btn-sm" onClick={addItem} style={{ marginBottom: 16 }}>
+          <span className="material-icons">add</span> Add Item
+        </button>
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label>Notes / Justification</label>
+          <textarea className="form-control" rows="2" placeholder="Reason for request, project reference…"
+            value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+        </div>
+
+        <ModalActions>
+          <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+          {!editing && (
+            <button type="button" className="btn btn-secondary" onClick={() => handleSubmit('draft')}>
+              <span className="material-icons">save</span> Save Draft
+            </button>
+          )}
+          <button type="button" className="btn btn-primary" onClick={() => handleSubmit(editing ? editing.status : 'submitted')}>
+            <span className="material-icons">send</span>
+            {editing ? 'Save Changes' : 'Submit for Approval'}
+          </button>
+        </ModalActions>
+      </ModalDialog>
 
       {/* Reject modal */}
-      {rejectModal.open && (
-        <div className="overlay" onClick={() => setRejectModal({ open: false, id: null, reason: '' })}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Reject <span>Requisition</span></div>
-            <div className="form-group">
-              <label>Reason for rejection *</label>
-              <textarea className="form-control" rows="3" autoFocus
-                placeholder="Explain why this is being rejected…"
-                value={rejectModal.reason}
-                onChange={e => setRejectModal({ ...rejectModal, reason: e.target.value })} />
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setRejectModal({ open: false, id: null, reason: '' })}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleReject}>Confirm Rejection</button>
-            </div>
-          </div>
+      <ModalDialog open={rejectModal.open} onClose={() => setRejectModal({ open: false, id: null, reason: '' })} title="Reject Requisition">
+        <div className="form-group">
+          <label>Reason for rejection *</label>
+          <textarea className="form-control" rows="3" autoFocus
+            placeholder="Explain why this is being rejected…"
+            value={rejectModal.reason}
+            onChange={e => setRejectModal({ ...rejectModal, reason: e.target.value })} />
         </div>
-      )}
+        <ModalActions>
+          <button className="btn btn-secondary" onClick={() => setRejectModal({ open: false, id: null, reason: '' })}>Cancel</button>
+          <button className="btn btn-danger" onClick={handleReject}>Confirm Rejection</button>
+        </ModalActions>
+      </ModalDialog>
     </div>
   )
 }

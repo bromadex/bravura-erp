@@ -8,6 +8,7 @@ import { useCanApprove } from '../../hooks/usePermission'
 import { getWorkingDays } from '../../utils/dateUtils'
 import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
+import { PageHeader, KPICard, EmptyState, TabNav } from '../../components/ui'
 
 export default function LeaveReports() {
   const { employees, departments, leaveTypes, leaveBalances, leaveRequests } = useHR()
@@ -131,12 +132,11 @@ export default function LeaveReports() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Leave Reports</h1>
+      <PageHeader title="Leave Reports">
         <button className="btn btn-secondary" onClick={exportToExcel}>
           <span className="material-icons">table_chart</span> Export to Excel
         </button>
-      </div>
+      </PageHeader>
 
       {/* Filters */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
@@ -168,28 +168,20 @@ export default function LeaveReports() {
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card"><div className="kpi-label">Approved Requests</div><div className="kpi-val">{totalReqs}</div><div className="kpi-sub">in range</div></div>
-        <div className="kpi-card"><div className="kpi-label">Total Leave Days</div><div className="kpi-val">{totalDays.toFixed(1)}</div><div className="kpi-sub">approved</div></div>
-        <div className="kpi-card"><div className="kpi-label">Working Days</div><div className="kpi-val">{workingDaysInRange}</div><div className="kpi-sub">in range</div></div>
-        <div className="kpi-card">
-          <div className="kpi-label">Avg Absenteeism</div>
-          <div className="kpi-val" style={{ color: 'var(--yellow)' }}>
-            {workingDaysInRange > 0 && filteredEmployees.length > 0
-              ? ((totalDays / (workingDaysInRange * filteredEmployees.length)) * 100).toFixed(1)
-              : '0.0'}%
-          </div>
-          <div className="kpi-sub">across employees</div>
-        </div>
+        <KPICard label="Approved Requests" value={totalReqs} sub="in range" icon="event_available" color="green" />
+        <KPICard label="Total Leave Days" value={totalDays.toFixed(1)} sub="approved" icon="date_range" color="blue" />
+        <KPICard label="Working Days" value={workingDaysInRange} sub="in range" icon="work" color="teal" />
+        <KPICard
+          label="Avg Absenteeism"
+          value={`${workingDaysInRange > 0 && filteredEmployees.length > 0 ? ((totalDays / (workingDaysInRange * filteredEmployees.length)) * 100).toFixed(1) : '0.0'}%`}
+          sub="across employees"
+          icon="trending_down"
+          color="yellow"
+        />
       </div>
 
       {/* View tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {VIEWS.map(v => (
-          <button key={v.id} onClick={() => setActiveView(v.id)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeView === v.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeView === v.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-icons" style={{ fontSize: 16 }}>{v.icon}</span>{v.label}
-          </button>
-        ))}
-      </div>
+      <TabNav tabs={VIEWS} active={activeView} onChange={setActiveView} />
 
       {/* Usage view */}
       {activeView === 'usage' && (
@@ -203,8 +195,8 @@ export default function LeaveReports() {
                   {usageByType.map(row => (
                     <tr key={row.name}>
                       <td style={{ fontWeight: 600 }}>{row.name}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{row.count}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>{row.days.toFixed(1)}</td>
+                      <td className="td-mono">{row.count}</td>
+                      <td className="td-mono">{row.days.toFixed(1)}</td>
                     </tr>
                   ))}
                   {usageByType.length === 0 && <tr><td colSpan="3" className="empty-state">No data</td></tr>}
@@ -222,8 +214,8 @@ export default function LeaveReports() {
                     <tr key={row.name}>
                       <td><div style={{ fontWeight: 600 }}>{row.name}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{row.empNumber}</div></td>
                       <td style={{ fontSize: 12 }}>{row.dept}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{row.count}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: row.days > 10 ? 'var(--yellow)' : 'inherit' }}>{row.days.toFixed(1)}</td>
+                      <td className="td-mono">{row.count}</td>
+                      <td className="td-mono" style={{ color: row.days > 10 ? 'var(--yellow)' : 'inherit' }}>{row.days.toFixed(1)}</td>
                     </tr>
                   ))}
                   {usageByEmployee.length === 0 && <tr><td colSpan="4" className="empty-state">No data</td></tr>}
@@ -281,8 +273,8 @@ export default function LeaveReports() {
                     <tr key={i}>
                       <td><div style={{ fontWeight: 600 }}>{row.name}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{row.empNumber}</div></td>
                       <td style={{ fontSize: 12 }}>{row.dept}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{row.days.toFixed(1)}</td>
-                      <td style={{ fontFamily: 'var(--mono)' }}>{workingDaysInRange}</td>
+                      <td className="td-mono">{row.days.toFixed(1)}</td>
+                      <td className="td-mono">{workingDaysInRange}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ flex: 1, height: 6, background: 'var(--border2)', borderRadius: 4, overflow: 'hidden', maxWidth: 80 }}>
@@ -313,9 +305,9 @@ export default function LeaveReports() {
                   <tr key={i}>
                     <td style={{ fontWeight: 600 }}>{row.name}</td>
                     <td>{row.type}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{row.start}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{row.end}</td>
-                    <td style={{ fontFamily: 'var(--mono)' }}>{row.days}</td>
+                    <td className="td-mono">{row.start}</td>
+                    <td className="td-mono">{row.end}</td>
+                    <td className="td-mono">{row.days}</td>
                     <td><span className="badge badge-yellow">{row.status}</span></td>
                     <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{row.created}</td>
                   </tr>

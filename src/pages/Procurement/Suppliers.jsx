@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { StatusBadge, PageHeader, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function Suppliers() {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier, loading } = useProcurement()
@@ -60,14 +61,13 @@ export default function Suppliers() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Suppliers</h1>
+      <PageHeader title="Suppliers">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => openModal()}>
             <span className="material-icons">add</span> Add Supplier
           </button>
         )}
-      </div>
+      </PageHeader>
 
       <div className="table-wrap">
         <table className="stock-table">
@@ -95,17 +95,19 @@ export default function Suppliers() {
                   <td>{s.email || '-'}</td>
                   <td>{s.payment_terms || '-'}</td>
                   <td>{s.lead_time_days || 0} days</td>
-                  <td><span className="badge bg-good">{s.status}</span></td>
+                  <td><StatusBadge status={s.status?.toLowerCase()} label={s.status} /></td>
                   {canEdit && (
-                    <td style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openModal(s)}>
-                        <span className="material-icons">edit</span>
-                      </button>
-                      {canDelete && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id, s.name)}>
-                          <span className="material-icons">delete</span>
+                    <td className="td-actions">
+                      <div className="btn-group-sm">
+                        <button className="btn btn-secondary btn-sm" onClick={() => openModal(s)}>
+                          <span className="material-icons">edit</span>
                         </button>
-                      )}
+                        {canDelete && (
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id, s.name)}>
+                            <span className="material-icons">delete</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -115,36 +117,31 @@ export default function Suppliers() {
         </table>
       </div>
 
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Supplier</span></div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group"><label>Supplier Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                <div className="form-group"><label>Contact Person</label><input className="form-control" value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
-                <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-              </div>
-              <div className="form-group"><label>Address</label><textarea className="form-control" rows="2" value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></div>
-              <div className="form-row">
-                <div className="form-group"><label>Tax ID</label><input className="form-control" value={form.tax_id} onChange={e => setForm({...form, tax_id: e.target.value})} /></div>
-                <div className="form-group"><label>Payment Terms</label><input className="form-control" placeholder="e.g. Net 30" value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} /></div>
-              </div>
-              <div className="form-row">
-                <div className="form-group"><label>Lead Time (days)</label><input type="number" className="form-control" value={form.lead_time_days} onChange={e => setForm({...form, lead_time_days: parseInt(e.target.value) || 0})} /></div>
-                <div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>Inactive</option></select></div>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title={`${editing ? 'Edit' : 'Add'} Supplier`} size="lg">
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group"><label>Supplier Name *</label><input className="form-control" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+            <div className="form-group"><label>Contact Person</label><input className="form-control" value={form.contact_person} onChange={e => setForm({...form, contact_person: e.target.value})} /></div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+            <div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+          </div>
+          <div className="form-group"><label>Address</label><textarea className="form-control" rows="2" value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></div>
+          <div className="form-row">
+            <div className="form-group"><label>Tax ID</label><input className="form-control" value={form.tax_id} onChange={e => setForm({...form, tax_id: e.target.value})} /></div>
+            <div className="form-group"><label>Payment Terms</label><input className="form-control" placeholder="e.g. Net 30" value={form.payment_terms} onChange={e => setForm({...form, payment_terms: e.target.value})} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Lead Time (days)</label><input type="number" className="form-control" value={form.lead_time_days} onChange={e => setForm({...form, lead_time_days: parseInt(e.target.value) || 0})} /></div>
+            <div className="form-group"><label>Status</label><select className="form-control" value={form.status} onChange={e => setForm({...form, status: e.target.value})}><option>Active</option><option>Inactive</option></select></div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

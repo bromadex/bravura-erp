@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 const ICON_OPTIONS = [
   { icon: 'category',             label: 'General'        },
@@ -114,27 +115,26 @@ export default function Categories() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Categories</h1>
+      <PageHeader title="Categories">
         {canEdit && (
           <button className="btn btn-primary" onClick={openCreate}>
             <span className="material-icons">add</span> Add Category
           </button>
         )}
-      </div>
+      </PageHeader>
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card"><div className="kpi-label">Categories</div><div className="kpi-val">{categories.length}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Total Items</div><div className="kpi-val">{items.length}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Low Stock</div><div className="kpi-val" style={{ color: 'var(--yellow)' }}>{items.filter(i => i.balance > 0 && i.balance <= (i.threshold || 5)).length}</div></div>
-        <div className="kpi-card"><div className="kpi-label">Out of Stock</div><div className="kpi-val" style={{ color: 'var(--red)' }}>{items.filter(i => i.balance <= 0).length}</div></div>
+        <KPICard label="Categories" value={categories.length} />
+        <KPICard label="Total Items" value={items.length} />
+        <KPICard label="Low Stock" value={items.filter(i => i.balance > 0 && i.balance <= (i.threshold || 5)).length} color="yellow" />
+        <KPICard label="Out of Stock" value={items.filter(i => i.balance <= 0).length} color="red" />
       </div>
 
       {loading ? <div style={{ textAlign: 'center', padding: 40 }}>Loading…</div> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
           {categories.length === 0 ? (
-            <div className="empty-state">No categories yet</div>
+            <EmptyState icon="category" message="No categories yet" />
           ) : categories.map(cat => {
             const count   = countMap[cat.name] || 0
             const icon    = cat.icon || getMaterialIcon(cat.name)
@@ -150,7 +150,7 @@ export default function Categories() {
                     <span className="material-icons" style={{ fontSize: 22, color: 'var(--gold)' }}>{icon}</span>
                   </div>
                   {(canEdit || canDelete) && (
-                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                    <div className="btn-group-sm" onClick={e => e.stopPropagation()}>
                       {canEdit && (
                         <button className="btn btn-secondary btn-sm" onClick={() => openEdit(cat)}>
                           <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
@@ -203,7 +203,7 @@ export default function Categories() {
                 </thead>
                 <tbody>
                   {categoryItems.length === 0 ? (
-                    <tr><td colSpan="6" className="empty-state">No items in this category</td></tr>
+                    <tr><td colSpan="6"><EmptyState icon="inventory_2" message="No items in this category" /></td></tr>
                   ) : categoryItems.map(item => {
                     const isOut = item.balance <= 0
                     const isLow = item.balance > 0 && item.balance <= (item.threshold || 5)
@@ -212,7 +212,7 @@ export default function Categories() {
                         <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--gold)' }}>{item.item_code || '—'}</td>
                         <td style={{ fontWeight: 600 }}>{item.name}</td>
                         <td style={{ color: 'var(--text-dim)' }}>{item.unit || 'pcs'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: isOut ? 'var(--red)' : isLow ? 'var(--yellow)' : 'var(--green)' }}>{item.balance}</td>
+                        <td className="td-mono" style={{ color: isOut ? 'var(--red)' : isLow ? 'var(--yellow)' : 'var(--green)' }}>{item.balance}</td>
                         <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{item.threshold || 5}</td>
                         <td>
                           {isOut  ? <span className="badge badge-red">OUT</span>
@@ -231,41 +231,38 @@ export default function Categories() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editing ? 'Edit' : 'Add'} <span>Category</span></div>
-            <div className="form-group">
-              <label>Category Name *</label>
-              <input className="form-control" required autoFocus placeholder="e.g. Electrical, PPE, Construction"
-                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Icon</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {ICON_OPTIONS.map(opt => (
-                  <button key={opt.icon} type="button"
-                    onClick={() => setForm({ ...form, icon: opt.icon })}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 4px', borderRadius: 8, border: `1.5px solid ${form.icon === opt.icon ? 'var(--gold)' : 'var(--border)'}`, background: form.icon === opt.icon ? 'rgba(244,162,97,.1)' : 'var(--surface2)', cursor: 'pointer' }}>
-                    <span className="material-icons" style={{ fontSize: 22, color: form.icon === opt.icon ? 'var(--gold)' : 'var(--text-mid)' }}>{opt.icon}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{opt.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {editing && (
-              <div style={{ padding: '8px 12px', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 6, fontSize: 11, color: 'var(--yellow)', marginBottom: 8 }}>
-                <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>warning</span>
-                Renaming will update all {countMap[editing.name] || 0} items in this category.
-              </div>
-            )}
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSave}>
-                {editing ? 'Save Changes' : 'Add Category'}
-              </button>
+        <ModalDialog open onClose={() => setShowModal(false)} title={`${editing ? 'Edit' : 'Add'} Category`}>
+          <div className="form-group">
+            <label>Category Name *</label>
+            <input className="form-control" required autoFocus placeholder="e.g. Electrical, PPE, Construction"
+              value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>Icon</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              {ICON_OPTIONS.map(opt => (
+                <button key={opt.icon} type="button"
+                  onClick={() => setForm({ ...form, icon: opt.icon })}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 4px', borderRadius: 8, border: `1.5px solid ${form.icon === opt.icon ? 'var(--gold)' : 'var(--border)'}`, background: form.icon === opt.icon ? 'rgba(244,162,97,.1)' : 'var(--surface2)', cursor: 'pointer' }}>
+                  <span className="material-icons" style={{ fontSize: 22, color: form.icon === opt.icon ? 'var(--gold)' : 'var(--text-mid)' }}>{opt.icon}</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{opt.label}</span>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
+          {editing && (
+            <div style={{ padding: '8px 12px', background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 6, fontSize: 11, color: 'var(--yellow)', marginBottom: 8 }}>
+              <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>warning</span>
+              Renaming will update all {countMap[editing.name] || 0} items in this category.
+            </div>
+          )}
+          <ModalActions>
+            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSave}>
+              {editing ? 'Save Changes' : 'Add Category'}
+            </button>
+          </ModalActions>
+        </ModalDialog>
       )}
     </div>
   )

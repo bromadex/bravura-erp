@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { StatusBadge, PageHeader, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function GoodsReceived() {
   const { goodsReceived, purchaseOrders, createGoodsReceived, loading } = useProcurement()
@@ -111,20 +112,19 @@ export default function GoodsReceived() {
   const grnStatus = (grn) => {
     const items = parseItems(grn.items)
     const anyShort = items.some(it => it.received < it.ordered && it.ordered > 0)
-    if (anyShort) return { label: 'Partial', cls: 'badge-yellow' }
-    return { label: 'Complete', cls: 'badge-green' }
+    if (anyShort) return 'partial'
+    return 'complete'
   }
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Goods Received</h1>
+      <PageHeader title="Goods Received">
         {canEdit && (
           <button className="btn btn-primary" onClick={() => { setForm(emptyForm()); setModalOpen(true) }}>
             <span className="material-icons">add</span> New GRN
           </button>
         )}
-      </div>
+      </PageHeader>
 
       {/* ── Stock-in confirmation banner ──────────────────────── */}
       {stockedIn && (
@@ -202,13 +202,13 @@ export default function GoodsReceived() {
               const status = grnStatus(grn)
               return (
                 <tr key={grn.id} style={{ cursor: 'pointer' }} onClick={() => setViewGRN(grn)}>
-                  <td style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontWeight: 700 }}>{grn.grn_number}</td>
+                  <td className="td-mono" style={{ color: 'var(--gold)' }}>{grn.grn_number}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{grn.date}</td>
                   <td style={{ fontWeight: 600 }}>{grn.supplier_name || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
-                  <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)', fontWeight: 700 }}>${total.toFixed(2)}</td>
+                  <td className="td-mono" style={{ color: 'var(--teal)' }}>${total.toFixed(2)}</td>
                   <td>{grn.received_by || '—'}</td>
-                  <td><span className={`badge ${status.cls}`}>{status.label}</span></td>
+                  <td><StatusBadge status={status} /></td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{grn.notes || '—'}</td>
                 </tr>
               )
@@ -218,142 +218,131 @@ export default function GoodsReceived() {
       </div>
 
       {/* New GRN modal */}
-      {modalOpen && (
-        <div className="overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">
-              <span className="material-icons" style={{ fontSize: 20, marginRight: 8 }}>move_to_inbox</span>
-              New Goods Received <span>Note</span>
+      <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title="New Goods Received Note" size="xl">
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>DATE *</label>
+              <input type="date" className="form-control" required value={form.date}
+                onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
             </div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>DATE *</label>
-                  <input type="date" className="form-control" required value={form.date}
-                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>LINK TO PURCHASE ORDER (optional)</label>
-                  <select className="form-control" value={form.po_id}
-                    onChange={e => handlePOSelect(e.target.value)}>
-                    <option value="">— None (direct delivery) —</option>
-                    {purchaseOrders.filter(po => po.status !== 'completed').map(po => (
-                      <option key={po.id} value={po.id}>{po.po_number} — {po.supplier_name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>SUPPLIER</label>
-                  <input className="form-control" value={form.supplier_name}
-                    onChange={e => setForm(f => ({ ...f, supplier_name: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>DRIVER / VEHICLE</label>
-                  <input className="form-control" placeholder="Driver name / vehicle reg" value={form.driver}
-                    onChange={e => setForm(f => ({ ...f, driver: e.target.value }))} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>RECEIVED BY</label>
-                <select className="form-control" value={form.received_by}
-                  onChange={e => setForm(f => ({ ...f, received_by: e.target.value }))}>
-                  <option value="">— Select employee —</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.name}>{emp.name} ({emp.employee_number})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ margin: '16px 0 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-dim)' }}>ITEMS RECEIVED</span>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  {itemsWithQty.length} item{itemsWithQty.length !== 1 ? 's' : ''} · Value: <strong style={{ color: 'var(--teal)' }}>${totalValue.toFixed(2)}</strong>
-                </span>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                {/* Header row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, minWidth: 700, marginBottom: 6, fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>
-                  <span>ITEM NAME</span><span>CATEGORY</span><span>UNIT</span>
-                  <span>ORDERED</span><span>RECEIVED</span><span>UNIT COST ($)</span>
-                  <span>LOT/BATCH #</span><span></span>
-                </div>
-                {form.items.map((it, i) => {
-                  const isShort   = it.ordered > 0 && it.received < it.ordered
-                  const isOver    = it.ordered > 0 && it.received > it.ordered
-                  const borderCol = isShort ? 'var(--yellow)' : isOver ? 'var(--red)' : ''
-                  return (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, marginBottom: 6, minWidth: 700 }}>
-                      <input className="form-control" placeholder="Item name" value={it.name}
-                        onChange={e => setItem(i, 'name', e.target.value)} />
-                      <input className="form-control" placeholder="Category" value={it.category}
-                        onChange={e => setItem(i, 'category', e.target.value)} />
-                      <input className="form-control" placeholder="pcs" value={it.unit}
-                        onChange={e => setItem(i, 'unit', e.target.value)} />
-                      <input type="number" className="form-control" min="0" value={it.ordered}
-                        onChange={e => setItem(i, 'ordered', parseInt(e.target.value) || 0)} />
-                      <input type="number" className="form-control" min="0" value={it.received}
-                        onChange={e => setItem(i, 'received', parseInt(e.target.value) || 0)}
-                        style={{ border: borderCol ? `1.5px solid ${borderCol}` : '' }}
-                        title={isShort ? 'Short delivery' : isOver ? 'Over-delivered' : ''} />
-                      <input type="number" className="form-control" min="0" step="0.01" placeholder="0.00"
-                        value={it.unit_cost} onChange={e => setItem(i, 'unit_cost', parseFloat(e.target.value) || 0)} />
-                      <input className="form-control" placeholder="Lot/Batch #" value={it.lot_batch}
-                        onChange={e => setItem(i, 'lot_batch', e.target.value)} />
-                      <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}>
-                        <span className="material-icons">close</span>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, marginBottom: 16 }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
-                  <span className="material-icons">add</span> Add Item
-                </button>
-                {form.items.some(it => it.ordered > 0 && it.received < it.ordered) && (
-                  <div style={{ fontSize: 11, color: 'var(--yellow)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span className="material-icons" style={{ fontSize: 14 }}>warning</span>
-                    Some items received less than ordered — partial delivery will be recorded
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>NOTES</label>
-                <textarea className="form-control" rows="2" value={form.notes}
-                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-              </div>
-
-              <div style={{ background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.2)', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 12 }}>
-                <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', color: 'var(--green)', marginRight: 6 }}>inventory</span>
-                Saving this GRN will <strong>automatically update Inventory</strong> — items will be added to or created in the stock list. No separate Stock In entry is needed.
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || itemsWithQty.length === 0}>
-                  <span className="material-icons">move_to_inbox</span>
-                  {saving ? 'Saving…' : `Save GRN & Stock In ${itemsWithQty.length} Item${itemsWithQty.length !== 1 ? 's' : ''}`}
-                </button>
-              </div>
-            </form>
+            <div className="form-group">
+              <label>LINK TO PURCHASE ORDER (optional)</label>
+              <select className="form-control" value={form.po_id}
+                onChange={e => handlePOSelect(e.target.value)}>
+                <option value="">— None (direct delivery) —</option>
+                {purchaseOrders.filter(po => po.status !== 'completed').map(po => (
+                  <option key={po.id} value={po.id}>{po.po_number} — {po.supplier_name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+          <div className="form-row">
+            <div className="form-group">
+              <label>SUPPLIER</label>
+              <input className="form-control" value={form.supplier_name}
+                onChange={e => setForm(f => ({ ...f, supplier_name: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>DRIVER / VEHICLE</label>
+              <input className="form-control" placeholder="Driver name / vehicle reg" value={form.driver}
+                onChange={e => setForm(f => ({ ...f, driver: e.target.value }))} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>RECEIVED BY</label>
+            <select className="form-control" value={form.received_by}
+              onChange={e => setForm(f => ({ ...f, received_by: e.target.value }))}>
+              <option value="">— Select employee —</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.name}>{emp.name} ({emp.employee_number})</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ margin: '16px 0 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-dim)' }}>ITEMS RECEIVED</span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              {itemsWithQty.length} item{itemsWithQty.length !== 1 ? 's' : ''} · Value: <strong style={{ color: 'var(--teal)' }}>${totalValue.toFixed(2)}</strong>
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            {/* Header row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, minWidth: 700, marginBottom: 6, fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>
+              <span>ITEM NAME</span><span>CATEGORY</span><span>UNIT</span>
+              <span>ORDERED</span><span>RECEIVED</span><span>UNIT COST ($)</span>
+              <span>LOT/BATCH #</span><span></span>
+            </div>
+            {form.items.map((it, i) => {
+              const isShort   = it.ordered > 0 && it.received < it.ordered
+              const isOver    = it.ordered > 0 && it.received > it.ordered
+              const borderCol = isShort ? 'var(--yellow)' : isOver ? 'var(--red)' : ''
+              return (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.7fr 0.8fr 0.8fr 0.9fr 1fr auto', gap: 6, marginBottom: 6, minWidth: 700 }}>
+                  <input className="form-control" placeholder="Item name" value={it.name}
+                    onChange={e => setItem(i, 'name', e.target.value)} />
+                  <input className="form-control" placeholder="Category" value={it.category}
+                    onChange={e => setItem(i, 'category', e.target.value)} />
+                  <input className="form-control" placeholder="pcs" value={it.unit}
+                    onChange={e => setItem(i, 'unit', e.target.value)} />
+                  <input type="number" className="form-control" min="0" value={it.ordered}
+                    onChange={e => setItem(i, 'ordered', parseInt(e.target.value) || 0)} />
+                  <input type="number" className="form-control" min="0" value={it.received}
+                    onChange={e => setItem(i, 'received', parseInt(e.target.value) || 0)}
+                    style={{ border: borderCol ? `1.5px solid ${borderCol}` : '' }}
+                    title={isShort ? 'Short delivery' : isOver ? 'Over-delivered' : ''} />
+                  <input type="number" className="form-control" min="0" step="0.01" placeholder="0.00"
+                    value={it.unit_cost} onChange={e => setItem(i, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                  <input className="form-control" placeholder="Lot/Batch #" value={it.lot_batch}
+                    onChange={e => setItem(i, 'lot_batch', e.target.value)} />
+                  <button type="button" className="btn btn-danger btn-sm" onClick={() => removeItem(i)}>
+                    <span className="material-icons">close</span>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="btn-group" style={{ marginTop: 8, marginBottom: 16 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
+              <span className="material-icons">add</span> Add Item
+            </button>
+            {form.items.some(it => it.ordered > 0 && it.received < it.ordered) && (
+              <div style={{ fontSize: 11, color: 'var(--yellow)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-icons" style={{ fontSize: 14 }}>warning</span>
+                Some items received less than ordered — partial delivery will be recorded
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>NOTES</label>
+            <textarea className="form-control" rows="2" value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+
+          <div style={{ background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.2)', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 12 }}>
+            <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', color: 'var(--green)', marginRight: 6 }}>inventory</span>
+            Saving this GRN will <strong>automatically update Inventory</strong> — items will be added to or created in the stock list. No separate Stock In entry is needed.
+          </div>
+
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || itemsWithQty.length === 0}>
+              <span className="material-icons">move_to_inbox</span>
+              {saving ? 'Saving…' : `Save GRN & Stock In ${itemsWithQty.length} Item${itemsWithQty.length !== 1 ? 's' : ''}`}
+            </button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
 
       {/* View GRN modal */}
-      {viewGRN && (
-        <div className="overlay" onClick={() => setViewGRN(null)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+      <ModalDialog open={!!viewGRN} onClose={() => setViewGRN(null)} title={viewGRN?.grn_number || ''} size="lg">
+        {viewGRN && (
+          <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div className="modal-title" style={{ marginBottom: 4 }}>{viewGRN.grn_number}</div>
-                <span className={`badge ${grnStatus(viewGRN).cls}`}>{grnStatus(viewGRN).label}</span>
-              </div>
+              <StatusBadge status={grnStatus(viewGRN)} />
               <button onClick={() => window.print()} className="btn btn-secondary btn-sm">
                 <span className="material-icons" style={{ fontSize: 14 }}>print</span> Print
               </button>
@@ -379,7 +368,7 @@ export default function GoodsReceived() {
                         <td>{it.category}</td>
                         <td>{it.unit || 'pcs'}</td>
                         <td style={{ fontFamily: 'var(--mono)' }}>{it.ordered || '—'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>
+                        <td className="td-mono">
                           <span style={{ color: isShort ? 'var(--yellow)' : 'var(--green)' }}>{it.received}</span>
                           {isShort && <span style={{ fontSize: 10, color: 'var(--yellow)', marginLeft: 4 }}>short</span>}
                         </td>
@@ -392,12 +381,12 @@ export default function GoodsReceived() {
                 </tbody>
               </table>
             </div>
-            <div className="modal-actions">
+            <ModalActions>
               <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+            </ModalActions>
+          </>
+        )}
+      </ModalDialog>
     </div>
   )
 }

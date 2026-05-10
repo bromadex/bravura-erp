@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { useLogistics } from '../../contexts/LogisticsContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
+import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
 
@@ -86,12 +87,7 @@ export default function CampStock() {
     return              { label: 'OK',   bg: 'rgba(52,211,153,.1)', border: 'rgba(52,211,153,.3)', color: 'var(--green)'  }
   }
 
-  const modalWrap  = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 500 }
-  const modalBox   = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '100%', maxWidth: 460, background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border2)', zIndex: 501, overflow: 'hidden' }
-  const modalHead  = { padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }
-  const modalBody  = { padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }
-  const grid2      = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
-  const modalFoot  = { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }
+  const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
 
   return (
     <div style={{ padding: 24 }}>
@@ -166,7 +162,7 @@ export default function CampStock() {
                   <tr key={i.id}>
                     <td style={{ fontWeight: 600 }}>{i.name}</td>
                     <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{i.category}</td>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: b.color }}>{i.balance} {i.unit}</td>
+                    <td className="td-mono" style={{ color: b.color }}>{i.balance} {i.unit}</td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{i.reorder_level || '—'}</td>
                     <td>
                       <span style={{ padding: '2px 8px', borderRadius: 20, background: b.bg, border: `1px solid ${b.border}`, color: b.color, fontSize: 11, fontWeight: 700 }}>{b.label}</span>
@@ -195,160 +191,133 @@ export default function CampStock() {
       </div>
 
       {/* ── Item modal ── */}
-      {itemModal && (
-        <>
-          <div onClick={() => { setItemModal(false); setEditingItem(null) }} style={modalWrap} />
-          <div style={modalBox}>
-            <div style={modalHead}>
-              <span className="material-icons" style={{ color: 'var(--blue)' }}>inventory_2</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{editingItem ? 'Edit' : 'Add'} Item</div>
-            </div>
-            <form onSubmit={handleSaveItem} style={modalBody}>
-              <div className="form-group">
-                <label className="form-label">Name *</label>
-                <input required className="form-control" value={itemForm.name}
-                  onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Category</label>
-                  <select className="form-control" value={itemForm.category}
-                    onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
-                    {CATS.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Unit</label>
-                  <input className="form-control" placeholder="kg, L, pcs…" value={itemForm.unit}
-                    onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} />
-                </div>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Reorder Level</label>
-                  <input type="number" min="0" className="form-control" value={itemForm.reorder_level}
-                    onChange={e => setItemForm(f => ({ ...f, reorder_level: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Unit Cost ($)</label>
-                  <input type="number" min="0" step="0.01" className="form-control" value={itemForm.unit_cost}
-                    onChange={e => setItemForm(f => ({ ...f, unit_cost: parseFloat(e.target.value) || 0 }))} />
-                </div>
-              </div>
-              <div style={modalFoot}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setItemModal(false); setEditingItem(null) }}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
+      <ModalDialog open={itemModal} onClose={() => { setItemModal(false); setEditingItem(null) }} title={`${editingItem ? 'Edit' : 'Add'} Item`}>
+        <form onSubmit={handleSaveItem} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Name *</label>
+            <input required className="form-control" value={itemForm.name}
+              onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} />
           </div>
-        </>
-      )}
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select className="form-control" value={itemForm.category}
+                onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
+                {CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Unit</label>
+              <input className="form-control" placeholder="kg, L, pcs…" value={itemForm.unit}
+                onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))} />
+            </div>
+          </div>
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Reorder Level</label>
+              <input type="number" min="0" className="form-control" value={itemForm.reorder_level}
+                onChange={e => setItemForm(f => ({ ...f, reorder_level: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Unit Cost ($)</label>
+              <input type="number" min="0" step="0.01" className="form-control" value={itemForm.unit_cost}
+                onChange={e => setItemForm(f => ({ ...f, unit_cost: parseFloat(e.target.value) || 0 }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => { setItemModal(false); setEditingItem(null) }}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
 
       {/* ── Stock In modal ── */}
-      {siModal && (
-        <>
-          <div onClick={() => setSiModal(false)} style={modalWrap} />
-          <div style={modalBox}>
-            <div style={modalHead}>
-              <span className="material-icons" style={{ color: 'var(--green)' }}>add_circle</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Stock In</div>
-            </div>
-            <form onSubmit={handleStockIn} style={modalBody}>
-              <div className="form-group">
-                <label className="form-label">Item *</label>
-                <select required className="form-control" value={siForm.item_id}
-                  onChange={e => setSiForm(f => ({ ...f, item_id: e.target.value }))}>
-                  <option value="">Select item…</option>
-                  {items.filter(i => i.category !== 'Batch Plant').map(i => (
-                    <option key={i.id} value={i.id}>{i.name} — {i.balance} {i.unit}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Quantity *</label>
-                  <input type="number" min="0.01" step="0.01" required className="form-control"
-                    value={siForm.qty} onChange={e => setSiForm(f => ({ ...f, qty: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date</label>
-                  <input type="date" className="form-control" value={siForm.date}
-                    onChange={e => setSiForm(f => ({ ...f, date: e.target.value }))} />
-                </div>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Supplier</label>
-                  <input className="form-control" value={siForm.supplier}
-                    onChange={e => setSiForm(f => ({ ...f, supplier: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Unit Cost ($)</label>
-                  <input type="number" min="0" step="0.01" className="form-control" value={siForm.unit_cost}
-                    onChange={e => setSiForm(f => ({ ...f, unit_cost: parseFloat(e.target.value) || 0 }))} />
-                </div>
-              </div>
-              <div style={modalFoot}>
-                <button type="button" className="btn btn-secondary" onClick={() => setSiModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Stock In</button>
-              </div>
-            </form>
+      <ModalDialog open={siModal} onClose={() => setSiModal(false)} title="Stock In">
+        <form onSubmit={handleStockIn} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Item *</label>
+            <select required className="form-control" value={siForm.item_id}
+              onChange={e => setSiForm(f => ({ ...f, item_id: e.target.value }))}>
+              <option value="">Select item…</option>
+              {items.filter(i => i.category !== 'Batch Plant').map(i => (
+                <option key={i.id} value={i.id}>{i.name} — {i.balance} {i.unit}</option>
+              ))}
+            </select>
           </div>
-        </>
-      )}
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Quantity *</label>
+              <input type="number" min="0.01" step="0.01" required className="form-control"
+                value={siForm.qty} onChange={e => setSiForm(f => ({ ...f, qty: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input type="date" className="form-control" value={siForm.date}
+                onChange={e => setSiForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+          </div>
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Supplier</label>
+              <input className="form-control" value={siForm.supplier}
+                onChange={e => setSiForm(f => ({ ...f, supplier: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Unit Cost ($)</label>
+              <input type="number" min="0" step="0.01" className="form-control" value={siForm.unit_cost}
+                onChange={e => setSiForm(f => ({ ...f, unit_cost: parseFloat(e.target.value) || 0 }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setSiModal(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Stock In</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
 
       {/* ── Issue Out modal ── */}
-      {soModal && (
-        <>
-          <div onClick={() => setSoModal(false)} style={modalWrap} />
-          <div style={modalBox}>
-            <div style={modalHead}>
-              <span className="material-icons" style={{ color: 'var(--gold)' }}>remove_circle</span>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>Issue Out</div>
-            </div>
-            <form onSubmit={handleStockOut} style={modalBody}>
-              <div className="form-group">
-                <label className="form-label">Item *</label>
-                <select required className="form-control" value={soForm.item_id}
-                  onChange={e => setSoForm(f => ({ ...f, item_id: e.target.value }))}>
-                  <option value="">Select item…</option>
-                  {items.filter(i => i.category !== 'Batch Plant' && i.balance > 0).map(i => (
-                    <option key={i.id} value={i.id}>{i.name} — {i.balance} {i.unit}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Quantity *</label>
-                  <input type="number" min="0.01" step="0.01" required className="form-control"
-                    value={soForm.qty} onChange={e => setSoForm(f => ({ ...f, qty: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date</label>
-                  <input type="date" className="form-control" value={soForm.date}
-                    onChange={e => setSoForm(f => ({ ...f, date: e.target.value }))} />
-                </div>
-              </div>
-              <div style={grid2}>
-                <div className="form-group">
-                  <label className="form-label">Issued To</label>
-                  <input className="form-control" value={soForm.issued_to}
-                    onChange={e => setSoForm(f => ({ ...f, issued_to: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Authorized By</label>
-                  <input className="form-control" value={soForm.authorized_by}
-                    onChange={e => setSoForm(f => ({ ...f, authorized_by: e.target.value }))} />
-                </div>
-              </div>
-              <div style={modalFoot}>
-                <button type="button" className="btn btn-secondary" onClick={() => setSoModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-danger">Issue</button>
-              </div>
-            </form>
+      <ModalDialog open={soModal} onClose={() => setSoModal(false)} title="Issue Out">
+        <form onSubmit={handleStockOut} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Item *</label>
+            <select required className="form-control" value={soForm.item_id}
+              onChange={e => setSoForm(f => ({ ...f, item_id: e.target.value }))}>
+              <option value="">Select item…</option>
+              {items.filter(i => i.category !== 'Batch Plant' && i.balance > 0).map(i => (
+                <option key={i.id} value={i.id}>{i.name} — {i.balance} {i.unit}</option>
+              ))}
+            </select>
           </div>
-        </>
-      )}
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Quantity *</label>
+              <input type="number" min="0.01" step="0.01" required className="form-control"
+                value={soForm.qty} onChange={e => setSoForm(f => ({ ...f, qty: parseFloat(e.target.value) || 0 }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input type="date" className="form-control" value={soForm.date}
+                onChange={e => setSoForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+          </div>
+          <div style={grid2}>
+            <div className="form-group">
+              <label className="form-label">Issued To</label>
+              <input className="form-control" value={soForm.issued_to}
+                onChange={e => setSoForm(f => ({ ...f, issued_to: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Authorized By</label>
+              <input className="form-control" value={soForm.authorized_by}
+                onChange={e => setSoForm(f => ({ ...f, authorized_by: e.target.value }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setSoModal(false)}>Cancel</button>
+            <button type="submit" className="btn btn-danger">Issue</button>
+          </ModalActions>
+        </form>
+      </ModalDialog>
     </div>
   )
 }

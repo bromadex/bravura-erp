@@ -10,6 +10,7 @@ import { useHR } from '../../contexts/HRContext'
 import { useCanApprove } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { PageHeader, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -359,13 +360,12 @@ export default function Travel() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Travel &amp; Expenses</h1>
+      <PageHeader title="Travel &amp; Expenses">
         <button className="btn btn-primary" onClick={() => { setShowForm(prev => !prev); setEditingId(null); setForm(BLANK_FORM) }}>
           <span className="material-icons">{showForm ? 'close' : 'add'}</span>
           {showForm ? 'Cancel' : 'New Request'}
         </button>
-      </div>
+      </PageHeader>
 
       {/* ── Request form ──────────────────────────────────── */}
       {showForm && (
@@ -466,19 +466,15 @@ export default function Travel() {
       )}
 
       {/* ── Tabs ──────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {[
-          { id: 'my',        label: 'My Requests',   icon: 'flight_takeoff'   },
-          { id: 'expenses',  label: 'My Expenses',   icon: 'receipt'          },
+      <TabNav
+        tabs={[
+          { id: 'my',        label: 'My Requests',      icon: 'flight_takeoff'   },
+          { id: 'expenses',  label: 'My Expenses',      icon: 'receipt'          },
           ...(showApprovals ? [{ id: 'approvals', label: 'Pending Approvals', icon: 'approval', count: pendingCount }] : []),
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab.id ? '2px solid var(--gold)' : '2px solid transparent', color: activeTab === tab.id ? 'var(--gold)' : 'var(--text-mid)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="material-icons" style={{ fontSize: 16 }}>{tab.icon}</span>
-            {tab.label}
-            {tab.count > 0 && <span style={{ background: 'var(--red)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700 }}>{tab.count}</span>}
-          </button>
-        ))}
-      </div>
+        ]}
+        active={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* ── Tab content ───────────────────────────────────── */}
       {loading ? (
@@ -488,10 +484,7 @@ export default function Travel() {
           {activeTab === 'my' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {requests.length === 0 ? (
-                <div className="empty-state">
-                  <span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>flight_takeoff</span>
-                  <span>No travel requests yet — click New Request to start</span>
-                </div>
+                <EmptyState icon="flight_takeoff" message="No travel requests yet — click New Request to start" />
               ) : requests.map(req => <RequestCard key={req.id} req={req} />)}
             </div>
           )}
@@ -508,7 +501,7 @@ export default function Travel() {
                       <td>{exp.claim_date}</td>
                       <td style={{ fontSize: 12 }}>{exp.travel_requests?.destination || '—'}</td>
                       <td>{exp.description}</td>
-                      <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>${exp.amount}</td>
+                      <td className="td-mono">${exp.amount}</td>
                       <td>
                         <span className={`badge ${exp.status === 'approved' ? 'badge-green' : exp.status === 'rejected' ? 'badge-red' : 'badge-yellow'}`}>
                           {exp.status}
@@ -530,10 +523,7 @@ export default function Travel() {
           {activeTab === 'approvals' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {pendingSupv.length === 0 && pendingHR.length === 0 ? (
-                <div className="empty-state">
-                  <span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>check_circle</span>
-                  <span>No travel requests pending your approval</span>
-                </div>
+                <EmptyState icon="check_circle" message="No travel requests pending your approval" />
               ) : (
                 <>
                   {pendingSupv.length > 0 && (

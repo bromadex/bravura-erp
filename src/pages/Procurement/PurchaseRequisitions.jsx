@@ -5,6 +5,7 @@ import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanApprove } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
+import { StatusBadge, PageHeader } from '../../components/ui'
 
 export default function PurchaseRequisitions() {
   const { purchaseRequisitions, approvePurchaseRequisition, rejectPurchaseRequisition, createPurchaseOrder, loading, fetchAll } = useProcurement()
@@ -53,11 +54,9 @@ export default function PurchaseRequisitions() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Purchase Requisitions</h1>
-      </div>
+      <PageHeader title="Purchase Requisitions" />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div className="btn-group" style={{ marginBottom: 16 }}>
         {['all', 'draft', 'submitted', 'approved', 'rejected'].map(s => (
           <button
             key={s}
@@ -96,7 +95,7 @@ export default function PurchaseRequisitions() {
                 const items = typeof pr.items === 'string' ? JSON.parse(pr.items) : pr.items
                 return (
                   <tr key={pr.id}>
-                    <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--gold)' }}>
+                    <td className="td-mono" style={{ color: 'var(--gold)' }}>
                       {pr.pr_number}
                     </td>
                     <td>{pr.date}</td>
@@ -104,20 +103,18 @@ export default function PurchaseRequisitions() {
                     <td>{pr.requester_name}</td>
                     <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
                     <td>
-                      <span className={`badge bg-${pr.status === 'approved' ? 'green' : pr.status === 'rejected' ? 'red' : 'yellow'}`}>
-                        {pr.status}
-                      </span>
+                      <StatusBadge status={pr.status} />
                     </td>
                     <td>
                       {canApprove && pr.status === 'submitted' && (
-                        <>
-                          <button className="btn btn-primary btn-sm" onClick={() => handleApprove(pr)} style={{ marginRight: 4 }}>
+                        <div className="btn-group-sm">
+                          <button className="btn btn-primary btn-sm" onClick={() => handleApprove(pr)}>
                             <span className="material-icons">check_circle</span> Approve
                           </button>
                           <button className="btn btn-danger btn-sm" onClick={() => handleReject(pr.id)}>
                             <span className="material-icons">cancel</span> Reject
                           </button>
-                        </>
+                        </div>
                       )}
                     </td>
                   </tr>
