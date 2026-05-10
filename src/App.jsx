@@ -13,6 +13,7 @@ import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
 import { AccountingProvider }      from './contexts/AccountingContext'
+import { MasterDataProvider }     from './contexts/MasterDataContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
