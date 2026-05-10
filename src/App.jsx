@@ -66,8 +66,14 @@ import StorageLocations from './pages/Inventory/StorageLocations'
 import Suppliers            from './pages/Procurement/Suppliers'
 import StoreRequisitions    from './pages/Procurement/StoreRequisitions'
 import PurchaseRequisitions from './pages/Procurement/PurchaseRequisitions'
+import RequestForQuotation  from './pages/Procurement/RequestForQuotation'
+import SupplierQuotations   from './pages/Procurement/SupplierQuotations'
+import QuotationComparison  from './pages/Procurement/QuotationComparison'
 import PurchaseOrders       from './pages/Procurement/PurchaseOrders'
 import GoodsReceived        from './pages/Procurement/GoodsReceived'
+import PurchaseInvoices     from './pages/Procurement/PurchaseInvoices'
+import SupplierPerformance  from './pages/Procurement/SupplierPerformance'
+import ProcurementDashboard from './pages/Procurement/ProcurementDashboard'
 
 // ── Fuel ──────────────────────────────────────────────────────
 import FuelTanks      from './pages/Fuel/FuelTanks'
@@ -225,11 +231,18 @@ function AppRoutes() {
         </ProtectedRoute>
       }>
         <Route index                        element={<Suppliers />} />
-        <Route path="suppliers"             element={<Suppliers />} />
-        <Route path="store-requisitions"    element={<StoreRequisitions />} />
-        <Route path="purchase-requisitions" element={<PurchaseRequisitions />} />
-        <Route path="purchase-orders"       element={<PurchaseOrders />} />
-        <Route path="goods-received"        element={<GoodsReceived />} />
+        <Route index                          element={<ProcurementDashboard />}  />
+        <Route path="dashboard"             element={<ProcurementDashboard />}  />
+        <Route path="suppliers"             element={<Suppliers />}             />
+        <Route path="store-requisitions"    element={<StoreRequisitions />}     />
+        <Route path="purchase-requisitions" element={<PurchaseRequisitions />}  />
+        <Route path="rfq"                   element={<RequestForQuotation />}   />
+        <Route path="quotations"            element={<SupplierQuotations />}    />
+        <Route path="quotation-comparison"  element={<QuotationComparison />}   />
+        <Route path="purchase-orders"       element={<PurchaseOrders />}        />
+        <Route path="goods-received"        element={<GoodsReceived />}         />
+        <Route path="invoices"              element={<PurchaseInvoices />}      />
+        <Route path="supplier-performance"  element={<SupplierPerformance />}   />
       </Route>
 
       {/* ── FUEL ─────────────────────────────────────────── */}
