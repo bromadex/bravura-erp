@@ -10,6 +10,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { auditLoginAttempt, auditLogout } from '../engine/auditEngine'
 
 const AuthContext = createContext(null)
 
@@ -110,6 +111,11 @@ export function AuthProvider({ children }) {
 
   // ── Session timeout ─────────────────────────────────────────
   const doLogout = useCallback((reason = '') => {
+    // Log logout — read user from state before clearing it
+    const currentUser = user  // capture before clear
+    if (currentUser) {
+      auditLogout({ userName: currentUser.full_name || currentUser.username, userId: currentUser.id })
+    }
     setUser(null)
     setPermissions([])
     setActionPermissions({})
@@ -117,7 +123,7 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('bravura_session')
     localStorage.removeItem('user_permissions_cache')
     if (reason) toast.error(reason, { duration: 5000 })
-  }, [])
+  }, [user])
 
   const resetTimer = useCallback(() => {
     clearTimeout(timeoutRef.current)
@@ -179,9 +185,15 @@ export function AuthProvider({ children }) {
       .limit(1)
       .single()
 
-    if (error || !data) throw new Error('User not found or inactive')
+    if (error || !data) {
+      auditLoginAttempt({ username, success: false, details: 'User not found or inactive' })
+      throw new Error('User not found or inactive')
+    }
     const pwMatch = data.password_plain === password || atob(data.password_hash || '') === password
-    if (!pwMatch) throw new Error('Incorrect password')
+    if (!pwMatch) {
+      auditLoginAttempt({ username, success: false, details: 'Incorrect password', userId: data.id })
+      throw new Error('Incorrect password')
+    }
 
     await supabase.from('app_users').update({ last_login: new Date().toISOString() }).eq('id', data.id)
 
@@ -201,6 +213,7 @@ export function AuthProvider({ children }) {
     setPermissions(result.permissions || [])
     setActionPermissions(result.actions || {})
     ;(rememberMe ? localStorage : sessionStorage).setItem('bravura_session', JSON.stringify(session))
+    auditLoginAttempt({ username, success: true, userId: data.id })
     return session
   }
 

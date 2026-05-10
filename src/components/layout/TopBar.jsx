@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { TXN_CODE_REGEX } from '../../utils/txnCode'
 import QuickActionModal from '../QuickActionModal'
+import QuickActionsPanel from '../QuickActionsPanel'
 
 const NOTIFICATION_ICONS = {
   leave_request:          { icon: 'event_note',         color: 'var(--yellow)'   },
@@ -72,6 +73,7 @@ export default function TopBar() {
   const [unreadCount,    setUnreadCount]    = useState(0)
   const [dropdownOpen,   setDropdownOpen]   = useState(false)
   const dropdownRef = useRef(null)
+  const [cmdOpen, setCmdOpen] = useState(false)
 
   // Search state
   const [searchQuery,    setSearchQuery]    = useState('')
@@ -81,6 +83,18 @@ export default function TopBar() {
   const [quickCode,      setQuickCode]      = useState(null)
   const searchRef   = useRef(null)
   const searchTimer = useRef(null)
+
+  // ── Cmd+K palette ─────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeydown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeydown)
+    return () => window.removeEventListener('keydown', handleKeydown)
+  }, [])
 
   // ── Notifications ─────────────────────────────────────────────
 
@@ -264,6 +278,17 @@ export default function TopBar() {
           )}
         </div>
 
+        {/* Cmd+K trigger button */}
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => setCmdOpen(true)}
+          title="Quick actions (Ctrl+K)"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 10px' }}
+        >
+          <span className="material-icons" style={{ fontSize: 15 }}>bolt</span>
+          <kbd style={{ fontFamily: 'var(--mono)', fontSize: 10, opacity: .7 }}>⌘K</kbd>
+        </button>
+
         <div style={{ flex: 1 }} />
 
         {/* ── Notification bell ─────────────────────────────── */}
@@ -362,6 +387,9 @@ export default function TopBar() {
 
       {/* Quick Action Modal from global search */}
       {quickCode && <QuickActionModal code={quickCode} onClose={() => setQuickCode(null)} />}
+
+      {/* Cmd+K command palette */}
+      <QuickActionsPanel open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </>
   )
 }
