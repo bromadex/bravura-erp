@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../contexts/PermissionContext'
 import { supabase } from '../lib/supabase'
+import TopBar from '../components/layout/TopBar'
 
 // All pages per module — must match Sidebar manifest
 // null means the module has no sub-pages; navigate directly to its root route
@@ -52,28 +53,9 @@ const ALL_MODULES = [
 ]
 
 export default function HomeGrid() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const navigate          = useNavigate()
   const { canView }       = usePermission()
-
-  const [unreadCount, setUnreadCount] = useState(0)
-
-  // Load unread notification count
-  useEffect(() => {
-    if (!user?.id) return
-    const fetchUnread = async () => {
-      const { count } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-      setUnreadCount(count || 0)
-    }
-    fetchUnread()
-    // Poll every 30 seconds
-    const interval = setInterval(fetchUnread, 30000)
-    return () => clearInterval(interval)
-  }, [user?.id])
 
   // Show module if user can view ANY page in it (or if module has no sub-pages)
   const visibleModules = ALL_MODULES.filter(mod => {
@@ -100,46 +82,7 @@ export default function HomeGrid() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
 
-      {/* Top bar */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--gold)' }}>BRAVURA ERP</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1 }}>KAMATIVI OPERATIONS</div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Notification bell */}
-          <button
-            onClick={() => navigate('/module/hr/leave')}
-            style={{ position: 'relative', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}
-            title="Notifications"
-          >
-            <span className="material-icons" style={{ fontSize: 20 }}>notifications</span>
-            {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--red)', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          {/* User chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 20, padding: '6px 12px' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: '#0b0f1a' }}>
-              {(user?.full_name || user?.username || '?').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.2 }}>{user?.full_name || user?.username}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-                {user?.role_id?.replace('role_', '').replace(/_/g, ' ').toUpperCase() || 'USER'}
-              </div>
-            </div>
-          </div>
-
-          <button className="btn btn-secondary btn-sm" onClick={logout}>
-            <span className="material-icons" style={{ fontSize: 16 }}>logout</span> Logout
-          </button>
-        </div>
-      </div>
+      <TopBar />
 
       {/* Welcome */}
       <div style={{ padding: '32px 24px 16px', textAlign: 'center' }}>
