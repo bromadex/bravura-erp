@@ -3,22 +3,45 @@
 
 import { useState, useEffect } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
+import { useContractor } from '../../contexts/ContractorContext'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { PageHeader, StatusBadge, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
+const CONTRACTOR_BLANK = {
+  contractor_name: '', equipment_type: '', equipment_description: '', registration: '',
+  assigned_project: '', rate_type: 'hourly', rate_amount: '', currency: 'USD',
+  contract_start: '', contract_end: '', invoice_cycle: 'monthly',
+  contact_person: '', contact_phone: '', notes: '', status: 'Active',
+}
+
 export default function HeavyEquipment() {
   const { earthMovers, addEarthMover, updateEarthMover, deleteEarthMover, equipmentHourLogs, addEquipmentHourLog, reclassifyFleetAsset, categoryConfigs, loading, fetchAll } = useFleet()
+  const { addEquipment } = useContractor()
   const canEdit   = useCanEdit('fleet', 'heavy-equipment')
   const canDelete = useCanDelete('fleet', 'heavy-equipment')
-  const [modalOpen,      setModalOpen]      = useState(false)
-  const [hourModalOpen,  setHourModalOpen]  = useState(false)
-  const [editing,        setEditing]        = useState(null)
-  const [employees,      setEmployees]      = useState([])
-  const [reclassAsset,   setReclassAsset]   = useState(null)
-  const [reclassForm,    setReclassForm]    = useState({ newCategory: '', reason: '' })
-  const [reclassLoading, setReclassLoading] = useState(false)
+  const [modalOpen,        setModalOpen]        = useState(false)
+  const [hourModalOpen,    setHourModalOpen]    = useState(false)
+  const [editing,          setEditing]          = useState(null)
+  const [employees,        setEmployees]        = useState([])
+  const [reclassAsset,     setReclassAsset]     = useState(null)
+  const [reclassForm,      setReclassForm]      = useState({ newCategory: '', reason: '' })
+  const [reclassLoading,   setReclassLoading]   = useState(false)
+  const [contractorAsset,  setContractorAsset]  = useState(null)
+  const [contractorForm,   setContractorForm]   = useState(CONTRACTOR_BLANK)
+  const [contractorSaving, setContractorSaving] = useState(false)
+
+  const openContractorModal = (eq) => {
+    setContractorAsset(eq)
+    setContractorForm({
+      ...CONTRACTOR_BLANK,
+      equipment_type:        eq.type || 'Heavy Equipment',
+      equipment_description: eq.description || '',
+      registration:          eq.reg || '',
+      assigned_project:      eq.assigned_project || '',
+    })
+  }
   const [form, setForm] = useState({
     reg: '', type: '', description: '', operator_id: '', operator_name: '',
     status: 'Active', odometer_km: '', last_service_date: '', assigned_project: ''
@@ -128,6 +151,7 @@ export default function HeavyEquipment() {
                 {eq.assigned_project && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>📍 {eq.assigned_project}</div>}
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>⏱ Total hours: {totalHours.toFixed(1)}</div>
                 <div className="btn-group-sm" style={{ justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  {canEdit && <button className="btn btn-secondary btn-sm" title="Move to Contractor Equipment" onClick={() => openContractorModal(eq)}><span className="material-icons">handshake</span></button>}
                   {canEdit && <button className="btn btn-secondary btn-sm" title="Reclassify" onClick={() => { setReclassAsset(eq); setReclassForm({ newCategory: '', reason: '' }) }}><span className="material-icons">swap_horiz</span></button>}
                   {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => openEdit(eq)}><span className="material-icons">edit</span></button>}
                   {canDelete && <button className="btn btn-danger btn-sm" onClick={async () => { if (window.confirm(`Delete ${eq.reg}?`)) { await deleteEarthMover(eq.id); toast.success('Deleted') } }}><span className="material-icons">delete</span></button>}
@@ -270,6 +294,142 @@ export default function HeavyEquipment() {
           </ModalActions>
         </form>
       </ModalDialog>
+
+      {/* ── Move to Contractor Equipment ── */}
+      {contractorAsset && (
+        <ModalDialog open={!!contractorAsset} onClose={() => setContractorAsset(null)}
+          title="Move to Contractor Equipment">
+          <div style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+            <span className="material-icons" style={{ fontSize: 15, verticalAlign: 'middle', marginRight: 6, color: 'var(--teal)' }}>info</span>
+            <strong>{contractorAsset.reg}</strong> details are pre-filled below. The original asset record is kept — only a new Contractor Equipment entry is created.
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            if (!contractorForm.contractor_name) return toast.error('Contractor name required')
+            if (!contractorForm.rate_amount)     return toast.error('Rate amount required')
+            setContractorSaving(true)
+            try {
+              const ce_code = await addEquipment(contractorForm)
+              toast.success(`Contractor record created — ${ce_code}`)
+              setContractorAsset(null)
+            } catch (err) { toast.error(err.message) }
+            finally { setContractorSaving(false) }
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>CONTRACTOR DETAILS</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Contractor / Company *</label>
+                <input className="form-control" required value={contractorForm.contractor_name}
+                  onChange={e => setContractorForm(f => ({ ...f, contractor_name: e.target.value }))}
+                  placeholder="e.g. ABC Plant Hire Ltd" />
+              </div>
+              <div className="form-group">
+                <label>Contact Person</label>
+                <input className="form-control" value={contractorForm.contact_person}
+                  onChange={e => setContractorForm(f => ({ ...f, contact_person: e.target.value }))} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Contact Phone</label>
+                <input className="form-control" value={contractorForm.contact_phone}
+                  onChange={e => setContractorForm(f => ({ ...f, contact_phone: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select className="form-control" value={contractorForm.status}
+                  onChange={e => setContractorForm(f => ({ ...f, status: e.target.value }))}>
+                  <option>Active</option><option>Suspended</option><option>Completed</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-dim)', margin: '12px 0 6px' }}>EQUIPMENT (pre-filled from asset)</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Equipment Type</label>
+                <input className="form-control" value={contractorForm.equipment_type}
+                  onChange={e => setContractorForm(f => ({ ...f, equipment_type: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Registration</label>
+                <input className="form-control" value={contractorForm.registration}
+                  onChange={e => setContractorForm(f => ({ ...f, registration: e.target.value }))} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Description / Model</label>
+              <input className="form-control" value={contractorForm.equipment_description}
+                onChange={e => setContractorForm(f => ({ ...f, equipment_description: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Assigned Project</label>
+              <input className="form-control" value={contractorForm.assigned_project}
+                onChange={e => setContractorForm(f => ({ ...f, assigned_project: e.target.value }))} />
+            </div>
+
+            <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-dim)', margin: '12px 0 6px' }}>RATE &amp; CONTRACT</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Rate Type *</label>
+                <select className="form-control" value={contractorForm.rate_type}
+                  onChange={e => setContractorForm(f => ({ ...f, rate_type: e.target.value }))}>
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Rate Amount *</label>
+                <input type="number" step="0.01" min="0" className="form-control" required
+                  value={contractorForm.rate_amount}
+                  onChange={e => setContractorForm(f => ({ ...f, rate_amount: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Currency</label>
+                <select className="form-control" value={contractorForm.currency}
+                  onChange={e => setContractorForm(f => ({ ...f, currency: e.target.value }))}>
+                  <option>USD</option><option>ZWG</option><option>ZAR</option><option>GBP</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Contract Start</label>
+                <input type="date" className="form-control" value={contractorForm.contract_start}
+                  onChange={e => setContractorForm(f => ({ ...f, contract_start: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Contract End</label>
+                <input type="date" className="form-control" value={contractorForm.contract_end}
+                  onChange={e => setContractorForm(f => ({ ...f, contract_end: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Invoice Cycle</label>
+                <select className="form-control" value={contractorForm.invoice_cycle}
+                  onChange={e => setContractorForm(f => ({ ...f, invoice_cycle: e.target.value }))}>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Bi-Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea className="form-control" rows={2} value={contractorForm.notes}
+                onChange={e => setContractorForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Any additional terms or notes" />
+            </div>
+            <ModalActions>
+              <button type="button" className="btn btn-secondary" onClick={() => setContractorAsset(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={contractorSaving}>
+                <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 4 }}>handshake</span>
+                {contractorSaving ? 'Creating…' : 'Create Contractor Record'}
+              </button>
+            </ModalActions>
+          </form>
+        </ModalDialog>
+      )}
     </div>
   )
 }
