@@ -84,7 +84,7 @@ export default function GoodsReceived() {
         ...form,
         items: itemsWithQty,
         total_value: totalValue,
-        created_by: user?.full_name || user?.username,
+        user_name: user?.full_name || user?.username,
       })
 
       // Show stock-in confirmation

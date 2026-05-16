@@ -103,7 +103,7 @@ export default function RequestForQuotation() {
     const reason = window.prompt(`Cancel RFQ ${rfq.rfq_number}?\nEnter reason (optional):`)
     if (reason === null) return // user pressed Cancel on the prompt
     try {
-      await updateRFQ(rfq.id, { status: 'Cancelled', cancel_reason: reason })
+      await updateRFQ(rfq.id, { status: 'Cancelled', cancellation_reason: reason || null })
       toast.success('RFQ cancelled')
     } catch (err) {
       toast.error(err.message)
@@ -211,7 +211,7 @@ export default function RequestForQuotation() {
                         {rfq.status === 'Open' && (
                           <button
                             className="btn btn-primary btn-sm"
-                            onClick={() => navigate(`/module/procurement/supplier-quotations?rfq_id=${rfq.id}`)}
+                            onClick={() => navigate(`/module/procurement/quotations?rfq_id=${rfq.id}`)}
                           >
                             Add Quote
                           </button>

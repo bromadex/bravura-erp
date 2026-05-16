@@ -160,7 +160,7 @@ export default function StoreRequisitions() {
         await updateStoreRequisition(editing.id, { ...form, items: form.items, status: editing.status })
         toast.success('Requisition updated')
       } else {
-        await createStoreRequisition({ ...form, items: form.items, status })
+        const savedId = await createStoreRequisition({ ...form, items: form.items, status })
         if (status !== 'draft') {
           try {
             await startWorkflow('store_requisitions', savedId, {
