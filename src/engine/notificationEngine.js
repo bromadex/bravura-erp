@@ -71,24 +71,25 @@ export async function pushNotificationToRole(roleId, notif) {
 }
 
 /**
- * Push to all HODs of a department.
- * Resolves: employees(is_hod=true, department=name) → app_users(employee_id)
+ * Push to the HOD of a department.
+ * Resolves via departments.hod_id → app_users.employee_id
+ * (departments.hod_id is the authoritative HOD reference in this schema)
  */
 export async function pushNotificationToHOD(departmentName, notif) {
   if (!departmentName) return
   try {
-    const { data: hods } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('department', departmentName)
-      .eq('is_hod', true)
-    if (!hods?.length) return
+    const { data: dept } = await supabase
+      .from('departments')
+      .select('hod_id')
+      .eq('name', departmentName)
+      .maybeSingle()
+    if (!dept?.hod_id) return
 
-    const empIds = hods.map(e => e.id)
     const { data: users } = await supabase
       .from('app_users')
       .select('id')
-      .in('employee_id', empIds)
+      .eq('employee_id', dept.hod_id)
+      .eq('is_active', true)
     if (users?.length) await pushNotificationToGroup(users.map(u => u.id), notif)
   } catch (err) {
     console.error('[notificationEngine] HOD push failed:', err?.message || err)
