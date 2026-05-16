@@ -118,7 +118,7 @@ export default function TankReconciliation() {
           .gte('date', dateFrom)
           .lte('date', dateTo),
         supabase.from('fuel_deliveries')
-          .select('date, qty, amount')
+          .select('date, qty')
           .gte('date', dateFrom)
           .lte('date', dateTo),
         supabase.from('dipstick_log')
@@ -144,9 +144,8 @@ export default function TankReconciliation() {
       const dipsticks  = dipRes.data || []
       const dipBefore  = dipBeforeRes.data || []
 
-      // Normalise delivery litres: prefer `qty` column, fall back to `amount`
       const deliveryLitres = (row) => {
-        const v = row.qty != null ? Number(row.qty) : row.amount != null ? Number(row.amount) : 0
+        const v = Number(row.qty)
         return isNaN(v) ? 0 : v
       }
 
