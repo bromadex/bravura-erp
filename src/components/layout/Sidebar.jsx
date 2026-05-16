@@ -82,24 +82,6 @@ const ALL_MODULES = {
       ],
     }],
   },
-  assets: {
-    label: 'Asset Registry', icon: 'inventory_2', color: '#b83232',
-    sections: [{
-      label: 'Overview', pages: [
-        { id: 'dashboard',       label: 'Dashboard',            icon: 'dashboard'     },
-        { id: 'registry',        label: 'Asset Registry',       icon: 'inventory_2'   },
-      ],
-    }, {
-      label: 'Reclassification', pages: [
-        { id: 'reclass-log',     label: 'Reclassification Log', icon: 'swap_horiz'    },
-        { id: 'import',          label: 'Import Assets',        icon: 'download'      },
-      ],
-    }, {
-      label: 'Configuration', pages: [
-        { id: 'category-config', label: 'Category Config',      icon: 'tune'          },
-      ],
-    }],
-  },
   fleet: {
     label: 'Fleet & Assets', icon: 'directions_car', color: '#34d399',
     sections: [{
@@ -110,6 +92,14 @@ const ALL_MODULES = {
         { id: 'heavy-equipment',    label: 'Heavy Equipment',    icon: 'construction'         },
         { id: 'maintenance-alerts', label: 'Maintenance Alerts', icon: 'notifications_active' },
         { id: 'asset-issues',       label: 'Asset Issues',       icon: 'bug_report'           },
+      ],
+    }, {
+      label: 'Asset Registry', pages: [
+        { id: 'asset-registry',     label: 'Asset Dashboard',    icon: 'inventory_2'          },
+        { id: 'registry',           label: 'All Assets',         icon: 'list_alt'             },
+        { id: 'reclass-log',        label: 'Reclassification Log', icon: 'swap_horiz'         },
+        { id: 'asset-import',       label: 'Import Assets',      icon: 'download'             },
+        { id: 'category-config',    label: 'Category Config',    icon: 'tune'                 },
       ],
     }, {
       label: 'Maintenance', pages: [

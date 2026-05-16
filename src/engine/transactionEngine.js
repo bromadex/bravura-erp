@@ -73,8 +73,8 @@ export const PREFIX_REGISTRY = {
   LD:  { label: 'Logistics Delivery',   module: 'logistics',   table: 'deliveries',            numCol: 'txn_code', route: '/module/logistics/deliveries'                 },
 
   // ── Asset Registry ────────────────────────────────────────
-  AS:  { label: 'Asset',                module: 'assets',      table: 'asset_registry',        numCol: 'asset_code', route: '/module/assets/registry'                   },
-  AR:  { label: 'Asset Reclassification', module: 'assets',    table: 'asset_reclassification_log', numCol: 'txn_code', route: '/module/assets/reclass-log'             },
+  AS:  { label: 'Asset',                module: 'assets',      table: 'asset_registry',        numCol: 'asset_code', route: '/module/fleet/registry'                   },
+  AR:  { label: 'Asset Reclassification', module: 'assets',    table: 'asset_reclassification_log', numCol: 'txn_code', route: '/module/fleet/reclass-log'             },
 }
 
 /**

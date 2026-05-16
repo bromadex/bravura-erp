@@ -28,7 +28,7 @@ export default function AssetDashboard() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Asset Dashboard</h1>
-        <button className="btn btn-primary" onClick={() => navigate('/module/assets/registry')}>
+        <button className="btn btn-primary" onClick={() => navigate('/module/fleet/registry')}>
           <span className="material-icons">inventory_2</span> Asset Registry
         </button>
       </div>
@@ -130,7 +130,7 @@ export default function AssetDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold)' }}>Recent Reclassifications</h3>
             <button className="btn btn-secondary" style={{ fontSize: 11, padding: '3px 10px' }}
-              onClick={() => navigate('/module/assets/reclass-log')}>View All</button>
+              onClick={() => navigate('/module/fleet/reclass-log')}>View All</button>
           </div>
           {recentReclass.length === 0 ? (
             <div className="empty-state" style={{ padding: 24 }}>No reclassifications yet</div>
