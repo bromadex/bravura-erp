@@ -619,20 +619,20 @@ export function FleetProvider({ children }) {
       const schedUpdates = { last_done_date: updates.actual_end_date }
       if (odometer_at_service)   schedUpdates.last_done_km    = odometer_at_service
       if (hour_meter_at_service) schedUpdates.last_done_hours = hour_meter_at_service
-      await supabase.from('maintenance_schedules').update(schedUpdates).eq('id', wo.schedule_id).catch(() => null)
+      await safe(supabase.from('maintenance_schedules').update(schedUpdates).eq('id', wo.schedule_id))
     }
     // Write last service back to asset record (asset_registry or legacy table)
     if (wo?.asset_id) {
       const allAssets = [...vehicles, ...generators, ...earthMovers]
       const asset = allAssets.find(a => a.id === wo.asset_id)
       if (asset?._legacy) {
-        await supabase.from(asset._legacyTable)
-          .update({ last_service_date: updates.actual_end_date }).eq('id', wo.asset_id).catch(() => null)
+        await safe(supabase.from(asset._legacyTable)
+          .update({ last_service_date: updates.actual_end_date }).eq('id', wo.asset_id))
       } else {
         const serviceUpdate = { last_service_date: updates.actual_end_date, updated_at: new Date().toISOString() }
         if (odometer_at_service)   serviceUpdate.last_service_val = odometer_at_service
         if (hour_meter_at_service) serviceUpdate.last_service_val = hour_meter_at_service
-        await supabase.from('asset_registry').update(serviceUpdate).eq('id', wo.asset_id).catch(() => null)
+        await safe(supabase.from('asset_registry').update(serviceUpdate).eq('id', wo.asset_id))
       }
     }
     auditLog({ module: 'fleet', action: 'CLOSE', entityType: 'work_order', entityId: id, entityName: wo?.wo_number || id })
@@ -688,7 +688,7 @@ export function FleetProvider({ children }) {
       if (tyre?.fitted_odometer) tyreUpdates.km_accumulated = (tyre.km_accumulated || 0) + (movement.km_at_event - tyre.fitted_odometer)
     }
     if (movement.event_type === 'fit') tyreUpdates.fitted_odometer = movement.km_at_event
-    await supabase.from('tyre_inventory').update(tyreUpdates).eq('id', movement.tyre_id).catch(() => null)
+    await safe(supabase.from('tyre_inventory').update(tyreUpdates).eq('id', movement.tyre_id))
     await fetchAll()
   }
 
@@ -774,7 +774,7 @@ export function FleetProvider({ children }) {
     }
 
     // Reclassification audit log
-    await supabase.from('asset_reclassification_log').insert([{
+    await safe(supabase.from('asset_reclassification_log').insert([{
       id: generateId(),
       txn_code: txnCode,
       asset_id: assetId,
@@ -790,18 +790,18 @@ export function FleetProvider({ children }) {
       status: 'Completed',
       requested_by: 'User',
       created_at: now,
-    }]).catch(err => console.error('Reclass log write:', err))
+    }]))
 
     // Timeline entry for asset_registry records
     if (!asset._legacy) {
-      await supabase.from('asset_timeline').insert([{
+      await safe(supabase.from('asset_timeline').insert([{
         id: generateId(), asset_id: assetId, event_type: 'reclassified',
         event_date: today,
         title: `Reclassified: ${fromCat} → ${newCategory}`,
         description: reason,
         metadata: { txn_code: txnCode, measurement_change: measurementChanging },
         created_by: 'User',
-      }]).catch(() => null)
+      }]))
     }
 
     auditLog({
