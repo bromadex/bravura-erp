@@ -284,13 +284,15 @@ function AppRoutes() {
         <Route path="reports"        element={<FuelReports />}        />
       </Route>
 
-      {/* ── FLEET ────────────────────────────────────────── */}
+      {/* ── FLEET & ASSET REGISTRY ───────────────────────── */}
       <Route path="/module/fleet" element={
         <ProtectedRoute>
           <PermissionRoute module="fleet" page="dashboard">
-            <FleetProvider>
-              <Layout module="fleet" />
-            </FleetProvider>
+            <AssetRegistryProvider>
+              <FleetProvider>
+                <Layout module="fleet" />
+              </FleetProvider>
+            </AssetRegistryProvider>
           </PermissionRoute>
         </ProtectedRoute>
       }>
@@ -305,24 +307,12 @@ function AppRoutes() {
         <Route path="tyre-management"         element={<TyreManagement />} />
         <Route path="downtime-analytics"      element={<DowntimeAnalytics />} />
         <Route path="cost-analysis"           element={<FleetCostAnalysis />} />
-      </Route>
-
-      {/* ── ASSETS ───────────────────────────────────────── */}
-      <Route path="/module/assets" element={
-        <ProtectedRoute>
-          <PermissionRoute module="assets" page="dashboard">
-            <AssetRegistryProvider>
-              <Layout module="assets" />
-            </AssetRegistryProvider>
-          </PermissionRoute>
-        </ProtectedRoute>
-      }>
-        <Route index                element={<AssetDashboard />} />
-        <Route path="dashboard"     element={<AssetDashboard />} />
-        <Route path="registry"      element={<AssetRegistry />} />
-        <Route path="category-config" element={<CategoryConfig />} />
-        <Route path="reclass-log"   element={<ReclassificationLog />} />
-        <Route path="import"        element={<AssetImport />} />
+        {/* Asset Registry — unified asset master */}
+        <Route path="asset-registry"          element={<AssetDashboard />} />
+        <Route path="registry"                element={<AssetRegistry />} />
+        <Route path="category-config"         element={<CategoryConfig />} />
+        <Route path="reclass-log"             element={<ReclassificationLog />} />
+        <Route path="asset-import"            element={<AssetImport />} />
       </Route>
 
       {/* ── HR ───────────────────────────────────────────── */}
