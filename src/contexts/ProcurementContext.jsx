@@ -174,7 +174,6 @@ export function ProcurementProvider({ children }) {
       }])
     }
 
-    // ✅ FIX: toast() not toast.info() — react-hot-toast has no .info method
     if (deficits.length) {
       toast(`${deficits.length} Purchase Requisition(s) auto-created for stock shortages`, {
         icon: '📋',
@@ -207,7 +206,6 @@ export function ProcurementProvider({ children }) {
     const notIssued = []
 
     for (const it of items) {
-      // Find item in inventory by name (case-insensitive)
       const { data: invItem } = await supabase
         .from('items')
         .select('*')
@@ -225,13 +223,11 @@ export function ProcurementProvider({ children }) {
         continue
       }
 
-      // Deduct from inventory
       await supabase.from('items').update({
         balance:   invItem.balance - issueQty,
         total_out: (invItem.total_out || 0) + issueQty,
       }).eq('id', invItem.id)
 
-      // Record transaction
       await supabase.from('transactions').insert([{
         id:            generateId(),
         type:          'OUT',
@@ -250,7 +246,6 @@ export function ProcurementProvider({ children }) {
       issued.push({ ...it, issued_qty: issueQty })
     }
 
-    // Mark as fulfilled (or partially fulfilled)
     const newStatus = notIssued.length === 0 ? 'fulfilled' : 'partially_fulfilled'
     await supabase.from('store_requisitions').update({
       status:        newStatus,
@@ -329,6 +324,35 @@ export function ProcurementProvider({ children }) {
     }])
     if (error) throw error
 
+    // Write supplier performance log entry (delivery event)
+    if (grn.supplier_id) {
+      const po = grn.po_id ? purchaseOrders.find(p => p.id === grn.po_id) : null
+      const deliveryDate  = grn.actual_delivery_date || grn.date
+      const expectedDate  = po?.delivery_date || null
+      const delayDays     = expectedDate && deliveryDate
+        ? Math.floor((new Date(deliveryDate) - new Date(expectedDate)) / 86400000)
+        : null
+      const totalOrdered  = (grn.items || []).reduce((s, i) => s + (parseFloat(i.ordered_qty) || parseFloat(i.qty) || 0), 0)
+      const totalReceived = (grn.items || []).reduce((s, i) => s + (parseFloat(i.received)    || parseFloat(i.qty) || 0), 0)
+
+      await supabase.from('supplier_performance_log').insert([{
+        id:            generateId(),
+        supplier_id:   grn.supplier_id,
+        supplier_name: grn.supplier_name || '',
+        po_id:         grn.po_id         || null,
+        grn_id:        id,
+        event_type:    delayDays > 0 ? 'delivery_late' : 'delivery_on_time',
+        event_date:    deliveryDate || new Date().toISOString().split('T')[0],
+        expected_date: expectedDate,
+        actual_date:   deliveryDate,
+        delay_days:    delayDays,
+        ordered_qty:   totalOrdered,
+        received_qty:  totalReceived,
+        quality_score: grn.quality_score ? parseInt(grn.quality_score) : null,
+        created_at:    new Date().toISOString(),
+      }]).catch(() => null) // non-blocking — don't fail GRN if perf log fails
+    }
+
     // Auto-update inventory stock
     for (const it of grn.items) {
       const { data: existing } = await supabase.from('items').select('*').ilike('name', it.name).maybeSingle()
@@ -406,7 +430,7 @@ export function ProcurementProvider({ children }) {
   const createPurchaseInvoice = async (pi) => {
     const id = generateId()
     const piNumber = await generateTxnCode('PI')
-    // outstanding is GENERATED ALWAYS AS (total_amount - paid_amount) STORED — do not insert it
+    // outstanding is GENERATED ALWAYS AS (total_amount - paid_amount) STORED — never insert it
     const { outstanding: _drop, ...piData } = pi
     const { error } = await supabase.from('purchase_invoices').insert([{
       id, pi_number: piNumber, ...piData,
@@ -418,7 +442,8 @@ export function ProcurementProvider({ children }) {
   }
 
   const updatePurchaseInvoice = async (id, updates) => {
-    const { error } = await supabase.from('purchase_invoices').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    const { outstanding: _drop, ...safeUpdates } = updates
+    const { error } = await supabase.from('purchase_invoices').update({ ...safeUpdates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
@@ -458,7 +483,6 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
-  // ── Budget helper: check if PO is within budget ───────────
   const checkBudget = (department, amount, fiscalYear = new Date().getFullYear()) => {
     const deptBudgets = budgets.filter(b => b.department === department && b.fiscal_year === fiscalYear)
     if (!deptBudgets.length) return { ok: true, warning: false, message: 'No budget configured' }
@@ -468,7 +492,7 @@ export function ProcurementProvider({ children }) {
       .reduce((s, p) => s + (p.total_amount || 0), 0)
     const remaining = (annual.budget_amount || 0) - spent
     const pctUsed   = (annual.budget_amount || 0) > 0 ? (spent + amount) / annual.budget_amount * 100 : 0
-    if (spent + amount > annual.budget_amount) return { ok: false, warning: true, message: `Over budget by $${((spent + amount - annual.budget_amount)).toFixed(2)}`, pctUsed }
+    if (spent + amount > annual.budget_amount) return { ok: false, warning: true, message: `Over budget by $${(spent + amount - annual.budget_amount).toFixed(2)}`, pctUsed }
     if (pctUsed > (annual.alert_threshold || 80)) return { ok: true, warning: true, message: `Budget at ${pctUsed.toFixed(0)}% — only $${remaining.toFixed(2)} remaining`, pctUsed }
     return { ok: true, warning: false, message: `$${remaining.toFixed(2)} remaining (${(100 - pctUsed).toFixed(0)}%)`, pctUsed }
   }

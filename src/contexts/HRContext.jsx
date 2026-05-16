@@ -25,9 +25,6 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtils'
-import { auditLog } from '../engine/auditEngine'
-import { pushNotification } from '../engine/notificationEngine'
-import { generateTxnCode } from '../engine/transactionEngine'
 
 const HRContext = createContext(null)
 
@@ -51,22 +48,55 @@ export function HRProvider({ children }) {
 
   // ── Employee number generator ──────────────────────────────────
   const generateEmployeeNumber = async () => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('employee_number')
+      .ilike('employee_number', 'BRA%')
+    if (error) return `BRA${Date.now().toString().slice(-6)}`
+    let maxNum = 160
+    data?.forEach(emp => {
+      if (emp.employee_number) {
+        const num = parseInt(emp.employee_number.replace(/^BRA/i, ''), 10)
+        if (!isNaN(num) && num > maxNum) maxNum = num
+      }
+    })
+    return `BRA${maxNum + 1}`
+  }
+
+  // ── Audit log helper ───────────────────────────────────────────
+  const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
     try {
-      return await generateTxnCode('EMP')
-    } catch {
-      return `EMP-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`
-    }
+      const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
+      await supabase.from('hr_audit_logs').insert([{
+        id:          generateId(),
+        user_name:   user?.full_name || user?.username || 'System',
+        action,
+        entity_type: entityType,
+        entity_id:   entityId,
+        entity_name: entityName,
+        old_values:  oldValues ? JSON.stringify(oldValues) : null,
+        new_values:  newValues ? JSON.stringify(newValues) : null,
+        created_at:  new Date().toISOString()
+      }])
+    } catch (err) { console.warn('Audit log failed:', err) }
   }
 
-  // ── Audit log helper — thin wrapper around auditEngine ────────
-  const logHRAction = (action, entityType, entityId, entityName) => {
-    const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-    auditLog({ module: 'hr', action, entityType, entityId: entityId || '', entityName: entityName || '', userName: user?.full_name || user?.username || 'System' })
+  // ── Notification helper (non-fatal) ────────────────────────────
+  const sendNotification = async (userId, type, title, message, link = '/module/hr/leave') => {
+    try {
+      await supabase.from('notifications').insert([{
+        id:         generateId(),
+        user_id:    userId,
+        type,
+        title,
+        message,
+        link,
+        is_read:    false,
+        category:   'general',
+        created_at: new Date().toISOString()
+      }])
+    } catch { /* notifications are non-fatal */ }
   }
-
-  // ── Notification helper — thin wrapper around notificationEngine
-  const sendNotification = (userId, type, title, message, link = '/module/hr/leave') =>
-    pushNotification(userId, { type, title, message, link })
 
   // ── System account creation ────────────────────────────────────
   const createSystemAccount = async (employeeId, fullName, roleId = 'role_viewer') => {
