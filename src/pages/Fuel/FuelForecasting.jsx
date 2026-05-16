@@ -58,7 +58,7 @@ export default function FuelForecasting() {
       // Latest dipstick reading
       supabase
         .from('dipstick_log')
-        .select('date, fuel_end, end_litres')
+        .select('date, fuel_end')
         .order('date', { ascending: false })
         .limit(1),
 
@@ -81,7 +81,7 @@ export default function FuelForecasting() {
       // Dipstick
       const dip = dipRes.data?.[0]
       if (dip) {
-        const level = dip.fuel_end != null ? dip.fuel_end : (dip.end_litres != null ? dip.end_litres : null)
+        const level = dip.fuel_end ?? null
         setCurrentLevel(level)
       } else {
         setCurrentLevel(null)
