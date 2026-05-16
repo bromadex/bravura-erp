@@ -34,6 +34,7 @@ const MODULE_PAGES = {
   governance:  ['announcements','policies','ethics'],
   accounting:  ['chart-of-accounts','journal-entries','reports'],
   reports:     ['overview','audit-log','drafts'],
+  projects:    ['petty-cash-dashboard','petty-cash-funds','petty-cash-expenses','petty-cash-reconciliation'],
 }
 
 const ALL_MODULES = [
@@ -47,6 +48,7 @@ const ALL_MODULES = [
   { id: 'campsite',    icon: 'cabin',               label: 'Campsite',           color: '#86efac', desc: 'Rooms & occupancy',       route: '/module/campsite',    moduleName: 'campsite'    },
   { id: 'connect',     icon: 'forum',               label: 'Connect',            color: '#67e8f9', desc: 'Chat & announcements',    route: '/module/connect',     moduleName: 'connect'     },
   { id: 'governance',  icon: 'policy',              label: 'Governance',         color: '#fcd34d', desc: 'Policies & ethics',       route: '/module/governance',  moduleName: 'governance'  },
+  { id: 'projects',    icon: 'folder_open',          label: 'Projects',           color: '#f59e0b', desc: 'Petty cash & project ops', route: '/module/projects',   moduleName: 'projects'    },
   { id: 'accounting',  icon: 'receipt',             label: 'Accounting',         color: '#818cf8', desc: 'Journals & reports',      route: '/module/accounting',  moduleName: 'accounting'  },
   { id: 'reports',     icon: 'bar_chart',           label: 'Reports',            color: '#38bdf8', desc: 'Analytics & exports',     route: '/module/reports',     moduleName: 'reports'     },
   { id: 'settings',    icon: 'admin_panel_settings', label: 'Settings & Admin',   color: '#a78bfa', desc: 'Workflow builder & config', route: '/module/settings/workflows', moduleName: 'settings' },

@@ -87,24 +87,28 @@ async function getInstanceForEntity(entityType, entityId) {
 }
 
 const TABLE_MAP = {
-  leave_requests:        'leave_requests',
-  travel_requests:       'travel_requests',
-  employee_attendance:   'employee_attendance',
-  store_requisitions:    'store_requisitions',
-  purchase_requisitions: 'purchase_requisitions',
-  purchase_orders:       'purchase_orders',
-  contractor_usage_logs: 'contractor_usage_logs',
+  leave_requests:            'leave_requests',
+  travel_requests:           'travel_requests',
+  employee_attendance:       'employee_attendance',
+  store_requisitions:        'store_requisitions',
+  purchase_requisitions:     'purchase_requisitions',
+  purchase_orders:           'purchase_orders',
+  contractor_usage_logs:     'contractor_usage_logs',
+  petty_cash_transactions:   'petty_cash_transactions',
+  petty_cash_reconciliations:'petty_cash_reconciliations',
 }
 
 // Valid statuses per DB CHECK constraints (from schema analysis)
 const VALID_STATUSES = {
-  leave_requests:        ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
-  travel_requests:       ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
-  employee_attendance:   ['pending','approved','rejected','cancelled'],
-  store_requisitions:    ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
-  purchase_requisitions: ['draft','submitted','pending','approved','rejected','cancelled'],
-  purchase_orders:       ['draft','pending','approved','rejected','cancelled','partially_received','received'],
-  contractor_usage_logs: ['draft','submitted','pending','approved','rejected','cancelled'],
+  leave_requests:            ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  travel_requests:           ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  employee_attendance:       ['pending','approved','rejected','cancelled'],
+  store_requisitions:        ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
+  purchase_requisitions:     ['draft','submitted','pending','approved','rejected','cancelled'],
+  purchase_orders:           ['draft','pending','approved','rejected','cancelled','partially_received','received'],
+  contractor_usage_logs:     ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_transactions:   ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_reconciliations:['draft','submitted','pending','approved','rejected'],
 }
 
 function validateStatus(entityType, status) {

@@ -81,6 +81,12 @@ export const PREFIX_REGISTRY = {
   CE:  { label: 'Contractor Equipment', module: 'fleet',       table: 'contractor_equipment',  numCol: 'ce_code',   route: '/module/fleet/contractor-equipment'        },
   CU:  { label: 'Contractor Usage Log', module: 'fleet',       table: 'contractor_usage_logs', numCol: 'cu_code',   route: '/module/fleet/contractor-equipment'        },
   CI:  { label: 'Contractor Invoice',   module: 'fleet',       table: 'journal_entries',       numCol: 'reference', route: '/module/accounting/journal-entries'        },
+
+  // ── Petty Cash ────────────────────────────────────────────
+  PCF: { label: 'Petty Cash Fund',      module: 'projects',    table: 'petty_cash_funds',         numCol: 'pcf_code', route: '/module/projects/petty-cash-funds'       },
+  PCT: { label: 'Petty Cash Top-up',    module: 'projects',    table: 'petty_cash_topups',        numCol: 'pct_code', route: '/module/projects/petty-cash-funds'       },
+  PCE: { label: 'Petty Cash Expense',   module: 'projects',    table: 'petty_cash_transactions',  numCol: 'pce_code', route: '/module/projects/petty-cash-expenses'    },
+  PCR: { label: 'Petty Cash Recon',     module: 'projects',    table: 'petty_cash_reconciliations', numCol: 'pcr_code', route: '/module/projects/petty-cash-reconciliation' },
 }
 
 /**
