@@ -42,15 +42,18 @@ export default function FuelIssuance() {
   const [vehicles,    setVehicles]    = useState([])
   const [generators,  setGenerators]  = useState([])
   const [earthmovers, setEarthmovers] = useState([])
+  const [contractors, setContractors] = useState([])
   useEffect(() => {
     Promise.all([
       supabase.from('fleet').select('reg, description').eq('status', 'Active'),
       supabase.from('generators').select('gen_code, gen_name'),
       supabase.from('earth_movers').select('reg, description'),
-    ]).then(([vRes, gRes, eRes]) => {
+      supabase.from('contractor_equipment').select('ce_code, contractor_name, equipment_type, equipment_description, registration').eq('status', 'Active'),
+    ]).then(([vRes, gRes, eRes, cRes]) => {
       if (vRes.data) setVehicles(vRes.data)
       if (gRes.data) setGenerators(gRes.data)
       if (eRes.data) setEarthmovers(eRes.data)
+      if (cRes.data) setContractors(cRes.data)
     })
   }, [])
 
@@ -273,27 +276,28 @@ export default function FuelIssuance() {
             <div className="form-group">
               <label>Equipment Type</label>
               <div className="btn-group">
-                {['vehicle', 'generator', 'earthmover'].map(t => (
+                {['vehicle', 'generator', 'earthmover', 'contractor'].map(t => (
                   <button key={t} type="button"
                     className={equipType === t ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
                     onClick={() => { setEquipType(t); setForm({ ...form, vehicle: '' }) }}>
                     <span className="material-icons" style={{ fontSize: 14 }}>
-                      {t === 'vehicle' ? 'directions_car' : t === 'generator' ? 'bolt' : 'construction'}
+                      {t === 'vehicle' ? 'directions_car' : t === 'generator' ? 'bolt' : t === 'contractor' ? 'handshake' : 'construction'}
                     </span>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {t === 'contractor' ? 'Contractor' : t.charAt(0).toUpperCase() + t.slice(1)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="form-group">
-              <label>{equipType === 'vehicle' ? 'Vehicle' : equipType === 'generator' ? 'Generator' : 'Equipment'} *</label>
+              <label>{equipType === 'vehicle' ? 'Vehicle' : equipType === 'generator' ? 'Generator' : equipType === 'contractor' ? 'Contractor Equipment' : 'Equipment'} *</label>
               <select className="form-control" required value={form.vehicle}
                 onChange={e => setForm({ ...form, vehicle: e.target.value })}>
                 <option value="">Select…</option>
                 {equipType === 'vehicle'    && vehicles.map(v    => <option key={v.reg}      value={`${v.reg} – ${v.description}`}>{v.reg} – {v.description}</option>)}
                 {equipType === 'generator'  && generators.map(g  => <option key={g.gen_code} value={`${g.gen_code} – ${g.gen_name}`}>{g.gen_code} – {g.gen_name}</option>)}
                 {equipType === 'earthmover' && earthmovers.map(e => <option key={e.reg}      value={`${e.reg} – ${e.description}`}>{e.reg} – {e.description}</option>)}
+                {equipType === 'contractor' && contractors.map(c  => <option key={c.ce_code} value={`${c.ce_code} – ${c.contractor_name} (${c.registration || c.equipment_type})`}>{c.ce_code} – {c.contractor_name} · {c.equipment_description || c.equipment_type}</option>)}
               </select>
             </div>
 
