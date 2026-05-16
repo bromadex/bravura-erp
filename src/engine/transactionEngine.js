@@ -49,9 +49,10 @@ export const PREFIX_REGISTRY = {
   // ── Employees ─────────────────────────────────────────────
   EMP: { label: 'Employee',             module: 'hr',          table: 'employees',             numCol: 'employee_number', route: '/module/hr/employees'                  },
 
-  // ── Fleet Master Records ───────────────────────────────────
-  FL:  { label: 'Fleet Vehicle',        module: 'fleet',       table: 'fleet',                 numCol: 'fleet_code',  route: '/module/fleet/vehicles'                   },
-  EM:  { label: 'Earth Mover',          module: 'fleet',       table: 'earth_movers',          numCol: 'fleet_code',  route: '/module/fleet/vehicles'                   },
+  // ── Fleet Master Records (backed by asset_registry) ──────────
+  FL:  { label: 'Fleet Vehicle',        module: 'fleet',       table: 'asset_registry',        numCol: 'asset_code',  route: '/module/fleet/vehicles'                   },
+  GN:  { label: 'Generator',            module: 'fleet',       table: 'asset_registry',        numCol: 'asset_code',  route: '/module/fleet/generators'                 },
+  EM:  { label: 'Earth Mover',          module: 'fleet',       table: 'asset_registry',        numCol: 'asset_code',  route: '/module/fleet/heavy-equipment'            },
 
   // ── Campsite ──────────────────────────────────────────────
   CA:  { label: 'Camp Assignment',      module: 'campsite',    table: 'room_assignments',      numCol: 'txn_code', route: '/module/campsite/assignments'                  },

@@ -1,3 +1,9 @@
+// src/contexts/FleetContext.jsx
+// TRUE MERGE: all vehicle/generator/equipment data lives in asset_registry.
+// Mapping helpers translate asset_registry columns ↔ the field names that
+// existing Fleet pages (Vehicles, Generators, HeavyEquipment) already use,
+// so those pages need no changes.
+
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -8,36 +14,230 @@ const FleetContext = createContext(null)
 
 const safe = (q) => Promise.resolve(q).catch(() => ({ data: [] }))
 
-export function FleetProvider({ children }) {
-  const [vehicles, setVehicles] = useState([])
-  const [generators, setGenerators] = useState([])
-  const [earthMovers, setEarthMovers] = useState([])
-  const [genRunLogs, setGenRunLogs] = useState([])
-  const [downtimeLogs, setDowntimeLogs] = useState([])
-  const [maintenanceLogs, setMaintenanceLogs] = useState([])
-  const [fuelLogs, setFuelLogs] = useState([])
-  const [vehicleTrips, setVehicleTrips] = useState([])
-  const [equipmentHourLogs, setEquipmentHourLogs] = useState([])
-  const [assetIssues, setAssetIssues] = useState([])
-  // PM / Work Orders / Tyres
-  const [maintenanceSchedules, setMaintenanceSchedules] = useState([])
-  const [workOrders, setWorkOrders] = useState([])
-  const [tyreInventory, setTyreInventory] = useState([])
-  const [tyreMovements, setTyreMovements] = useState([])
-  const [loading, setLoading] = useState(true)
+// ── Category grouping ────────────────────────────────────────────────────────
+// Which asset_registry categories belong to each fleet sub-type.
+// Vehicles page shows 'Vehicle'.
+// Generators page shows 'Generator'.
+// HeavyEquipment page shows everything else.
+const VEHICLE_CATS   = ['Vehicle']
+const GENERATOR_CATS = ['Generator']
+const EQUIPMENT_CATS = ['Heavy Equipment','Light Equipment','Water Pump','Compressor','Fixed Plant','Roller','Excavator']
 
-  const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+// ── Column mappers ───────────────────────────────────────────────────────────
+
+/** asset_registry row → vehicle-shaped object (as Fleet pages expect) */
+function toVehicle(a) {
+  return {
+    ...a,                                             // keep all asset_registry fields
+    reg:                        a.plate_number || a.asset_name || '',
+    fleet_code:                 a.asset_code,
+    type:                       a.asset_subtype || '',
+    description:                a.notes || '',
+    driver_id:                  a.metadata?.driver_id || '',
+    driver_name:                a.assigned_to || '',
+    odometer_km:                a.primary_metric_val || 0,
+    service_interval_km:        a.measurement_type === 'km' ? (a.service_interval || null) : null,
+    service_interval_days:      a.metadata?.service_interval_days || null,
+    utilization_available_hours: a.metadata?.utilization_available_hours || null,
+    // enhancement fields stored in metadata
+    tare_weight:                a.metadata?.tare_weight || null,
+    gross_vehicle_mass:         a.metadata?.gross_vehicle_mass || null,
+    licence_expiry:             a.metadata?.licence_expiry || null,
+    insurance_expiry:           a.metadata?.insurance_expiry || null,
+    roadworthy_expiry:          a.metadata?.roadworthy_expiry || null,
+    tracker_id:                 a.metadata?.tracker_id || null,
+    cost_center:                a.metadata?.cost_center || null,
+    acquisition_cost:           a.purchase_cost || 0,
+    acquisition_date:           a.purchase_date || null,
+  }
+}
+
+/** vehicle-shaped form data → asset_registry insert payload */
+function fromVehicle(v, id, asset_code) {
+  return {
+    id,
+    asset_code,
+    asset_name:            v.reg || v.description || 'Unknown Vehicle',
+    asset_category:        v.asset_category || 'Vehicle',
+    asset_subtype:         v.type || '',
+    measurement_type:      'km',
+    primary_metric_val:    parseFloat(v.odometer_km) || 0,
+    service_interval:      v.service_interval_km ? parseFloat(v.service_interval_km) : null,
+    service_interval_basis: 'km',
+    last_service_date:     v.last_service_date || null,
+    last_service_val:      v.last_service_km ? parseFloat(v.last_service_km) : null,
+    plate_number:          v.reg || '',
+    status:                v.status || 'Active',
+    assigned_to:           v.driver_name || '',
+    assigned_project:      v.assigned_project || '',
+    department:            v.department || '',
+    location:              v.location || '',
+    purchase_cost:         v.acquisition_cost ? parseFloat(v.acquisition_cost) : 0,
+    purchase_date:         v.acquisition_date || null,
+    salvage_value:         v.salvage_value ? parseFloat(v.salvage_value) : 0,
+    notes:                 v.description || '',
+    source_table:          'fleet',
+    metadata: {
+      driver_id:                  v.driver_id || null,
+      service_interval_days:      v.service_interval_days ? parseInt(v.service_interval_days) : null,
+      utilization_available_hours: v.utilization_available_hours ? parseFloat(v.utilization_available_hours) : null,
+      tare_weight:                v.tare_weight || null,
+      gross_vehicle_mass:         v.gross_vehicle_mass || null,
+      licence_expiry:             v.licence_expiry || null,
+      insurance_expiry:           v.insurance_expiry || null,
+      roadworthy_expiry:          v.roadworthy_expiry || null,
+      tracker_id:                 v.tracker_id || null,
+      cost_center:                v.cost_center || null,
+    },
+  }
+}
+
+/** asset_registry row → generator-shaped object */
+function toGenerator(a) {
+  return {
+    ...a,
+    gen_code: a.asset_code,
+    gen_name: a.asset_name,
+  }
+}
+
+/** generator form data → asset_registry insert payload */
+function fromGenerator(g, id, asset_code) {
+  return {
+    id,
+    asset_code:        g.gen_code || asset_code,
+    asset_name:        g.gen_name || g.gen_code || 'Unknown Generator',
+    asset_category:    'Generator',
+    asset_subtype:     g.type || g.asset_subtype || '',
+    measurement_type:  'hours',
+    primary_metric_val: 0,
+    service_interval_basis: 'hours',
+    status:            g.status || 'Active',
+    assigned_project:  g.assigned_project || '',
+    department:        g.department || '',
+    notes:             g.description || g.notes || '',
+    source_table:      'generators',
+    metadata:          {},
+  }
+}
+
+/** asset_registry row → earth-mover-shaped object */
+function toEarthMover(a) {
+  return {
+    ...a,
+    reg:                   a.plate_number || a.asset_name || '',
+    fleet_code:            a.asset_code,
+    type:                  a.asset_subtype || '',
+    description:           a.notes || '',
+    hour_meter:            a.primary_metric_val || 0,
+    service_interval_hours: a.measurement_type === 'hours' ? (a.service_interval || null) : null,
+    assigned_project:      a.assigned_project || '',
+    driver_name:           a.assigned_to || '',
+  }
+}
+
+/** earth mover form data → asset_registry insert payload */
+function fromEarthMover(e, id, asset_code) {
+  return {
+    id,
+    asset_code,
+    asset_name:        e.reg || e.description || 'Unknown Equipment',
+    asset_category:    e.asset_category || 'Heavy Equipment',
+    asset_subtype:     e.type || '',
+    measurement_type:  'hours',
+    primary_metric_val: parseFloat(e.hour_meter) || 0,
+    service_interval:  e.service_interval_hours ? parseFloat(e.service_interval_hours) : null,
+    service_interval_basis: 'hours',
+    last_service_date: e.last_service_date || null,
+    plate_number:      e.reg || '',
+    status:            e.status || 'Active',
+    assigned_to:       e.driver_name || '',
+    assigned_project:  e.assigned_project || '',
+    department:        e.department || '',
+    notes:             e.description || '',
+    source_table:      'earth_movers',
+    metadata:          {},
+  }
+}
+
+/** Build asset_registry UPDATE payload from a partial vehicle update object */
+function vehicleUpdateToAR(updates, currentAsset) {
+  const ar = { updated_at: new Date().toISOString() }
+  if ('reg' in updates)                { ar.plate_number = updates.reg; ar.asset_name = updates.reg }
+  if ('type' in updates)               ar.asset_subtype = updates.type
+  if ('description' in updates)        ar.notes = updates.description
+  if ('status' in updates)             ar.status = updates.status
+  if ('odometer_km' in updates)        ar.primary_metric_val = parseFloat(updates.odometer_km) || 0
+  if ('service_interval_km' in updates) ar.service_interval = updates.service_interval_km ? parseFloat(updates.service_interval_km) : null
+  if ('last_service_date' in updates)  ar.last_service_date = updates.last_service_date
+  if ('driver_name' in updates)        ar.assigned_to = updates.driver_name
+  if ('assigned_project' in updates)   ar.assigned_project = updates.assigned_project
+  if ('department' in updates)         ar.department = updates.department
+  if ('acquisition_cost' in updates)   ar.purchase_cost = parseFloat(updates.acquisition_cost) || 0
+  if ('acquisition_date' in updates)   ar.purchase_date = updates.acquisition_date
+  if ('salvage_value' in updates)      ar.salvage_value = parseFloat(updates.salvage_value) || 0
+  // Metadata patch — merge with existing
+  const META_FIELDS = ['driver_id','service_interval_days','utilization_available_hours','tare_weight',
+    'gross_vehicle_mass','licence_expiry','insurance_expiry','roadworthy_expiry','tracker_id','cost_center']
+  const metaPatch = {}
+  for (const f of META_FIELDS) { if (f in updates) metaPatch[f] = updates[f] }
+  if (Object.keys(metaPatch).length > 0) {
+    ar.metadata = { ...(currentAsset?.metadata || {}), ...metaPatch }
+  }
+  return ar
+}
+
+function earthMoverUpdateToAR(updates, currentAsset) {
+  const ar = { updated_at: new Date().toISOString() }
+  if ('reg' in updates)                  { ar.plate_number = updates.reg; ar.asset_name = updates.reg }
+  if ('type' in updates)                 ar.asset_subtype = updates.type
+  if ('description' in updates)          ar.notes = updates.description
+  if ('status' in updates)               ar.status = updates.status
+  if ('hour_meter' in updates)           ar.primary_metric_val = parseFloat(updates.hour_meter) || 0
+  if ('service_interval_hours' in updates) ar.service_interval = updates.service_interval_hours ? parseFloat(updates.service_interval_hours) : null
+  if ('last_service_date' in updates)    ar.last_service_date = updates.last_service_date
+  if ('driver_name' in updates)          ar.assigned_to = updates.driver_name
+  if ('assigned_project' in updates)     ar.assigned_project = updates.assigned_project
+  if ('department' in updates)           ar.department = updates.department
+  if ('asset_category' in updates)       ar.asset_category = updates.asset_category
+  return ar
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
+export function FleetProvider({ children }) {
+  const [vehicles, setVehicles]                 = useState([])
+  const [generators, setGenerators]             = useState([])
+  const [earthMovers, setEarthMovers]           = useState([])
+  const [genRunLogs, setGenRunLogs]             = useState([])
+  const [downtimeLogs, setDowntimeLogs]         = useState([])
+  const [maintenanceLogs, setMaintenanceLogs]   = useState([])
+  const [fuelLogs, setFuelLogs]                 = useState([])
+  const [vehicleTrips, setVehicleTrips]         = useState([])
+  const [equipmentHourLogs, setEquipmentHourLogs] = useState([])
+  const [assetIssues, setAssetIssues]           = useState([])
+  const [maintenanceSchedules, setMaintenanceSchedules] = useState([])
+  const [workOrders, setWorkOrders]             = useState([])
+  const [tyreInventory, setTyreInventory]       = useState([])
+  const [tyreMovements, setTyreMovements]       = useState([])
+  const [loading, setLoading]                   = useState(true)
+
+  const generateId = () =>
+    crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+
+  // ── Fetch ────────────────────────────────────────────────────────────────
+  // Vehicles, generators, and equipment all come from asset_registry now.
+  // Operational logs (trips, hours, maintenance, tyres) still have their own tables.
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
       const [
-        vRes, gRes, eRes, grRes, dtRes, mtRes, fRes, vtRes, ehRes, aiRes,
+        arRes,                                        // all asset_registry rows
+        grRes, dtRes, mtRes, fRes, vtRes, ehRes, aiRes,
         msRes, woRes, tiRes, tmRes,
       ] = await Promise.all([
-        safe(supabase.from('fleet').select('*').order('reg')),
-        safe(supabase.from('generators').select('*').order('gen_code')),
-        safe(supabase.from('earth_movers').select('*').order('reg')),
+        safe(supabase.from('asset_registry').select('*').order('asset_name')),
         safe(supabase.from('gen_run_log').select('*').order('date', { ascending: false })),
         safe(supabase.from('downtime_logs').select('*').order('breakdown_date', { ascending: false })),
         safe(supabase.from('service_maintenance_logs').select('*').order('service_date', { ascending: false })),
@@ -50,20 +250,25 @@ export function FleetProvider({ children }) {
         safe(supabase.from('tyre_inventory').select('*').order('serial_number')),
         safe(supabase.from('tyre_movements').select('*').order('event_date', { ascending: false })),
       ])
-      if (vRes.data)  setVehicles(vRes.data)
-      if (gRes.data)  setGenerators(gRes.data)
-      if (eRes.data)  setEarthMovers(eRes.data)
-      if (grRes.data) setGenRunLogs(grRes.data)
-      if (dtRes.data) setDowntimeLogs(dtRes.data)
-      if (mtRes.data) setMaintenanceLogs(mtRes.data)
-      if (fRes.data)  setFuelLogs(fRes.data)
-      if (vtRes.data) setVehicleTrips(vtRes.data)
-      if (ehRes.data) setEquipmentHourLogs(ehRes.data)
-      if (aiRes.data) setAssetIssues(aiRes.data)
-      if (msRes.data) setMaintenanceSchedules(msRes.data)
-      if (woRes.data) setWorkOrders(woRes.data)
-      if (tiRes.data) setTyreInventory(tiRes.data)
-      if (tmRes.data) setTyreMovements(tmRes.data)
+
+      const allAssets = arRes.data || []
+      setVehicles(allAssets.filter(a => VEHICLE_CATS.includes(a.asset_category)).map(toVehicle))
+      setGenerators(allAssets.filter(a => GENERATOR_CATS.includes(a.asset_category)).map(toGenerator))
+      setEarthMovers(allAssets.filter(a =>
+        !VEHICLE_CATS.includes(a.asset_category) && !GENERATOR_CATS.includes(a.asset_category)
+      ).map(toEarthMover))
+
+      if (grRes.data)  setGenRunLogs(grRes.data)
+      if (dtRes.data)  setDowntimeLogs(dtRes.data)
+      if (mtRes.data)  setMaintenanceLogs(mtRes.data)
+      if (fRes.data)   setFuelLogs(fRes.data)
+      if (vtRes.data)  setVehicleTrips(vtRes.data)
+      if (ehRes.data)  setEquipmentHourLogs(ehRes.data)
+      if (aiRes.data)  setAssetIssues(aiRes.data)
+      if (msRes.data)  setMaintenanceSchedules(msRes.data)
+      if (woRes.data)  setWorkOrders(woRes.data)
+      if (tiRes.data)  setTyreInventory(tiRes.data)
+      if (tmRes.data)  setTyreMovements(tmRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load fleet data')
@@ -74,36 +279,42 @@ export function FleetProvider({ children }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ---- Vehicle CRUD ----
+  // ── Vehicle CRUD → asset_registry ────────────────────────────────────────
+
   const addVehicle = async (vehicle) => {
     const id = generateId()
-    const fleet_code = await generateTxnCode('FL').catch(() => null)
-    const { error } = await supabase.from('fleet').insert([{ id, fleet_code, ...vehicle, created_at: new Date().toISOString() }])
+    const asset_code = await generateTxnCode('FL').catch(() => `FL-${Date.now()}`)
+    const { error } = await supabase.from('asset_registry')
+      .insert([{ ...fromVehicle(vehicle, id, asset_code), created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'vehicle', entityId: id, entityName: vehicle.reg || id })
     await fetchAll()
   }
 
   const updateVehicle = async (id, updates) => {
-    const v = vehicles.find(x => x.id === id)
-    const { error } = await supabase.from('fleet').update(updates).eq('id', id)
+    const current = vehicles.find(x => x.id === id)
+    const arUpdates = vehicleUpdateToAR(updates, current)
+    const { error } = await supabase.from('asset_registry').update(arUpdates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'vehicle', entityId: id, entityName: v?.reg || id })
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'vehicle', entityId: id, entityName: current?.reg || id })
     await fetchAll()
   }
 
   const deleteVehicle = async (id) => {
     const v = vehicles.find(x => x.id === id)
-    const { error } = await supabase.from('fleet').delete().eq('id', id)
+    const { error } = await supabase.from('asset_registry').delete().eq('id', id)
     if (error) throw error
     auditLog({ module: 'fleet', action: 'DELETE', entityType: 'vehicle', entityId: id, entityName: v?.reg || id })
     await fetchAll()
   }
 
-  // ---- Generator CRUD ----
+  // ── Generator CRUD → asset_registry ──────────────────────────────────────
+
   const addGenerator = async (generator) => {
     const id = generateId()
-    const { error } = await supabase.from('generators').insert([{ id, ...generator, created_at: new Date().toISOString() }])
+    const asset_code = await generateTxnCode('GN').catch(() => `GN-${Date.now()}`)
+    const { error } = await supabase.from('asset_registry')
+      .insert([{ ...fromGenerator(generator, id, asset_code), created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'generator', entityId: id, entityName: generator.gen_code || id })
     await fetchAll()
@@ -111,7 +322,15 @@ export function FleetProvider({ children }) {
 
   const updateGenerator = async (id, updates) => {
     const g = generators.find(x => x.id === id)
-    const { error } = await supabase.from('generators').update(updates).eq('id', id)
+    const ar = { updated_at: new Date().toISOString() }
+    if ('gen_name' in updates)       ar.asset_name = updates.gen_name
+    if ('gen_code' in updates)       ar.asset_code = updates.gen_code
+    if ('status' in updates)         ar.status = updates.status
+    if ('description' in updates)    ar.notes = updates.description
+    if ('assigned_project' in updates) ar.assigned_project = updates.assigned_project
+    if ('department' in updates)     ar.department = updates.department
+    if ('asset_subtype' in updates)  ar.asset_subtype = updates.asset_subtype
+    const { error } = await supabase.from('asset_registry').update(ar).eq('id', id)
     if (error) throw error
     auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'generator', entityId: id, entityName: g?.gen_code || id })
     await fetchAll()
@@ -119,39 +338,43 @@ export function FleetProvider({ children }) {
 
   const deleteGenerator = async (id) => {
     const g = generators.find(x => x.id === id)
-    const { error } = await supabase.from('generators').delete().eq('id', id)
+    const { error } = await supabase.from('asset_registry').delete().eq('id', id)
     if (error) throw error
     auditLog({ module: 'fleet', action: 'DELETE', entityType: 'generator', entityId: id, entityName: g?.gen_code || id })
     await fetchAll()
   }
 
-  // ---- Earth Mover CRUD ----
+  // ── Earth Mover / Equipment CRUD → asset_registry ────────────────────────
+
   const addEarthMover = async (equipment) => {
     const id = generateId()
-    const fleet_code = await generateTxnCode('EM').catch(() => null)
-    const { error } = await supabase.from('earth_movers').insert([{ id, fleet_code, ...equipment, created_at: new Date().toISOString() }])
+    const asset_code = await generateTxnCode('EM').catch(() => `EM-${Date.now()}`)
+    const { error } = await supabase.from('asset_registry')
+      .insert([{ ...fromEarthMover(equipment, id, asset_code), created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'heavy_equipment', entityId: id, entityName: equipment.reg || id })
     await fetchAll()
   }
 
   const updateEarthMover = async (id, updates) => {
-    const e = earthMovers.find(x => x.id === id)
-    const { error } = await supabase.from('earth_movers').update(updates).eq('id', id)
+    const current = earthMovers.find(x => x.id === id)
+    const arUpdates = earthMoverUpdateToAR(updates, current)
+    const { error } = await supabase.from('asset_registry').update(arUpdates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'heavy_equipment', entityId: id, entityName: e?.reg || id })
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'heavy_equipment', entityId: id, entityName: current?.reg || id })
     await fetchAll()
   }
 
   const deleteEarthMover = async (id) => {
     const e = earthMovers.find(x => x.id === id)
-    const { error } = await supabase.from('earth_movers').delete().eq('id', id)
+    const { error } = await supabase.from('asset_registry').delete().eq('id', id)
     if (error) throw error
     auditLog({ module: 'fleet', action: 'DELETE', entityType: 'heavy_equipment', entityId: id, entityName: e?.reg || id })
     await fetchAll()
   }
 
-  // ---- Generator Run Logs ----
+  // ── Generator Run Logs ────────────────────────────────────────────────────
+
   const addGenRunLog = async (log) => {
     const id = generateId()
     const { error } = await supabase.from('gen_run_log').insert([{ id, ...log, created_at: new Date().toISOString() }])
@@ -163,16 +386,18 @@ export function FleetProvider({ children }) {
   const deleteGenRunLog = async (id) => {
     const { error } = await supabase.from('gen_run_log').delete().eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'gen_run', entityId: id })
     await fetchAll()
   }
 
-  // ---- Trip logging (vehicles) ----
+  // ── Trip logging — updates asset_registry.primary_metric_val ────────────
+
   const addVehicleTrip = async (trip) => {
     const id = generateId()
     const vehicle = vehicles.find(v => v.id === trip.vehicle_id)
-    if (vehicle && trip.end_odometer > vehicle.odometer_km) {
-      await supabase.from('fleet').update({ odometer_km: trip.end_odometer }).eq('id', trip.vehicle_id)
+    if (vehicle && trip.end_odometer > (vehicle.odometer_km || 0)) {
+      await supabase.from('asset_registry')
+        .update({ primary_metric_val: trip.end_odometer, updated_at: new Date().toISOString() })
+        .eq('id', trip.vehicle_id)
     }
     const { error } = await supabase.from('vehicle_trips').insert([{ id, ...trip, created_at: new Date().toISOString() }])
     if (error) throw error
@@ -180,12 +405,15 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Hour logging (heavy equipment) ----
+  // ── Hour logging — updates asset_registry.primary_metric_val ────────────
+
   const addEquipmentHourLog = async (log) => {
     const id = generateId()
     const equipment = earthMovers.find(e => e.id === log.equipment_id)
-    if (equipment && log.end_hour_meter > equipment.hour_meter) {
-      await supabase.from('earth_movers').update({ hour_meter: log.end_hour_meter }).eq('id', log.equipment_id)
+    if (equipment && log.end_hour_meter > (equipment.hour_meter || 0)) {
+      await supabase.from('asset_registry')
+        .update({ primary_metric_val: log.end_hour_meter, updated_at: new Date().toISOString() })
+        .eq('id', log.equipment_id)
     }
     const { error } = await supabase.from('equipment_hour_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
@@ -193,7 +421,8 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Asset Issues ----
+  // ── Asset Issues ──────────────────────────────────────────────────────────
+
   const addAssetIssue = async (issue) => {
     const id = generateId()
     const { error } = await supabase.from('asset_issues').insert([{ id, ...issue, created_at: new Date().toISOString() }])
@@ -210,7 +439,8 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  // ---- Maintenance & Downtime Logs ----
+  // ── Maintenance & Downtime ────────────────────────────────────────────────
+
   const addMaintenanceLog = async (log) => {
     const id = generateId()
     const { error } = await supabase.from('service_maintenance_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
@@ -235,45 +465,39 @@ export function FleetProvider({ children }) {
       downtime_hours = (new Date(closed_at) - new Date(breakdownDate)) / 3600000
     }
     const { error } = await supabase.from('downtime_logs').update({
-      closed_at,
-      repair_cost: repair_cost || null,
+      closed_at, repair_cost: repair_cost || null,
       resolution_notes: resolution_notes || null,
       downtime_hours: downtime_hours ? +downtime_hours.toFixed(2) : null,
       status: 'resolved',
     }).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'downtime', entityId: id, entityName: dl?.asset_id || id })
     await fetchAll()
   }
 
-  // ---- Maintenance Schedules (PM) ----
+  // ── PM Schedules ──────────────────────────────────────────────────────────
+
   const addMaintenanceSchedule = async (schedule) => {
     const id = generateId()
-    const { error } = await supabase.from('maintenance_schedules').insert([{
-      id, ...schedule, created_at: new Date().toISOString(),
-    }])
+    const { error } = await supabase.from('maintenance_schedules').insert([{ id, ...schedule, created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'maintenance_schedule', entityId: id, entityName: schedule.task_name || id })
     await fetchAll()
   }
 
   const updateMaintenanceSchedule = async (id, updates) => {
-    const ms = maintenanceSchedules.find(x => x.id === id)
     const { error } = await supabase.from('maintenance_schedules').update(updates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'maintenance_schedule', entityId: id, entityName: ms?.task_name || id })
     await fetchAll()
   }
 
   const deleteMaintenanceSchedule = async (id) => {
-    const ms = maintenanceSchedules.find(x => x.id === id)
     const { error } = await supabase.from('maintenance_schedules').delete().eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'DELETE', entityType: 'maintenance_schedule', entityId: id, entityName: ms?.task_name || id })
     await fetchAll()
   }
 
-  // ---- Work Orders ----
+  // ── Work Orders ───────────────────────────────────────────────────────────
+
   const createWorkOrder = async (wo) => {
     const id = generateId()
     const wo_number = await generateTxnCode('WO').catch(() => `WO-${Date.now()}`)
@@ -281,43 +505,47 @@ export function FleetProvider({ children }) {
       id, wo_number, ...wo, status: wo.status || 'open', created_at: new Date().toISOString(),
     }])
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'work_order', entityId: id, entityName: wo_number || id })
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'work_order', entityId: id, entityName: wo_number })
     await fetchAll()
     return id
   }
 
   const updateWorkOrder = async (id, updates) => {
-    const wo = workOrders.find(x => x.id === id)
     const { error } = await supabase.from('maintenance_work_orders').update(updates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'work_order', entityId: id, entityName: wo?.wo_number || id })
     await fetchAll()
   }
 
   const closeWorkOrder = async (id, { actual_cost, completion_notes, actual_end_date, odometer_at_service, hour_meter_at_service }) => {
     const wo = workOrders.find(x => x.id === id)
     const updates = {
-      status: 'closed',
-      actual_cost: actual_cost || null,
+      status: 'closed', actual_cost: actual_cost || null,
       completion_notes: completion_notes || null,
       actual_end_date: actual_end_date || new Date().toISOString().split('T')[0],
     }
-    if (odometer_at_service) updates.odometer_at_service = odometer_at_service
+    if (odometer_at_service)   updates.odometer_at_service   = odometer_at_service
     if (hour_meter_at_service) updates.hour_meter_at_service = hour_meter_at_service
     const { error } = await supabase.from('maintenance_work_orders').update(updates).eq('id', id)
     if (error) throw error
-    // If linked to a schedule, update last_done on that schedule
     if (wo?.schedule_id) {
       const schedUpdates = { last_done_date: updates.actual_end_date }
-      if (odometer_at_service) schedUpdates.last_done_km = odometer_at_service
+      if (odometer_at_service)   schedUpdates.last_done_km    = odometer_at_service
       if (hour_meter_at_service) schedUpdates.last_done_hours = hour_meter_at_service
       await supabase.from('maintenance_schedules').update(schedUpdates).eq('id', wo.schedule_id).catch(() => null)
+    }
+    // Write last service back to asset_registry
+    if (wo?.asset_id) {
+      const serviceUpdate = { last_service_date: updates.actual_end_date, updated_at: new Date().toISOString() }
+      if (odometer_at_service)   serviceUpdate.last_service_val = odometer_at_service
+      if (hour_meter_at_service) serviceUpdate.last_service_val = hour_meter_at_service
+      await supabase.from('asset_registry').update(serviceUpdate).eq('id', wo.asset_id).catch(() => null)
     }
     auditLog({ module: 'fleet', action: 'CLOSE', entityType: 'work_order', entityId: id, entityName: wo?.wo_number || id })
     await fetchAll()
   }
 
-  // ---- Tyre Inventory ----
+  // ── Tyre Inventory ────────────────────────────────────────────────────────
+
   const addTyre = async (tyre) => {
     const id = generateId()
     const tyre_code = await generateTxnCode('TYR').catch(() => `TYR-${Date.now()}`)
@@ -326,44 +554,32 @@ export function FleetProvider({ children }) {
       created_at: new Date().toISOString(),
     }])
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'tyre', entityId: id, entityName: tyre.serial_number || id })
     await fetchAll()
   }
 
   const updateTyre = async (id, updates) => {
-    const t = tyreInventory.find(x => x.id === id)
     const { error } = await supabase.from('tyre_inventory').update(updates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'tyre', entityId: id, entityName: t?.serial_number || id })
     await fetchAll()
   }
 
   const scrapTyre = async (id, notes) => {
-    const t = tyreInventory.find(x => x.id === id)
     const { error } = await supabase.from('tyre_inventory').update({
       status: 'scrapped', scrapped_at: new Date().toISOString(), scrap_notes: notes || null,
     }).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fleet', action: 'SCRAP', entityType: 'tyre', entityId: id, entityName: t?.serial_number || id })
     await fetchAll()
   }
 
-  // ---- Tyre Movements ----
   const recordTyreMovement = async (movement) => {
     const id = generateId()
-    const { error } = await supabase.from('tyre_movements').insert([{
-      id, ...movement, created_at: new Date().toISOString(),
-    }])
+    const { error } = await supabase.from('tyre_movements').insert([{ id, ...movement, created_at: new Date().toISOString() }])
     if (error) throw error
-    // Update tyre status/position based on event
     const tyreUpdates = { last_event: movement.event_type, last_event_date: movement.event_date }
     if (movement.event_type === 'fit') {
-      tyreUpdates.current_vehicle = movement.vehicle_id
-      tyreUpdates.current_position = movement.position
-      tyreUpdates.status = 'fitted'
+      tyreUpdates.current_vehicle = movement.vehicle_id; tyreUpdates.current_position = movement.position; tyreUpdates.status = 'fitted'
     } else if (['remove', 'scrap'].includes(movement.event_type)) {
-      tyreUpdates.current_vehicle = null
-      tyreUpdates.current_position = null
+      tyreUpdates.current_vehicle = null; tyreUpdates.current_position = null
       tyreUpdates.status = movement.event_type === 'scrap' ? 'scrapped' : 'in_stock'
     } else if (movement.event_type === 'rotate') {
       tyreUpdates.current_position = movement.position
@@ -374,86 +590,73 @@ export function FleetProvider({ children }) {
     if (movement.tread_depth !== undefined) tyreUpdates.tread_depth_current = movement.tread_depth
     if (movement.km_at_event && movement.event_type === 'remove') {
       const tyre = tyreInventory.find(t => t.id === movement.tyre_id)
-      if (tyre?.fitted_odometer) {
-        tyreUpdates.km_accumulated = (tyre.km_accumulated || 0) + (movement.km_at_event - tyre.fitted_odometer)
-      }
+      if (tyre?.fitted_odometer) tyreUpdates.km_accumulated = (tyre.km_accumulated || 0) + (movement.km_at_event - tyre.fitted_odometer)
     }
     if (movement.event_type === 'fit') tyreUpdates.fitted_odometer = movement.km_at_event
     await supabase.from('tyre_inventory').update(tyreUpdates).eq('id', movement.tyre_id).catch(() => null)
-    auditLog({ module: 'fleet', action: 'LOG', entityType: 'tyre_movement', entityId: id, entityName: movement.tyre_id })
     await fetchAll()
   }
 
-  // ---- Helper functions ----
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
   const getVehicleFuelEfficiency = (reg) => {
     const fuelEntries = fuelLogs.filter(f => f.vehicle === reg)
-    if (fuelEntries.length === 0) return null
+    if (!fuelEntries.length) return null
     const totalFuel = fuelEntries.reduce((s, f) => s + (f.amount || 0), 0)
     const vehicle = vehicles.find(v => v.reg === reg)
-    if (!vehicle || !vehicle.odometer_km || totalFuel === 0) return null
+    if (!vehicle || !vehicle.odometer_km || !totalFuel) return null
     return { kmPerLiter: vehicle.odometer_km / totalFuel, litersPer100km: (totalFuel / vehicle.odometer_km) * 100 }
   }
 
   const getGeneratorEfficiency = (genId) => {
     const logs = genRunLogs.filter(l => l.gen_id === genId)
-    if (logs.length === 0) return null
-    const totalFuel = logs.reduce((s, l) => s + (l.fuel_used || 0), 0)
+    if (!logs.length) return null
+    const totalFuel  = logs.reduce((s, l) => s + (l.fuel_used || 0), 0)
     const totalHours = logs.reduce((s, l) => s + (l.hours || 0), 0)
-    if (totalHours === 0) return null
-    return totalFuel / totalHours
+    return totalHours ? totalFuel / totalHours : null
   }
 
   const getEquipmentEfficiency = (reg) => {
     const fuelEntries = fuelLogs.filter(f => f.vehicle === reg)
-    if (fuelEntries.length === 0) return null
+    if (!fuelEntries.length) return null
     const totalFuel = fuelEntries.reduce((s, f) => s + (f.amount || 0), 0)
     const equip = earthMovers.find(e => e.reg === reg)
-    if (!equip || !equip.hour_meter || totalFuel === 0) return null
+    if (!equip || !equip.hour_meter || !totalFuel) return null
     return totalFuel / equip.hour_meter
   }
 
   const getNextService = (asset) => {
     const lastService = asset.last_service_date ? new Date(asset.last_service_date) : null
     if (!lastService) return null
-    if (asset.service_interval_days) {
-      const nextDate = new Date(lastService)
-      nextDate.setDate(lastService.getDate() + asset.service_interval_days)
-      return nextDate.toISOString().split('T')[0]
+    const intervalDays = asset.service_interval_days || asset.metadata?.service_interval_days
+    if (intervalDays) {
+      const next = new Date(lastService); next.setDate(lastService.getDate() + parseInt(intervalDays))
+      return next.toISOString().split('T')[0]
     }
-    if (asset.service_interval_km && asset.odometer_km) {
-      const nextOdometer = asset.odometer_km + asset.service_interval_km
-      return { type: 'odometer', value: nextOdometer }
-    }
-    if (asset.service_interval_hours && asset.hour_meter) {
-      const nextHours = asset.hour_meter + asset.service_interval_hours
-      return { type: 'hours', value: nextHours }
-    }
+    if (asset.service_interval_km && asset.odometer_km)
+      return { type: 'odometer', value: asset.odometer_km + asset.service_interval_km }
+    if (asset.service_interval_hours && asset.hour_meter)
+      return { type: 'hours', value: asset.hour_meter + asset.service_interval_hours }
     return null
   }
 
   const getHealthScore = (asset, type) => {
     let score = 100
     const next = getNextService(asset)
-    if (next && next.type === 'date') {
-      const isOverdue = new Date(next) < new Date()
-      if (isOverdue) score -= 30
-    }
+    if (next && typeof next === 'string' && new Date(next) < new Date()) score -= 30
     if (type === 'vehicle') {
       const eff = getVehicleFuelEfficiency(asset.reg)
-      if (eff && eff.litersPer100km > 20) score -= 20
-      else if (eff && eff.litersPer100km > 15) score -= 10
+      if (eff?.litersPer100km > 20) score -= 20
+      else if (eff?.litersPer100km > 15) score -= 10
     } else if (type === 'generator') {
       const eff = getGeneratorEfficiency(asset.id)
-      if (eff && eff > 50) score -= 20
-      else if (eff && eff > 40) score -= 10
+      if (eff && eff > 50) score -= 20; else if (eff && eff > 40) score -= 10
     } else {
       const eff = getEquipmentEfficiency(asset.reg)
-      if (eff && eff > 30) score -= 20
-      else if (eff && eff > 20) score -= 10
+      if (eff && eff > 30) score -= 20; else if (eff && eff > 20) score -= 10
     }
     const downtimeCount = downtimeLogs.filter(d => d.asset_id === asset.id).length
-    if (downtimeCount > 2) score -= 20
-    else if (downtimeCount > 0) score -= 10
+    if (downtimeCount > 2) score -= 20; else if (downtimeCount > 0) score -= 10
     return Math.max(0, Math.min(100, score))
   }
 
@@ -464,27 +667,14 @@ export function FleetProvider({ children }) {
   }
 
   const getOverdueAlerts = () => {
-    const alerts = []
     const today = new Date()
-    vehicles.forEach(v => {
-      const next = getNextService(v)
-      if (next?.type === 'date' && new Date(next) < today) {
-        alerts.push({ asset: v.reg, type: 'vehicle', message: `Service overdue since ${next}` })
+    const alerts = []
+    ;[...vehicles, ...generators, ...earthMovers].forEach(a => {
+      const next = getNextService(a)
+      if (typeof next === 'string' && new Date(next) < today) {
+        alerts.push({ asset: a.reg || a.gen_code || a.asset_name, type: a.asset_category || 'asset', message: `Service overdue since ${next}` })
       }
     })
-    generators.forEach(g => {
-      const next = getNextService(g)
-      if (next?.type === 'date' && new Date(next) < today) {
-        alerts.push({ asset: g.gen_code, type: 'generator', message: `Service overdue since ${next}` })
-      }
-    })
-    earthMovers.forEach(e => {
-      const next = getNextService(e)
-      if (next?.type === 'date' && new Date(next) < today) {
-        alerts.push({ asset: e.reg, type: 'earthmover', message: `Service overdue since ${next}` })
-      }
-    })
-    // PM Schedule overdue alerts
     maintenanceSchedules.forEach(ms => {
       if (ms.next_due_date && new Date(ms.next_due_date) < today) {
         alerts.push({ asset: ms.asset_id, type: 'pm_schedule', message: `PM "${ms.task_name}" overdue since ${ms.next_due_date}`, scheduleId: ms.id })
@@ -493,58 +683,38 @@ export function FleetProvider({ children }) {
     return alerts
   }
 
-  // Get upcoming PM tasks (next N days)
   const getUpcomingPM = (days = 30) => {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() + days)
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + days)
     return maintenanceSchedules
       .filter(ms => ms.next_due_date && new Date(ms.next_due_date) <= cutoff && ms.is_active !== false)
       .sort((a, b) => new Date(a.next_due_date) - new Date(b.next_due_date))
   }
 
-  // Get tyres currently fitted to a vehicle
-  const getVehicleTyres = (vehicleId) => {
-    return tyreInventory.filter(t => t.current_vehicle === vehicleId && t.status === 'fitted')
-  }
+  const getVehicleTyres = (vehicleId) =>
+    tyreInventory.filter(t => t.current_vehicle === vehicleId && t.status === 'fitted')
 
-  // Get total fleet costs for a period
   const getFleetCosts = (fromDate, toDate) => {
-    const from = fromDate ? new Date(fromDate) : null
-    const to   = toDate   ? new Date(toDate)   : null
     const inRange = (d) => {
       if (!d) return false
       const dt = new Date(d)
-      if (from && dt < from) return false
-      if (to   && dt > to)   return false
+      if (fromDate && dt < new Date(fromDate)) return false
+      if (toDate   && dt > new Date(toDate))   return false
       return true
     }
-    const fuelCost = fuelLogs
-      .filter(f => inRange(f.date))
-      .reduce((s, f) => s + (f.total_cost || f.amount * (f.unit_price || 0) || 0), 0)
-    const maintenanceCost = workOrders
-      .filter(wo => inRange(wo.actual_end_date) && wo.status === 'closed')
-      .reduce((s, wo) => s + (wo.actual_cost || 0), 0)
-    const downtimeCost = downtimeLogs
-      .filter(dl => inRange(dl.breakdown_date))
-      .reduce((s, dl) => s + (dl.repair_cost || 0), 0)
+    const fuelCost        = fuelLogs.filter(f => inRange(f.date)).reduce((s, f) => s + (f.total_cost || 0), 0)
+    const maintenanceCost = workOrders.filter(wo => inRange(wo.actual_end_date) && wo.status === 'closed').reduce((s, wo) => s + (wo.actual_cost || 0), 0)
+    const downtimeCost    = downtimeLogs.filter(dl => inRange(dl.breakdown_date)).reduce((s, dl) => s + (dl.repair_cost || 0), 0)
     return { fuelCost, maintenanceCost, downtimeCost, total: fuelCost + maintenanceCost + downtimeCost }
   }
 
-  // Compute MTBF / MTTR for an asset from downtime_logs
   const getAssetReliability = (assetId) => {
-    const events = downtimeLogs
-      .filter(d => d.asset_id === assetId)
-      .sort((a, b) => new Date(a.breakdown_date) - new Date(b.breakdown_date))
-    if (events.length === 0) return { mtbf: null, mttr: null, availability: 100, breakdowns: 0 }
+    const events = downtimeLogs.filter(d => d.asset_id === assetId).sort((a, b) => new Date(a.breakdown_date) - new Date(b.breakdown_date))
+    if (!events.length) return { mtbf: null, mttr: null, availability: 100, breakdowns: 0 }
     const totalDowntime = events.reduce((s, e) => s + (e.downtime_hours || 0), 0)
-    const mttr = events.length > 0 ? totalDowntime / events.length : 0
-    // MTBF: average hours between breakdowns (rough: span / count)
-    const firstBreakdown = new Date(events[0].breakdown_date)
-    const lastBreakdown  = new Date(events[events.length - 1].breakdown_date)
-    const spanHours = (lastBreakdown - firstBreakdown) / 3600000 || 1
+    const mttr = totalDowntime / events.length
+    const spanHours = events.length > 1 ? (new Date(events[events.length-1].breakdown_date) - new Date(events[0].breakdown_date)) / 3600000 || 1 : 1
     const mtbf = events.length > 1 ? spanHours / (events.length - 1) : null
-    const uptime = spanHours - totalDowntime
-    const availability = spanHours > 0 ? Math.max(0, (uptime / spanHours) * 100) : 100
+    const availability = Math.max(0, ((spanHours - totalDowntime) / spanHours) * 100)
     return { mtbf: mtbf ? +mtbf.toFixed(1) : null, mttr: +mttr.toFixed(1), availability: +availability.toFixed(1), breakdowns: events.length }
   }
 
