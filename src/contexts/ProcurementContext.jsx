@@ -406,9 +406,10 @@ export function ProcurementProvider({ children }) {
   const createPurchaseInvoice = async (pi) => {
     const id = generateId()
     const piNumber = await generateTxnCode('PI')
+    // outstanding is GENERATED ALWAYS AS (total_amount - paid_amount) STORED — do not insert it
+    const { outstanding: _drop, ...piData } = pi
     const { error } = await supabase.from('purchase_invoices').insert([{
-      id, pi_number: piNumber, ...pi,
-      outstanding: (pi.total_amount || 0) - (pi.paid_amount || 0),
+      id, pi_number: piNumber, ...piData,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }])
     if (error) throw error

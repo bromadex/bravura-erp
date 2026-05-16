@@ -141,6 +141,22 @@ ALTER TABLE goods_received
   ADD COLUMN IF NOT EXISTS quality_score     INT,
   ADD COLUMN IF NOT EXISTS rejected_items    JSONB DEFAULT '[]';
 
+-- Add fulfilment tracking columns to store_requisitions
+ALTER TABLE store_requisitions
+  ADD COLUMN IF NOT EXISTS issued_by      TEXT,
+  ADD COLUMN IF NOT EXISTS issued_by_id   TEXT,
+  ADD COLUMN IF NOT EXISTS issued_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS issued_items   JSONB DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS not_issued     JSONB DEFAULT '[]';
+
+-- Add source link + approval fields to purchase_requisitions (if not already present)
+ALTER TABLE purchase_requisitions
+  ADD COLUMN IF NOT EXISTS source_req_id  TEXT,
+  ADD COLUMN IF NOT EXISTS approver_id    TEXT,
+  ADD COLUMN IF NOT EXISTS approver_name  TEXT,
+  ADD COLUMN IF NOT EXISTS approved_at    TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+
 -- Add performance fields to suppliers
 ALTER TABLE suppliers
   ADD COLUMN IF NOT EXISTS tax_id            TEXT,
