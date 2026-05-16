@@ -5,7 +5,7 @@ import { usePermission } from '../../contexts/PermissionContext'
 
 const ALL_MODULES = {
   dashboard: {
-    label: 'Dashboard', icon: 'dashboard', color: '#f4a261',
+    label: 'Dashboard', icon: 'dashboard', color: '#b83232',
     sections: [{ label: 'Overview', pages: [{ id: 'overview', label: 'Dashboard', icon: 'dashboard' }] }],
   },
   procurement: {
@@ -79,6 +79,24 @@ const ALL_MODULES = {
         { id: 'consumption',     label: 'Vehicle Consumption', icon: 'speed'            },
         { id: 'forecasting',     label: 'Forecasting',      icon: 'trending_up'        },
         { id: 'reports',         label: 'Fuel Reports',     icon: 'bar_chart'          },
+      ],
+    }],
+  },
+  assets: {
+    label: 'Asset Registry', icon: 'inventory_2', color: '#b83232',
+    sections: [{
+      label: 'Overview', pages: [
+        { id: 'dashboard',       label: 'Dashboard',            icon: 'dashboard'     },
+        { id: 'registry',        label: 'Asset Registry',       icon: 'inventory_2'   },
+      ],
+    }, {
+      label: 'Reclassification', pages: [
+        { id: 'reclass-log',     label: 'Reclassification Log', icon: 'swap_horiz'    },
+        { id: 'import',          label: 'Import Assets',        icon: 'download'      },
+      ],
+    }, {
+      label: 'Configuration', pages: [
+        { id: 'category-config', label: 'Category Config',      icon: 'tune'          },
       ],
     }],
   },

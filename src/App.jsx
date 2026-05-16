@@ -15,6 +15,7 @@ import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
 import { AccountingProvider }      from './contexts/AccountingContext'
 import { MasterDataProvider }     from './contexts/MasterDataContext'
+import { AssetRegistryProvider }  from './contexts/AssetRegistryContext'
 
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
@@ -125,6 +126,13 @@ import Drafts            from './pages/Reports/Drafts'
 import ReportBuilder     from './pages/Reports/ReportBuilder'
 import KpiDashboards     from './pages/Reports/KpiDashboards'
 import ScheduledReports  from './pages/Reports/ScheduledReports'
+
+// ── Assets ────────────────────────────────────────────────────
+import AssetDashboard      from './pages/Assets/AssetDashboard'
+import AssetRegistry       from './pages/Assets/AssetRegistry'
+import CategoryConfig      from './pages/Assets/CategoryConfig'
+import ReclassificationLog from './pages/Assets/ReclassificationLog'
+import AssetImport         from './pages/Assets/AssetImport'
 
 // ── Logistics ─────────────────────────────────────────────────
 import LogisticsDashboard  from './pages/Logistics/LogisticsDashboard'
@@ -297,6 +305,24 @@ function AppRoutes() {
         <Route path="tyre-management"         element={<TyreManagement />} />
         <Route path="downtime-analytics"      element={<DowntimeAnalytics />} />
         <Route path="cost-analysis"           element={<FleetCostAnalysis />} />
+      </Route>
+
+      {/* ── ASSETS ───────────────────────────────────────── */}
+      <Route path="/module/assets" element={
+        <ProtectedRoute>
+          <PermissionRoute module="assets" page="dashboard">
+            <AssetRegistryProvider>
+              <Layout module="assets" />
+            </AssetRegistryProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                element={<AssetDashboard />} />
+        <Route path="dashboard"     element={<AssetDashboard />} />
+        <Route path="registry"      element={<AssetRegistry />} />
+        <Route path="category-config" element={<CategoryConfig />} />
+        <Route path="reclass-log"   element={<ReclassificationLog />} />
+        <Route path="import"        element={<AssetImport />} />
       </Route>
 
       {/* ── HR ───────────────────────────────────────────── */}
