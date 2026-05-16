@@ -76,6 +76,11 @@ export const PREFIX_REGISTRY = {
   // ── Asset Registry ────────────────────────────────────────
   AS:  { label: 'Asset',                module: 'assets',      table: 'asset_registry',        numCol: 'asset_code', route: '/module/fleet/registry'                   },
   AR:  { label: 'Asset Reclassification', module: 'assets',    table: 'asset_reclassification_log', numCol: 'txn_code', route: '/module/fleet/reclass-log'             },
+
+  // ── Contractor Equipment ──────────────────────────────────
+  CE:  { label: 'Contractor Equipment', module: 'fleet',       table: 'contractor_equipment',  numCol: 'ce_code',   route: '/module/fleet/contractor-equipment'        },
+  CU:  { label: 'Contractor Usage Log', module: 'fleet',       table: 'contractor_usage_logs', numCol: 'cu_code',   route: '/module/fleet/contractor-equipment'        },
+  CI:  { label: 'Contractor Invoice',   module: 'fleet',       table: 'journal_entries',       numCol: 'reference', route: '/module/accounting/journal-entries'        },
 }
 
 /**

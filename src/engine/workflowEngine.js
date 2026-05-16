@@ -93,6 +93,7 @@ const TABLE_MAP = {
   store_requisitions:    'store_requisitions',
   purchase_requisitions: 'purchase_requisitions',
   purchase_orders:       'purchase_orders',
+  contractor_usage_logs: 'contractor_usage_logs',
 }
 
 // Valid statuses per DB CHECK constraints (from schema analysis)
@@ -103,6 +104,7 @@ const VALID_STATUSES = {
   store_requisitions:    ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
   purchase_requisitions: ['draft','submitted','pending','approved','rejected','cancelled'],
   purchase_orders:       ['draft','pending','approved','rejected','cancelled','partially_received','received'],
+  contractor_usage_logs: ['draft','submitted','pending','approved','rejected','cancelled'],
 }
 
 function validateStatus(entityType, status) {

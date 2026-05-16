@@ -86,6 +86,7 @@ const ALL_MODULES = {
     label: 'Fleet & Assets', icon: 'directions_car', color: '#34d399',
     sections: [{
       label: 'Operations', pages: [
+        { id: 'contractor-equipment', label: 'Contractor Equipment', icon: 'handshake'        },
         { id: 'dashboard',          label: 'Fleet Dashboard',    icon: 'dashboard'            },
         { id: 'vehicles',           label: 'Vehicles',           icon: 'directions_car'       },
         { id: 'generators',         label: 'Generators',         icon: 'bolt'                 },

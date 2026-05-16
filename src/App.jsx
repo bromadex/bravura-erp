@@ -10,6 +10,7 @@ import { InventoryProvider }       from './contexts/InventoryContext'
 import { ProcurementProvider }     from './contexts/ProcurementContext'
 import { FuelProvider }            from './contexts/FuelContext'
 import { FleetProvider }           from './contexts/FleetContext'
+import { ContractorProvider }      from './contexts/ContractorContext'
 import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
@@ -89,6 +90,7 @@ import FuelForecasting      from './pages/Fuel/FuelForecasting'
 
 // ── Fleet ─────────────────────────────────────────────────────
 import FleetDashboard          from './pages/Fleet/FleetDashboard'
+import ContractorEquipment     from './pages/Fleet/ContractorEquipment'
 import Vehicles                from './pages/Fleet/Vehicles'
 import Generators              from './pages/Fleet/Generators'
 import HeavyEquipment          from './pages/Fleet/HeavyEquipment'
@@ -290,7 +292,9 @@ function AppRoutes() {
           <PermissionRoute module="fleet" page="dashboard">
             <AssetRegistryProvider>
               <FleetProvider>
-                <Layout module="fleet" />
+                <ContractorProvider>
+                  <Layout module="fleet" />
+                </ContractorProvider>
               </FleetProvider>
             </AssetRegistryProvider>
           </PermissionRoute>
@@ -298,6 +302,7 @@ function AppRoutes() {
       }>
         <Route index                            element={<FleetDashboard />} />
         <Route path="dashboard"               element={<FleetDashboard />} />
+        <Route path="contractor-equipment"    element={<ContractorEquipment />} />
         <Route path="vehicles"                element={<Vehicles />} />
         <Route path="generators"              element={<Generators />} />
         <Route path="heavy-equipment"         element={<HeavyEquipment />} />
