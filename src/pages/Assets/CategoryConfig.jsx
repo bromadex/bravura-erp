@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { useAssetRegistry } from '../../contexts/AssetRegistryContext'
-import { useAuth } from '../../contexts/AuthContext'
+import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 const BLANK = {
@@ -34,8 +34,7 @@ const TOGGLE = ({ label, field, form, setForm }) => (
 
 export default function CategoryConfig() {
   const { categoryConfigs, createCategoryConfig, updateCategoryConfig, loading } = useAssetRegistry()
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = useCanEdit('fleet', 'category-config')
 
   const [showModal, setShowModal] = useState(false)
   const [editId,    setEditId]    = useState(null)
