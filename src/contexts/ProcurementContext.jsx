@@ -9,80 +9,41 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { pushNotificationToHOD, pushNotificationToRoles, pushNotificationFromTemplate } from '../engine/notificationEngine'
+import { auditLog } from '../engine/auditEngine'
+import { generateTxnCode } from '../engine/transactionEngine'
 
 const ProcurementContext = createContext(null)
 
 export function ProcurementProvider({ children }) {
-  const [suppliers,           setSuppliers]           = useState([])
-  const [storeRequisitions,   setStoreRequisitions]   = useState([])
+  const [suppliers,            setSuppliers]            = useState([])
+  const [storeRequisitions,    setStoreRequisitions]    = useState([])
   const [purchaseRequisitions, setPurchaseRequisitions] = useState([])
-  const [purchaseOrders,      setPurchaseOrders]      = useState([])
-  const [goodsReceived,       setGoodsReceived]       = useState([])
-  const [loading,             setLoading]             = useState(true)
-  const [rfqs,               setRfqs]               = useState([])
-  const [rfqQuotations,      setRfqQuotations]      = useState([])
-  const [budgets,            setBudgets]            = useState([])
-  const [purchaseInvoices,   setPurchaseInvoices]   = useState([])
+  const [purchaseOrders,       setPurchaseOrders]       = useState([])
+  const [goodsReceived,        setGoodsReceived]        = useState([])
+  const [rfqs,                 setRfqs]                 = useState([])
+  const [rfqQuotations,        setRfqQuotations]        = useState([])
+  const [purchaseInvoices,     setPurchaseInvoices]     = useState([])
+  const [budgets,              setBudgets]              = useState([])
+  const [loading,              setLoading]              = useState(true)
 
-  const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+  const generateId = () => crypto.randomUUID()
 
-  // ── Notification helper ───────────────────────────────────────
-  const sendNotification = async ({ userId, type, title, message, link = null }) => {
-    try {
-      await supabase.from('notifications').insert([{
-        id:         generateId(),
-        user_id:    userId,
-        type,
-        title,
-        message,
-        link,
-        is_read:    false,
-        category:   'general',
-        created_at: new Date().toISOString(),
-      }])
-    } catch (err) {
-      console.warn('Notification send failed:', err.message)
-    }
-  }
-
-  const notifyHOD = async ({ departmentName, type, title, message, link }) => {
-    const { data: hodEmployees } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('department', departmentName)
-      .eq('is_hod', true)
-    if (!hodEmployees?.length) return
-    for (const emp of hodEmployees) {
-      const { data: users } = await supabase.from('app_users').select('id').eq('employee_id', emp.id)
-      for (const u of (users || [])) {
-        await sendNotification({ userId: u.id, type, title, message, link })
-      }
-    }
-  }
-
-  const notifyStorekeepers = async ({ type, title, message, link }) => {
-    const { data: users } = await supabase
-      .from('app_users')
-      .select('id')
-      .in('role_id', ['role_storekeeper', 'role_store_manager'])
-    for (const u of (users || [])) {
-      await sendNotification({ userId: u.id, type, title, message, link })
-    }
-  }
+  const safe = (q) => q.catch(() => ({ data: [] }))
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, budRes, invRes] = await Promise.all([
+      const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_orders').select('*').order('order_date', { ascending: false }),
         supabase.from('goods_received').select('*').order('date', { ascending: false }),
-        supabase.from('rfq').select('*').order('created_at', { ascending: false }),
-        supabase.from('rfq_quotations').select('*').order('created_at', { ascending: false }),
-        supabase.from('procurement_budgets').select('*').order('created_at', { ascending: false }),
-        supabase.from('purchase_invoices').select('*').order('created_at', { ascending: false }),
+        safe(supabase.from('rfq').select('*').order('created_at', { ascending: false })),
+        safe(supabase.from('rfq_quotations').select('*').order('created_at', { ascending: false })),
+        safe(supabase.from('purchase_invoices').select('*').order('invoice_date', { ascending: false })),
+        safe(supabase.from('procurement_budgets').select('*').order('department')),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
@@ -91,8 +52,8 @@ export function ProcurementProvider({ children }) {
       if (grRes.data)  setGoodsReceived(grRes.data)
       if (rfqRes.data)  setRfqs(rfqRes.data)
       if (quotRes.data) setRfqQuotations(quotRes.data)
+      if (piRes.data)   setPurchaseInvoices(piRes.data)
       if (budRes.data)  setBudgets(budRes.data)
-      if (invRes.data)  setPurchaseInvoices(invRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -125,7 +86,7 @@ export function ProcurementProvider({ children }) {
   // ── Store Requisitions ────────────────────────────────────
   const createStoreRequisition = async (req) => {
     const id = generateId()
-    const srNumber = `SR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const srNumber = await generateTxnCode('SR')
     const { error } = await supabase.from('store_requisitions').insert([{
       id,
       req_number: srNumber,
@@ -137,8 +98,10 @@ export function ProcurementProvider({ children }) {
     if (error) throw error
 
     // Notify HOD that a requisition needs approval
-    await notifyHOD({
-      departmentName: req.department,
+    await pushNotificationFromTemplate('sr_submitted', {
+      requester_name: req.requester_name || 'Someone',
+      req_number:     srNumber,
+    }, { department: req.department }, {
       type:    'requisition_submitted',
       title:   'Store Requisition Pending Approval',
       message: `${req.requester_name || 'Someone'} submitted ${srNumber} for your approval.`,
@@ -190,7 +153,7 @@ export function ProcurementProvider({ children }) {
     // Auto-create PRs for items with insufficient stock
     for (const deficit of deficits) {
       const prId     = generateId()
-      const prNumber = `PR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+      const prNumber = await generateTxnCode('PR')
       await supabase.from('purchase_requisitions').insert([{
         id: prId, pr_number: prNumber,
         date:           new Date().toISOString().split('T')[0],
@@ -211,7 +174,6 @@ export function ProcurementProvider({ children }) {
       }])
     }
 
-    // ✅ FIX: toast() not toast.info() — react-hot-toast has no .info method
     if (deficits.length) {
       toast(`${deficits.length} Purchase Requisition(s) auto-created for stock shortages`, {
         icon: '📋',
@@ -221,10 +183,12 @@ export function ProcurementProvider({ children }) {
 
     // Notify storekeepers that a requisition is ready to fulfil
     const srNum = req?.sr_number || req?.req_number || id
-    await notifyStorekeepers({
+    await pushNotificationFromTemplate('sr_ready_to_fulfil', {
+      req_number: srNum,
+    }, { roles: ['role_storekeeper', 'role_store_manager'] }, {
       type:    'requisition_approved',
       title:   'Store Requisition Ready to Fulfil',
-      message: `${srNum} has been approved and is awaiting fulfilment.`,
+      message: `SR ${srNum} is ready to fulfil from store.`,
       link:    '/module/procurement/store-requisitions',
     })
 
@@ -242,7 +206,6 @@ export function ProcurementProvider({ children }) {
     const notIssued = []
 
     for (const it of items) {
-      // Find item in inventory by name (case-insensitive)
       const { data: invItem } = await supabase
         .from('items')
         .select('*')
@@ -260,13 +223,11 @@ export function ProcurementProvider({ children }) {
         continue
       }
 
-      // Deduct from inventory
       await supabase.from('items').update({
         balance:   invItem.balance - issueQty,
         total_out: (invItem.total_out || 0) + issueQty,
       }).eq('id', invItem.id)
 
-      // Record transaction
       await supabase.from('transactions').insert([{
         id:            generateId(),
         type:          'OUT',
@@ -285,7 +246,6 @@ export function ProcurementProvider({ children }) {
       issued.push({ ...it, issued_qty: issueQty })
     }
 
-    // Mark as fulfilled (or partially fulfilled)
     const newStatus = notIssued.length === 0 ? 'fulfilled' : 'partially_fulfilled'
     await supabase.from('store_requisitions').update({
       status:        newStatus,
@@ -338,7 +298,7 @@ export function ProcurementProvider({ children }) {
   // ── Purchase Orders ───────────────────────────────────────
   const createPurchaseOrder = async (po) => {
     const id       = generateId()
-    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const poNumber = await generateTxnCode('PO')
     const { error } = await supabase.from('purchase_orders').insert([{
       id, po_number: poNumber, ...po, created_at: new Date().toISOString(),
     }])
@@ -358,18 +318,18 @@ export function ProcurementProvider({ children }) {
   // ── Goods Received ────────────────────────────────────────
   const createGoodsReceived = async (grn) => {
     const id        = generateId()
-    const grnNumber = `GRN-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const grnNumber = await generateTxnCode('GRN')
     const { error } = await supabase.from('goods_received').insert([{
       id, grn_number: grnNumber, ...grn, created_at: new Date().toISOString(),
     }])
     if (error) throw error
 
-    // Write supplier performance log entry
+    // Write supplier performance log entry (delivery event)
     if (grn.supplier_id) {
       const po = grn.po_id ? purchaseOrders.find(p => p.id === grn.po_id) : null
-      const deliveryDate = grn.actual_delivery_date || grn.date
-      const expectedDate = po?.delivery_date || null
-      const delayDays = expectedDate && deliveryDate
+      const deliveryDate  = grn.actual_delivery_date || grn.date
+      const expectedDate  = po?.delivery_date || null
+      const delayDays     = expectedDate && deliveryDate
         ? Math.floor((new Date(deliveryDate) - new Date(expectedDate)) / 86400000)
         : null
       const totalOrdered  = (grn.items || []).reduce((s, i) => s + (parseFloat(i.ordered_qty) || parseFloat(i.qty) || 0), 0)
@@ -381,7 +341,7 @@ export function ProcurementProvider({ children }) {
         supplier_name: grn.supplier_name || '',
         po_id:         grn.po_id         || null,
         grn_id:        id,
-        event_type:    'delivery',
+        event_type:    delayDays > 0 ? 'delivery_late' : 'delivery_on_time',
         event_date:    deliveryDate || new Date().toISOString().split('T')[0],
         expected_date: expectedDate,
         actual_date:   deliveryDate,
@@ -390,7 +350,7 @@ export function ProcurementProvider({ children }) {
         received_qty:  totalReceived,
         quality_score: grn.quality_score ? parseInt(grn.quality_score) : null,
         created_at:    new Date().toISOString(),
-      }])
+      }]).catch(() => null) // non-blocking — don't fail GRN if perf log fails
     }
 
     // Auto-update inventory stock
@@ -427,52 +387,35 @@ export function ProcurementProvider({ children }) {
     return id
   }
 
-  // ── RFQ Functions ────────────────────────────────────────────
+  // ── RFQ ───────────────────────────────────────────────────
   const createRFQ = async (rfq) => {
     const id = generateId()
-    const year = new Date().getFullYear()
-    const { data: seq } = await supabase.from('code_sequences')
-      .select('last_number').eq('prefix', 'RFQ').eq('year', year).single()
-    const num = ((seq?.last_number || 0) + 1)
-    const rfqNumber = `RFQ-${year}-${String(num).padStart(5, '0')}`
-    await supabase.from('code_sequences').upsert([{ prefix: 'RFQ', year, last_number: num }])
+    const rfqNumber = await generateTxnCode('RFQ')
     const { error } = await supabase.from('rfq').insert([{
-      id, rfq_number: rfqNumber, ...rfq,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      id, rfq_number: rfqNumber, ...rfq, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }])
     if (error) throw error
-    await fetchAll()
-    return id
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'rfq', entityId: id, entityName: rfqNumber })
+    await fetchAll(); return id
   }
 
   const updateRFQ = async (id, updates) => {
-    const { error } = await supabase.from('rfq').update({
-      ...updates, updated_at: new Date().toISOString(),
-    }).eq('id', id)
+    const { error } = await supabase.from('rfq').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw error
     await fetchAll()
   }
 
-  // ── RFQ Quotation Functions ───────────────────────────────────
-  const addQuotation = async (quotation) => {
+  // ── Quotations ────────────────────────────────────────────
+  const addQuotation = async (quot) => {
     const id = generateId()
-    const { error } = await supabase.from('rfq_quotations').insert([{
-      id, ...quotation, created_at: new Date().toISOString(),
-    }])
+    const { error } = await supabase.from('rfq_quotations').insert([{ id, ...quot, created_at: new Date().toISOString() }])
     if (error) throw error
-    await fetchAll()
-    return id
+    await fetchAll(); return id
   }
 
-  const selectQuotation = async (quotationId, rfqId) => {
-    // Mark selected quotation as Selected, others as Not Selected
-    const { error: e1 } = await supabase.from('rfq_quotations')
-      .update({ status: 'Not Selected' }).eq('rfq_id', rfqId)
-    if (e1) throw e1
-    const { error: e2 } = await supabase.from('rfq_quotations')
-      .update({ status: 'Selected' }).eq('id', quotationId)
-    if (e2) throw e2
-    // Close the RFQ
+  const selectQuotation = async (quotId, rfqId, reason = '') => {
+    await supabase.from('rfq_quotations').update({ status: 'Selected', selected_reason: reason }).eq('id', quotId)
+    await supabase.from('rfq_quotations').update({ status: 'Rejected' }).eq('rfq_id', rfqId).neq('id', quotId)
     await supabase.from('rfq').update({ status: 'Closed', updated_at: new Date().toISOString() }).eq('id', rfqId)
     await fetchAll()
   }
@@ -483,15 +426,49 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
-  // ── Budget Functions ──────────────────────────────────────────
-  const addBudget = async (budget) => {
+  // ── Purchase Invoices ─────────────────────────────────────
+  const createPurchaseInvoice = async (pi) => {
     const id = generateId()
-    const { error } = await supabase.from('procurement_budgets').insert([{
-      id, ...budget, created_at: new Date().toISOString(),
+    const piNumber = await generateTxnCode('PI')
+    // outstanding is GENERATED ALWAYS AS (total_amount - paid_amount) STORED — never insert it
+    const { outstanding: _drop, ...piData } = pi
+    const { error } = await supabase.from('purchase_invoices').insert([{
+      id, pi_number: piNumber, ...piData,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }])
     if (error) throw error
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'purchase_invoice', entityId: id, entityName: piNumber })
+    await fetchAll(); return id
+  }
+
+  const updatePurchaseInvoice = async (id, updates) => {
+    const { outstanding: _drop, ...safeUpdates } = updates
+    const { error } = await supabase.from('purchase_invoices').update({ ...safeUpdates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
     await fetchAll()
-    return id
+  }
+
+  const recordPayment = async (id, { amount, method, reference, date }) => {
+    const inv = purchaseInvoices.find(p => p.id === id)
+    if (!inv) throw new Error('Invoice not found')
+    const newPaid = (inv.paid_amount || 0) + amount
+    const newStatus = newPaid >= inv.total_amount ? 'Paid' : 'Partially Paid'
+    const { error } = await supabase.from('purchase_invoices').update({
+      paid_amount: newPaid, status: newStatus,
+      payment_method: method, payment_reference: reference, payment_date: date,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    auditLog({ module: 'procurement', action: 'PAYMENT', entityType: 'purchase_invoice', entityId: id, entityName: inv.pi_number })
+    await fetchAll()
+  }
+
+  // ── Budgets ───────────────────────────────────────────────
+  const createBudget = async (budget) => {
+    const id = generateId()
+    const { error } = await supabase.from('procurement_budgets').insert([{ id, ...budget, created_at: new Date().toISOString() }])
+    if (error) throw error
+    await fetchAll(); return id
   }
 
   const updateBudget = async (id, updates) => {
@@ -506,36 +483,24 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
-  // ── Purchase Invoice Functions ────────────────────────────────
-  const createInvoice = async (invoice) => {
-    const id = generateId()
-    const year = new Date().getFullYear()
-    const { data: seq } = await supabase.from('code_sequences')
-      .select('last_number').eq('prefix', 'PI').eq('year', year).single()
-    const num = ((seq?.last_number || 0) + 1)
-    const piNumber = `PI-${year}-${String(num).padStart(5, '0')}`
-    await supabase.from('code_sequences').upsert([{ prefix: 'PI', year, last_number: num }])
-    const { error } = await supabase.from('purchase_invoices').insert([{
-      id, pi_number: piNumber, ...invoice,
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-    }])
-    if (error) throw error
-    await fetchAll()
-    return id
-  }
-
-  const updateInvoice = async (id, updates) => {
-    const { error } = await supabase.from('purchase_invoices').update({
-      ...updates, updated_at: new Date().toISOString(),
-    }).eq('id', id)
-    if (error) throw error
-    await fetchAll()
+  const checkBudget = (department, amount, fiscalYear = new Date().getFullYear()) => {
+    const deptBudgets = budgets.filter(b => b.department === department && b.fiscal_year === fiscalYear)
+    if (!deptBudgets.length) return { ok: true, warning: false, message: 'No budget configured' }
+    const annual = deptBudgets.find(b => b.period === 'annual') || deptBudgets[0]
+    const spent  = purchaseOrders
+      .filter(p => p.department === department && p.status !== 'Cancelled')
+      .reduce((s, p) => s + (p.total_amount || 0), 0)
+    const remaining = (annual.budget_amount || 0) - spent
+    const pctUsed   = (annual.budget_amount || 0) > 0 ? (spent + amount) / annual.budget_amount * 100 : 0
+    if (spent + amount > annual.budget_amount) return { ok: false, warning: true, message: `Over budget by $${(spent + amount - annual.budget_amount).toFixed(2)}`, pctUsed }
+    if (pctUsed > (annual.alert_threshold || 80)) return { ok: true, warning: true, message: `Budget at ${pctUsed.toFixed(0)}% — only $${remaining.toFixed(2)} remaining`, pctUsed }
+    return { ok: true, warning: false, message: `$${remaining.toFixed(2)} remaining (${(100 - pctUsed).toFixed(0)}%)`, pctUsed }
   }
 
   return (
     <ProcurementContext.Provider value={{
       suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived,
-      rfqs, rfqQuotations, budgets, purchaseInvoices, loading,
+      rfqs, rfqQuotations, purchaseInvoices, budgets, loading,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
       approveStoreRequisition, rejectStoreRequisition, fulfillStoreRequisition,
@@ -544,8 +509,8 @@ export function ProcurementProvider({ children }) {
       createGoodsReceived,
       createRFQ, updateRFQ,
       addQuotation, selectQuotation, deleteQuotation,
-      addBudget, updateBudget, deleteBudget,
-      createInvoice, updateInvoice,
+      createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
+      createBudget, updateBudget, deleteBudget, checkBudget,
       fetchAll,
     }}>
       {children}
