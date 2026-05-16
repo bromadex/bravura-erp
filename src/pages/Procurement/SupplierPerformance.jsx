@@ -81,12 +81,9 @@ export default function SupplierPerformance() {
   // Fetch performance log
   useEffect(() => {
     setLogLoading(true)
-    supabase
-      .from('supplier_performance_log')
-      .select('*')
-      .order('event_date', { ascending: false })
-      .limit(50)
-      .catch(() => ({ data: [] }))
+    Promise.resolve(
+      supabase.from('supplier_performance_log').select('*').order('event_date', { ascending: false }).limit(50)
+    ).catch(() => ({ data: [] }))
       .then(({ data }) => {
         setPerfLog(data || [])
         setLogLoading(false)
@@ -94,12 +91,9 @@ export default function SupplierPerformance() {
   }, [])
 
   const refreshLog = async () => {
-    const { data } = await supabase
-      .from('supplier_performance_log')
-      .select('*')
-      .order('event_date', { ascending: false })
-      .limit(50)
-      .catch(() => ({ data: [] }))
+    const { data } = await Promise.resolve(
+      supabase.from('supplier_performance_log').select('*').order('event_date', { ascending: false }).limit(50)
+    ).catch(() => ({ data: [] }))
     setPerfLog(data || [])
   }
 

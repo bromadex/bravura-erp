@@ -4,21 +4,24 @@
 
 -- ── 1. Request for Quotation ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS rfq (
-  id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  rfq_number    TEXT UNIQUE NOT NULL,
-  pr_id         TEXT,                    -- optional link to purchase_requisition
-  title         TEXT NOT NULL,
-  description   TEXT,
-  deadline      DATE NOT NULL,           -- deadline for supplier submissions
-  status        TEXT NOT NULL DEFAULT 'Open', -- Open | Closed | Cancelled
-  items         JSONB NOT NULL DEFAULT '[]',  -- [{name, qty, unit, specs}]
-  department    TEXT,
-  created_by    TEXT,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  updated_at    TIMESTAMPTZ DEFAULT now()
+  id                   TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  rfq_number           TEXT UNIQUE NOT NULL,
+  pr_id                TEXT,
+  title                TEXT NOT NULL,
+  description          TEXT,
+  deadline             DATE NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'Open', -- Open | Closed | Cancelled
+  items                JSONB NOT NULL DEFAULT '[]',
+  department           TEXT,
+  created_by           TEXT,
+  cancellation_reason  TEXT,
+  created_at           TIMESTAMPTZ DEFAULT now(),
+  updated_at           TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_rfq_status ON rfq(status);
 CREATE INDEX IF NOT EXISTS idx_rfq_pr     ON rfq(pr_id);
+-- Add column if table already exists in live DB
+ALTER TABLE rfq ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
 
 -- ── 2. Supplier Quotations (responses to RFQ) ──────────────────────────
 CREATE TABLE IF NOT EXISTS rfq_quotations (
@@ -134,12 +137,15 @@ ALTER TABLE purchase_orders
   ADD COLUMN IF NOT EXISTS finance_approved_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
 
--- Add rejection tracking to goods_received
+-- Add fields to goods_received
 ALTER TABLE goods_received
   ADD COLUMN IF NOT EXISTS pi_id             TEXT,
   ADD COLUMN IF NOT EXISTS actual_delivery_date DATE,
   ADD COLUMN IF NOT EXISTS quality_score     INT,
-  ADD COLUMN IF NOT EXISTS rejected_items    JSONB DEFAULT '[]';
+  ADD COLUMN IF NOT EXISTS rejected_items    JSONB DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS supplier_id       TEXT,
+  ADD COLUMN IF NOT EXISTS supplier_name     TEXT,
+  ADD COLUMN IF NOT EXISTS total_value       NUMERIC DEFAULT 0;
 
 -- Add fulfilment tracking columns to store_requisitions
 ALTER TABLE store_requisitions
