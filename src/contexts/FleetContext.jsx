@@ -209,6 +209,7 @@ export function FleetProvider({ children }) {
   const [vehicles, setVehicles]                 = useState([])
   const [generators, setGenerators]             = useState([])
   const [earthMovers, setEarthMovers]           = useState([])
+  const [categoryConfigs, setCategoryConfigs]   = useState([])
   const [genRunLogs, setGenRunLogs]             = useState([])
   const [downtimeLogs, setDowntimeLogs]         = useState([])
   const [maintenanceLogs, setMaintenanceLogs]   = useState([])
@@ -234,12 +235,13 @@ export function FleetProvider({ children }) {
     setLoading(true)
     try {
       const [
-        arRes,
+        arRes, cfgRes,
         legacyFleetRes, legacyEMRes, legacyGenRes,
         grRes, dtRes, mtRes, fRes, vtRes, ehRes, aiRes,
         msRes, woRes, tiRes, tmRes,
       ] = await Promise.all([
         safe(supabase.from('asset_registry').select('*').order('asset_name')),
+        safe(supabase.from('asset_category_config').select('*').order('sort_order')),
         safe(supabase.from('fleet').select('*').order('reg')),
         safe(supabase.from('earth_movers').select('*').order('reg')),
         safe(supabase.from('generators').select('*').order('gen_name')),
@@ -286,6 +288,7 @@ export function FleetProvider({ children }) {
         ...arRows.filter(a => !VEHICLE_CATS.includes(a.asset_category) && !GENERATOR_CATS.includes(a.asset_category)).map(toEarthMover),
         ...legacyEM,
       ])
+      if (cfgRes?.data) setCategoryConfigs(cfgRes.data)
 
       if (grRes.data)  setGenRunLogs(grRes.data)
       if (dtRes.data)  setDowntimeLogs(dtRes.data)
@@ -689,6 +692,128 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Reclassification ─────────────────────────────────────────────────────
+  // Moves any fleet asset to a new category.
+  // Handles both legacy (old-table) and asset_registry records.
+  // Legacy records are auto-migrated into asset_registry on reclassify.
+
+  const reclassifyFleetAsset = async (assetId, newCategory, reason) => {
+    const all = [...vehicles, ...generators, ...earthMovers]
+    const asset = all.find(a => a.id === assetId)
+    if (!asset) throw new Error('Asset not found')
+
+    const fromCat = asset.asset_category ||
+      (vehicles.find(v => v.id === assetId) ? 'Vehicle' :
+       generators.find(g => g.id === assetId) ? 'Generator' : 'Heavy Equipment')
+
+    if (fromCat === newCategory) throw new Error('Already in this category')
+
+    const FALLBACK_CATS = [
+      { category: 'Vehicle',         measurement_type: 'km',    service_interval_basis: 'km'    },
+      { category: 'Generator',       measurement_type: 'hours', service_interval_basis: 'hours' },
+      { category: 'Heavy Equipment', measurement_type: 'hours', service_interval_basis: 'hours' },
+      { category: 'Light Equipment', measurement_type: 'hours', service_interval_basis: 'hours' },
+      { category: 'Water Pump',      measurement_type: 'hours', service_interval_basis: 'hours' },
+      { category: 'Compressor',      measurement_type: 'hours', service_interval_basis: 'hours' },
+      { category: 'Fixed Plant',     measurement_type: 'fixed', service_interval_basis: 'hours' },
+    ]
+    const configs = categoryConfigs.length ? categoryConfigs : FALLBACK_CATS
+    const fromCfg = configs.find(c => c.category === fromCat)
+    const toCfg   = configs.find(c => c.category === newCategory)
+    const toMeasurement = toCfg?.measurement_type || 'hours'
+    const measurementChanging = (fromCfg?.measurement_type || 'km') !== toMeasurement
+
+    // Archive the old metric value if measurement type changes
+    const archived = {}
+    if (measurementChanging) {
+      const pfx = fromCat.toLowerCase().replace(/ /g, '_')
+      archived[`${pfx}_metric`] = asset.primary_metric_val ?? asset.odometer_km ?? asset.hour_meter ?? 0
+      archived[`${pfx}_measurement_type`] = fromCfg?.measurement_type || 'km'
+    }
+
+    const txnCode = await generateTxnCode('AR').catch(() => `AR-${Date.now()}`)
+    const now   = new Date().toISOString()
+    const today = now.split('T')[0]
+
+    if (asset._legacy) {
+      // Auto-migrate to asset_registry with the new category in one step
+      const assetCode = await generateTxnCode('AS').catch(() => `AS-${Date.now()}`)
+      const { error } = await supabase.from('asset_registry').insert([{
+        id: assetId,
+        asset_code: assetCode,
+        asset_name: asset.reg || asset.gen_name || asset.asset_name || 'Unknown',
+        asset_category: newCategory,
+        measurement_type: toMeasurement,
+        service_interval_basis: toCfg?.service_interval_basis || 'hours',
+        primary_metric_val: measurementChanging ? 0 : (asset.primary_metric_val ?? asset.odometer_km ?? asset.hour_meter ?? 0),
+        plate_number: asset.reg || asset.plate_number || '',
+        status: asset.status || 'Active',
+        assigned_project: asset.assigned_project || '',
+        source_table: asset._legacyTable,
+        source_id: assetId,
+        archived_fields: archived,
+        created_by: 'Reclassification',
+        created_at: now,
+      }])
+      if (error) throw error
+    } else {
+      const upd = {
+        asset_category: newCategory,
+        measurement_type: toMeasurement,
+        service_interval_basis: toCfg?.service_interval_basis || 'hours',
+        archived_fields: { ...(asset.archived_fields || {}), ...archived },
+        updated_at: now,
+      }
+      if (measurementChanging) {
+        upd.primary_metric_val = 0
+        upd.service_interval   = null
+        upd.last_service_val   = null
+      }
+      const { error } = await supabase.from('asset_registry').update(upd).eq('id', assetId)
+      if (error) throw error
+    }
+
+    // Reclassification audit log
+    await supabase.from('asset_reclassification_log').insert([{
+      id: generateId(),
+      txn_code: txnCode,
+      asset_id: assetId,
+      asset_code: asset.asset_code || asset.fleet_code || asset.gen_code || assetId,
+      asset_name: asset.reg || asset.gen_name || asset.asset_name || 'Unknown',
+      from_category: fromCat,
+      to_category: newCategory,
+      from_measurement_type: fromCfg?.measurement_type,
+      to_measurement_type: toMeasurement,
+      reason,
+      archived_fields: archived,
+      migrated_fields: {},
+      status: 'Completed',
+      requested_by: 'User',
+      created_at: now,
+    }]).catch(err => console.error('Reclass log write:', err))
+
+    // Timeline entry for asset_registry records
+    if (!asset._legacy) {
+      await supabase.from('asset_timeline').insert([{
+        id: generateId(), asset_id: assetId, event_type: 'reclassified',
+        event_date: today,
+        title: `Reclassified: ${fromCat} → ${newCategory}`,
+        description: reason,
+        metadata: { txn_code: txnCode, measurement_change: measurementChanging },
+        created_by: 'User',
+      }]).catch(() => null)
+    }
+
+    auditLog({
+      module: 'fleet', action: 'RECLASSIFY', entityType: 'asset',
+      entityId: assetId, entityName: asset.reg || asset.gen_name || 'Asset',
+      txnCode, details: `${fromCat} → ${newCategory}: ${reason}`,
+    })
+
+    await fetchAll()
+    return txnCode
+  }
+
   // ── Analytics ─────────────────────────────────────────────────────────────
 
   const getVehicleFuelEfficiency = (reg) => {
@@ -815,10 +940,12 @@ export function FleetProvider({ children }) {
       vehicles, generators, earthMovers, genRunLogs, downtimeLogs, maintenanceLogs, fuelLogs,
       vehicleTrips, equipmentHourLogs, assetIssues,
       maintenanceSchedules, workOrders, tyreInventory, tyreMovements,
+      categoryConfigs,
       loading,
       addVehicle, updateVehicle, deleteVehicle,
       addGenerator, updateGenerator, deleteGenerator,
       addEarthMover, updateEarthMover, deleteEarthMover,
+      reclassifyFleetAsset,
       addGenRunLog, deleteGenRunLog,
       addVehicleTrip, addEquipmentHourLog,
       addAssetIssue, updateAssetIssue,
