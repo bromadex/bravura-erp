@@ -276,7 +276,7 @@ export function FleetProvider({ children }) {
   // ---- Work Orders ----
   const createWorkOrder = async (wo) => {
     const id = generateId()
-    const wo_number = await generateTxnCode('WO').catch(() => null)
+    const wo_number = await generateTxnCode('WO').catch(() => `WO-${Date.now()}`)
     const { error } = await supabase.from('maintenance_work_orders').insert([{
       id, wo_number, ...wo, status: wo.status || 'open', created_at: new Date().toISOString(),
     }])
@@ -320,8 +320,9 @@ export function FleetProvider({ children }) {
   // ---- Tyre Inventory ----
   const addTyre = async (tyre) => {
     const id = generateId()
+    const tyre_code = await generateTxnCode('TYR').catch(() => `TYR-${Date.now()}`)
     const { error } = await supabase.from('tyre_inventory').insert([{
-      id, ...tyre, km_accumulated: tyre.km_accumulated || 0, status: tyre.status || 'in_stock',
+      id, tyre_code, ...tyre, km_accumulated: tyre.km_accumulated || 0, status: tyre.status || 'in_stock',
       created_at: new Date().toISOString(),
     }])
     if (error) throw error
