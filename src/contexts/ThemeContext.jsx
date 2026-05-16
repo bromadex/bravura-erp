@@ -11,7 +11,7 @@ const STORAGE_KEY = 'bravura_theme'
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) || 'dark' } catch { return 'dark' }
+    try { return localStorage.getItem(STORAGE_KEY) || 'light' } catch { return 'light' }
   })
 
   useEffect(() => {

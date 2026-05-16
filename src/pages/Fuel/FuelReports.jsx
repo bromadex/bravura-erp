@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProcurement } from '../../contexts/ProcurementContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import toast from 'react-hot-toast'
 import {
   Chart as ChartJS,
@@ -32,6 +33,7 @@ export default function FuelReports() {
   } = useFuel()
   const { user } = useAuth()
   const { createStoreRequisition } = useProcurement()
+  const { theme } = useTheme()
   const [prediction, setPrediction] = useState(null)
   const [showReqModal, setShowReqModal] = useState(false)
   const [reqForm, setReqForm] = useState({ quantity: 5000, notes: 'Auto-generated from low fuel alert' })
@@ -75,16 +77,42 @@ export default function FuelReports() {
     }
   }
 
+  // Chart.js draws on <canvas> — it cannot read CSS variables.
+  // Must use real colours derived from current theme.
+  const isDark      = theme === 'dark'
+  const textColor   = isDark ? '#e2e8f0' : '#1e293b'
+  const dimColor    = isDark ? '#94a3b8' : '#64748b'
+  const gridColor   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'
+  const tooltipBg   = isDark ? '#1e293b' : '#ffffff'
+  const tooltipBrd  = isDark ? '#334155' : '#e2e8f0'
+
   const chartOptions = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,   // fill the fixed-height container without distorting
     plugins: {
-      legend: { labels: { color: 'var(--text)' } },
-      tooltip: { backgroundColor: '#1a2235', titleColor: '#f4a261', bodyColor: '#f1f5f9' },
+      legend: {
+        labels: { color: textColor, font: { size: 12 } },
+      },
+      tooltip: {
+        backgroundColor: tooltipBg,
+        titleColor: '#f4a261',
+        bodyColor: textColor,
+        borderColor: tooltipBrd,
+        borderWidth: 1,
+        padding: 10,
+      },
     },
     scales: {
-      y: { ticks: { color: 'var(--text-dim)' } },
-      x: { ticks: { color: 'var(--text-dim)' } },
+      y: {
+        ticks:  { color: dimColor, font: { size: 11 } },
+        grid:   { color: gridColor },
+        border: { color: gridColor },
+      },
+      x: {
+        ticks:  { color: dimColor, font: { size: 11 }, maxRotation: 45, minRotation: 0 },
+        grid:   { color: gridColor },
+        border: { color: gridColor },
+      },
     },
   }
 
@@ -127,20 +155,21 @@ export default function FuelReports() {
       <div className="card" style={{ padding: 16, marginBottom: 24 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Fuel Issuance by Day</h3>
         {issuanceByDay.labels?.length > 0 ? (
-          <div style={{ height: 400, width: '100%' }}>
-            <Line data={{
+          <div style={{ height: 340, width: '100%' }}>
+            <Line key={`day-${theme}`} data={{
               labels: issuanceByDay.labels,
               datasets: [{
                 label: 'Litres Issued',
                 data: issuanceByDay.data,
-                borderColor: '#60a5fa',
-                backgroundColor: 'rgba(96,165,250,0.2)',
-                borderWidth: 3,
-                pointRadius: 5,
-                pointBackgroundColor: '#60a5fa',
-                pointBorderColor: '#fff',
+                borderColor: '#3b82f6',
+                backgroundColor: isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)',
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: isDark ? '#1e293b' : '#ffffff',
+                pointBorderWidth: 2,
                 fill: true,
-                tension: 0.3,
+                tension: 0.35,
               }],
             }} options={chartOptions} />
           </div>
@@ -150,15 +179,15 @@ export default function FuelReports() {
       <div className="card" style={{ padding: 16, marginBottom: 24 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Fuel Issuance by Vehicle (Top 10)</h3>
         {issuanceByVehicle.labels?.length > 0 ? (
-          <div style={{ height: 400, width: '100%' }}>
-            <Bar data={{
+          <div style={{ height: 340, width: '100%' }}>
+            <Bar key={`veh-${theme}`} data={{
               labels: issuanceByVehicle.labels,
               datasets: [{
                 label: 'Litres Issued',
                 data: issuanceByVehicle.data,
-                backgroundColor: '#f4a261',
+                backgroundColor: isDark ? 'rgba(244,162,97,0.85)' : 'rgba(180,83,9,0.75)',
                 borderRadius: 6,
-                barPercentage: 0.7,
+                barPercentage: 0.65,
               }],
             }} options={chartOptions} />
           </div>
@@ -168,20 +197,21 @@ export default function FuelReports() {
       <div className="card" style={{ padding: 16, marginBottom: 24 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: 'var(--gold)' }}>Main Tank Level Over Time</h3>
         {tankTrend.labels?.length > 0 ? (
-          <div style={{ height: 400, width: '100%' }}>
-            <Line data={{
+          <div style={{ height: 340, width: '100%' }}>
+            <Line key={`tank-${theme}`} data={{
               labels: tankTrend.labels,
               datasets: [{
                 label: 'Litres in Tank',
                 data: tankTrend.data,
-                borderColor: '#2dd4bf',
-                backgroundColor: 'rgba(45,212,191,0.2)',
-                borderWidth: 3,
-                pointRadius: 5,
-                pointBackgroundColor: '#2dd4bf',
-                pointBorderColor: '#fff',
+                borderColor: '#14b8a6',
+                backgroundColor: isDark ? 'rgba(20,184,166,0.15)' : 'rgba(20,184,166,0.08)',
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointBackgroundColor: '#14b8a6',
+                pointBorderColor: isDark ? '#1e293b' : '#ffffff',
+                pointBorderWidth: 2,
                 fill: true,
-                tension: 0.3,
+                tension: 0.35,
               }],
             }} options={chartOptions} />
           </div>
