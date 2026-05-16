@@ -18,6 +18,8 @@ export function CampsiteProvider({ children }) {
   const [assignments, setAssignments] = useState([])
   const [loading,     setLoading]     = useState(true)
 
+  const generateId = () => crypto.randomUUID ? generateId() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -106,7 +108,7 @@ export function CampsiteProvider({ children }) {
   // ── Blocks ────────────────────────────────────────────────────
 
   const addBlock = async (block) => {
-    const id = crypto.randomUUID()
+    const id = generateId()
     const { error } = await supabase.from('camp_blocks').insert([{ id, ...block, created_at: new Date().toISOString() }])
     if (error) throw error
     await fetchAll()
@@ -128,7 +130,7 @@ export function CampsiteProvider({ children }) {
   // ── Rooms ─────────────────────────────────────────────────────
 
   const addRoom = async (room) => {
-    const id = crypto.randomUUID()
+    const id = generateId()
     const { error } = await supabase.from('camp_rooms').insert([{ id, ...room, is_maintenance: false, created_at: new Date().toISOString() }])
     if (error) throw error
     await fetchAll()
@@ -152,7 +154,7 @@ export function CampsiteProvider({ children }) {
 
     if (isMaintenance && txnCode) {
       await supabase.from('camp_maintenance_flags').insert([{
-        id:         crypto.randomUUID(),
+        id:         generateId(),
         txn_code:   txnCode,
         room_id:    roomId,
         reason:     notes,
@@ -180,7 +182,7 @@ export function CampsiteProvider({ children }) {
     if (existingActive) throw new Error('Employee already has an active room assignment. Use Transfer instead.')
 
     const txnCode = await generateTxnCode('CA')
-    const id = crypto.randomUUID()
+    const id = generateId()
     const { error } = await supabase.from('room_assignments').insert([{
       id,
       txn_code:    txnCode,
@@ -195,7 +197,7 @@ export function CampsiteProvider({ children }) {
     if (error) throw error
 
     await supabase.from('txn_timeline').insert([{
-      id:          crypto.randomUUID(),
+      id:          generateId(),
       record_id:   txnCode,
       record_type: 'room_assignment',
       action:      'Assigned',
@@ -229,7 +231,7 @@ export function CampsiteProvider({ children }) {
     // Create new assignment
     const caCode = await generateTxnCode('CA')
     await supabase.from('room_assignments').insert([{
-      id:          crypto.randomUUID(),
+      id:          generateId(),
       txn_code:    caCode,
       employee_id: assignment.employee_id,
       room_id:     newRoomId,
@@ -241,7 +243,7 @@ export function CampsiteProvider({ children }) {
 
     // Transfer record
     await supabase.from('room_transfers').insert([{
-      id:              crypto.randomUUID(),
+      id:              generateId(),
       txn_code:        ctCode,
       employee_id:     assignment.employee_id,
       from_room_id:    assignment.room_id,
@@ -271,7 +273,7 @@ export function CampsiteProvider({ children }) {
     }).eq('id', assignmentId)
 
     await supabase.from('room_vacates').insert([{
-      id:             crypto.randomUUID(),
+      id:             generateId(),
       txn_code:       cvCode,
       assignment_id:  assignmentId,
       employee_id:    assignment.employee_id,
@@ -282,7 +284,7 @@ export function CampsiteProvider({ children }) {
     }])
 
     await supabase.from('txn_timeline').insert([{
-      id:          crypto.randomUUID(),
+      id:          generateId(),
       record_id:   assignment.txn_code,
       record_type: 'room_assignment',
       action:      'Vacated',

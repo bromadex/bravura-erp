@@ -55,7 +55,7 @@ export function MasterDataProvider({ children }) {
   const [notificationTemplates,  setNotificationTemplates]  = useState([])
   const [loading,                setLoading]                = useState(true)
 
-  const generateId = () => crypto.randomUUID()
+  const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
