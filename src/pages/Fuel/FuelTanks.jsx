@@ -282,7 +282,7 @@ export default function FuelTanks() {
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>End-of-day levels from dipstick readings</div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 100, overflowX: 'auto' }}>
                 {[...dipstickLog].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-30).map((d, i) => {
-                  const lvl = d.fuel_end || d.end_litres || 0
+                  const lvl = d.fuel_end || 0
                   const pct = (lvl / TANK_MAX_LITRES) * 100
                   const col = pct < 10 ? 'var(--red)' : pct < 20 ? 'var(--yellow)' : 'var(--teal)'
                   return (

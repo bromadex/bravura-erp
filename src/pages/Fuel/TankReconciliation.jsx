@@ -55,11 +55,10 @@ function buildBuckets(start, end, grouping) {
   return Array.from(map.values())
 }
 
-/** Extract closing-level (litres) from a dipstick row, handling both column names. */
+/** Extract closing-level (litres) from a dipstick row. */
 function dipLevel(row) {
-  if (!row) return null
-  const v = row.fuel_end != null ? row.fuel_end : row.end_litres != null ? row.end_litres : null
-  return v != null ? Number(v) : null
+  if (!row || row.fuel_end == null) return null
+  return Number(row.fuel_end)
 }
 
 /** Variance colour based on absolute percentage. */
@@ -118,17 +117,17 @@ export default function TankReconciliation() {
           .gte('date', dateFrom)
           .lte('date', dateTo),
         supabase.from('fuel_deliveries')
-          .select('date, qty')
+          .select('date, qty, amount')
           .gte('date', dateFrom)
           .lte('date', dateTo),
         supabase.from('dipstick_log')
-          .select('date, fuel_end, end_litres')
+          .select('date, fuel_end')
           .gte('date', dateFrom)
           .lte('date', dateTo)
           .order('date', { ascending: true }),
         // For opening balance: latest dipstick strictly before range start
         supabase.from('dipstick_log')
-          .select('date, fuel_end, end_litres')
+          .select('date, fuel_end')
           .lt('date', dateFrom)
           .order('date', { ascending: false })
           .limit(1),
@@ -144,8 +143,9 @@ export default function TankReconciliation() {
       const dipsticks  = dipRes.data || []
       const dipBefore  = dipBeforeRes.data || []
 
+      // qty = litres received; amount = invoice value (USD) for AP reconciliation
       const deliveryLitres = (row) => {
-        const v = Number(row.qty)
+        const v = row.qty != null ? Number(row.qty) : row.amount != null ? Number(row.amount) : 0
         return isNaN(v) ? 0 : v
       }
 

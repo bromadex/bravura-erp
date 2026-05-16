@@ -29,20 +29,20 @@ export default function FuelDeliveries() {
       .then(({ data }) => { if (data) setSuppliers(data) })
   }, [])
 
-  const BLANK = { date: today, fuel_type: 'DIESEL', qty: '', supplier: '', dip_before: '', dip_after: '', delivery_note: '', notes: '' }
+  const BLANK = { date: today, fuel_type: 'DIESEL', qty: '', amount: '', supplier: '', dip_before: '', dip_after: '', delivery_note: '', notes: '' }
   const [form, setForm] = useState(BLANK)
 
   const openNew  = () => { setEditRecord(null); setForm(BLANK); setShowModal(true) }
   const openEdit = (r) => {
     setEditRecord(r)
-    setForm({ date: r.date, fuel_type: r.fuel_type || 'DIESEL', qty: r.qty, supplier: r.supplier || '', dip_before: r.dip_before || '', dip_after: r.dip_after || '', delivery_note: r.delivery_note || '', notes: r.notes || '' })
+    setForm({ date: r.date, fuel_type: r.fuel_type || 'DIESEL', qty: r.qty, amount: r.amount || '', supplier: r.supplier || '', dip_before: r.dip_before || '', dip_after: r.dip_after || '', delivery_note: r.delivery_note || '', notes: r.notes || '' })
     setShowModal(true)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.qty || parseFloat(form.qty) <= 0) return toast.error('Enter a valid quantity')
-    const payload = { ...form, qty: parseFloat(form.qty), user_name: user?.full_name || user?.username }
+    const payload = { ...form, qty: parseFloat(form.qty), amount: form.amount ? parseFloat(form.amount) : null, user_name: user?.full_name || user?.username }
     try {
       if (editRecord) {
         const { error } = await supabase.from('fuel_deliveries').update(payload).eq('id', editRecord.id)
@@ -79,7 +79,7 @@ export default function FuelDeliveries() {
   const uniqueSuppliers  = new Set(deliveries.map(r => r.supplier).filter(Boolean)).size
 
   const handleExport = () => {
-    exportXLSX(filtered.map(r => ({ Date: r.date, Type: r.fuel_type, Qty: r.qty, Supplier: r.supplier, DipBefore: r.dip_before, DipAfter: r.dip_after, DeliveryNote: r.delivery_note, Notes: r.notes })), `FuelDeliveries_${today}`, 'Deliveries')
+    exportXLSX(filtered.map(r => ({ Date: r.date, Type: r.fuel_type, 'Qty (L)': r.qty, 'Amount (USD)': r.amount, Supplier: r.supplier, DipBefore: r.dip_before, DipAfter: r.dip_after, DeliveryNote: r.delivery_note, Notes: r.notes })), `FuelDeliveries_${today}`, 'Deliveries')
     toast.success('Exported')
   }
 
@@ -159,21 +159,22 @@ export default function FuelDeliveries() {
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Date</th><th>Fuel Type</th><th>Quantity (L)</th><th>Supplier</th>
+                <th>Date</th><th>Fuel Type</th><th>Quantity (L)</th><th>Amount (USD)</th><th>Supplier</th>
                 <th>Dip Before (cm)</th><th>Dip After (cm)</th><th>Delivery Note</th><th>Notes</th>
                 {(canEdit || canDelete) && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="9" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                <tr><td colSpan="10" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="9" className="empty-state">No deliveries found</td></tr>
+                <tr><td colSpan="10" className="empty-state">No deliveries found</td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
                   <td><span className={`badge ${r.fuel_type === 'DIESEL' ? 'badge-yellow' : 'badge-green'}`}>{r.fuel_type}</span></td>
                   <td style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--green)' }}>{(r.qty || 0).toLocaleString()} L</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{r.amount ? `$${Number(r.amount).toLocaleString()}` : '—'}</td>
                   <td style={{ fontWeight: 600 }}>{r.supplier || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{r.dip_before || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{r.dip_after  || '—'}</td>
@@ -218,6 +219,13 @@ export default function FuelDeliveries() {
                   <input type="number" step="0.1" min="1" className="form-control" required
                     value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} />
                 </div>
+                <div className="form-group">
+                  <label>Invoice Amount (USD)</label>
+                  <input type="number" step="0.01" min="0" className="form-control" placeholder="0.00"
+                    value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-row">
                 <div className="form-group">
                   <label>Supplier</label>
                   <select className="form-control" value={form.supplier}

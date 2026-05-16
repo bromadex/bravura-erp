@@ -76,7 +76,7 @@ export function FuelProvider({ children }) {
   const getCurrentTankLevel = () => {
     if (!dipstickLog.length) return 0
     const latest = [...dipstickLog].sort((a,b) => new Date(b.date) - new Date(a.date))[0]
-    return latest.fuel_end || latest.end_litres || 0
+    return latest.fuel_end || 0
   }
 
   const getTankPercentage = () => (getCurrentTankLevel() / TANK_MAX_LITRES) * 100
@@ -113,7 +113,7 @@ export function FuelProvider({ children }) {
   const getTankLevelTrend = () => {
     const sorted = [...dipstickLog].sort((a,b) => new Date(a.date) - new Date(b.date))
     const labels = sorted.map(d => d.date)
-    const levels = sorted.map(d => d.fuel_end || d.end_litres || 0)
+    const levels = sorted.map(d => d.fuel_end || 0)
     return { labels, data: levels }
   }
 
@@ -125,7 +125,7 @@ export function FuelProvider({ children }) {
     // Use last 14 days of tank level data
     const recent = sorted.slice(-14)
     const x = recent.map((_, idx) => idx) // days index
-    const y = recent.map(d => d.fuel_end || d.end_litres || 0)
+    const y = recent.map(d => d.fuel_end || 0)
 
     // Simple linear regression
     const n = x.length
