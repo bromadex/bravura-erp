@@ -37,6 +37,7 @@ export function ProcurementProvider({ children }) {
         message,
         link,
         is_read:    false,
+        category:   'general',
         created_at: new Date().toISOString(),
       }])
     } catch (err) {
@@ -362,6 +363,35 @@ export function ProcurementProvider({ children }) {
       id, grn_number: grnNumber, ...grn, created_at: new Date().toISOString(),
     }])
     if (error) throw error
+
+    // Write supplier performance log entry
+    if (grn.supplier_id) {
+      const po = grn.po_id ? purchaseOrders.find(p => p.id === grn.po_id) : null
+      const deliveryDate = grn.actual_delivery_date || grn.date
+      const expectedDate = po?.delivery_date || null
+      const delayDays = expectedDate && deliveryDate
+        ? Math.floor((new Date(deliveryDate) - new Date(expectedDate)) / 86400000)
+        : null
+      const totalOrdered  = (grn.items || []).reduce((s, i) => s + (parseFloat(i.ordered_qty) || parseFloat(i.qty) || 0), 0)
+      const totalReceived = (grn.items || []).reduce((s, i) => s + (parseFloat(i.received)    || parseFloat(i.qty) || 0), 0)
+
+      await supabase.from('supplier_performance_log').insert([{
+        id:            generateId(),
+        supplier_id:   grn.supplier_id,
+        supplier_name: grn.supplier_name || '',
+        po_id:         grn.po_id         || null,
+        grn_id:        id,
+        event_type:    'delivery',
+        event_date:    deliveryDate || new Date().toISOString().split('T')[0],
+        expected_date: expectedDate,
+        actual_date:   deliveryDate,
+        delay_days:    delayDays,
+        ordered_qty:   totalOrdered,
+        received_qty:  totalReceived,
+        quality_score: grn.quality_score ? parseInt(grn.quality_score) : null,
+        created_at:    new Date().toISOString(),
+      }])
+    }
 
     // Auto-update inventory stock
     for (const it of grn.items) {
