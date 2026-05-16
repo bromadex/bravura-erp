@@ -29,7 +29,7 @@ export function ProcurementProvider({ children }) {
 
   const generateId = () => crypto.randomUUID()
 
-  const safe = (q) => q.catch(() => ({ data: [] }))
+  const safe = (q) => Promise.resolve(q).catch(() => ({ data: [] }))
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
