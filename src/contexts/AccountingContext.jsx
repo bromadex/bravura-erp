@@ -12,6 +12,8 @@ export function AccountingProvider({ children }) {
   const [journalLines,   setJournalLines]   = useState([])
   const [loading,        setLoading]        = useState(true)
 
+  const generateId = () => crypto.randomUUID ? generateId() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -33,7 +35,7 @@ export function AccountingProvider({ children }) {
 
   // ── Accounts ─────────────────────────────────────────────────
   const addAccount = async (data, userName = '') => {
-    const id = crypto.randomUUID()
+    const id = generateId()
     const { error } = await supabase.from('accounts').insert([{
       id, ...data, is_active: true, balance: 0, created_at: new Date().toISOString(),
     }])
@@ -65,7 +67,7 @@ export function AccountingProvider({ children }) {
     if (Math.abs(totalDebit - totalCredit) > 0.001)
       throw new Error(`Entry does not balance. Debit: ${totalDebit}, Credit: ${totalCredit}`)
 
-    const entryId = crypto.randomUUID()
+    const entryId = generateId()
     const { error: ee } = await supabase.from('journal_entries').insert([{
       id:           entryId,
       entry_date,
@@ -81,7 +83,7 @@ export function AccountingProvider({ children }) {
 
     const { error: le } = await supabase.from('journal_lines').insert(
       lines.map(l => ({
-        id:          crypto.randomUUID(),
+        id:          generateId(),
         entry_id:    entryId,
         account_id:  l.account_id,
         debit:       l.debit  || 0,
