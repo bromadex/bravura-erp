@@ -9,13 +9,16 @@ import toast from 'react-hot-toast'
 import { PageHeader, StatusBadge, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
 
 export default function Vehicles() {
-  const { vehicles, addVehicle, updateVehicle, deleteVehicle, loading, fetchAll } = useFleet()
+  const { vehicles, addVehicle, updateVehicle, deleteVehicle, reclassifyFleetAsset, categoryConfigs, loading, fetchAll } = useFleet()
   const canEdit   = useCanEdit('fleet', 'vehicles')
   const canDelete = useCanDelete('fleet', 'vehicles')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing,   setEditing]   = useState(null)
-  const [fuelMap,   setFuelMap]   = useState({})
-  const [employees, setEmployees] = useState([])
+  const [modalOpen,      setModalOpen]      = useState(false)
+  const [editing,        setEditing]        = useState(null)
+  const [fuelMap,        setFuelMap]        = useState({})
+  const [employees,      setEmployees]      = useState([])
+  const [reclassAsset,   setReclassAsset]   = useState(null)
+  const [reclassForm,    setReclassForm]    = useState({ newCategory: '', reason: '' })
+  const [reclassLoading, setReclassLoading] = useState(false)
   const [form, setForm] = useState({
     reg: '', type: '', description: '', driver_name: '', driver_id: '', status: 'Active',
     odometer_km: '', last_service_date: '', service_interval_km: '',
@@ -142,6 +145,7 @@ export default function Vehicles() {
                 )}
                 <div style={{ marginTop: 8, fontSize: 12 }}>⛽ Total Fuel: <strong>{totalFuel.toLocaleString()} L</strong></div>
                 <div className="btn-group-sm" style={{ justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  {canEdit && <button className="btn btn-secondary btn-sm" title="Reclassify" onClick={() => { setReclassAsset(v); setReclassForm({ newCategory: '', reason: '' }) }}><span className="material-icons">swap_horiz</span></button>}
                   {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => openModal(v)}><span className="material-icons">edit</span></button>}
                   {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(v)}><span className="material-icons">delete</span></button>}
                 </div>
@@ -149,6 +153,71 @@ export default function Vehicles() {
             )
           })}
         </div>
+      )}
+
+      {/* Reclassify Modal */}
+      {reclassAsset && (
+        <ModalDialog open={!!reclassAsset} onClose={() => setReclassAsset(null)} title="Reclassify Asset">
+          <div style={{ marginBottom: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 8, fontSize: 13 }}>
+            <strong>{reclassAsset.reg}</strong> is currently a <strong>Vehicle</strong>
+            {reclassAsset._legacy && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>(legacy record — will be migrated)</span>}
+          </div>
+          <div className="form-group">
+            <label>Move to Category *</label>
+            <select className="form-control" value={reclassForm.newCategory}
+              onChange={e => setReclassForm(f => ({ ...f, newCategory: e.target.value }))}>
+              <option value="">— Select target category —</option>
+              {(categoryConfigs.length
+                ? categoryConfigs.filter(c => c.category !== 'Vehicle')
+                : [
+                    { category: 'Generator', measurement_type: 'hours' },
+                    { category: 'Heavy Equipment', measurement_type: 'hours' },
+                    { category: 'Light Equipment', measurement_type: 'hours' },
+                    { category: 'Water Pump', measurement_type: 'hours' },
+                    { category: 'Compressor', measurement_type: 'hours' },
+                    { category: 'Fixed Plant', measurement_type: 'fixed' },
+                  ]
+              ).map(c => (
+                <option key={c.category} value={c.category}>
+                  {c.category} ({c.measurement_type})
+                </option>
+              ))}
+            </select>
+          </div>
+          {reclassForm.newCategory && (() => {
+            const toCfg = (categoryConfigs.length ? categoryConfigs : []).find(c => c.category === reclassForm.newCategory)
+            const toMeasure = toCfg?.measurement_type || 'hours'
+            if (toMeasure !== 'km') return (
+              <div style={{ background: 'rgba(251,191,36,.12)', border: '1px solid rgba(251,191,36,.3)', borderRadius: 6, padding: 10, fontSize: 12, marginBottom: 12 }}>
+                <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 4, color: 'var(--yellow)' }}>warning</span>
+                Measurement changes <strong>km → {toMeasure}</strong>. The current odometer value ({(reclassAsset.odometer_km || 0).toLocaleString()} km) will be <strong>archived</strong> and the metric will reset to 0.
+              </div>
+            )
+            return null
+          })()}
+          <div className="form-group">
+            <label>Reason for Reclassification *</label>
+            <textarea className="form-control" rows={3} required value={reclassForm.reason}
+              onChange={e => setReclassForm(f => ({ ...f, reason: e.target.value }))}
+              placeholder="e.g. Vehicle repurposed as site generator" />
+          </div>
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={() => setReclassAsset(null)}>Cancel</button>
+            <button
+              className="btn btn-primary" disabled={!reclassForm.newCategory || !reclassForm.reason || reclassLoading}
+              onClick={async () => {
+                setReclassLoading(true)
+                try {
+                  const code = await reclassifyFleetAsset(reclassAsset.id, reclassForm.newCategory, reclassForm.reason)
+                  toast.success(`Reclassified → ${reclassForm.newCategory} (${code})`)
+                  setReclassAsset(null)
+                } catch (err) { toast.error(err.message) }
+                finally { setReclassLoading(false) }
+              }}>
+              {reclassLoading ? 'Processing…' : `Reclassify → ${reclassForm.newCategory || '…'}`}
+            </button>
+          </ModalActions>
+        </ModalDialog>
       )}
 
       <ModalDialog open={modalOpen} onClose={() => setModalOpen(false)} title={`${editing ? 'Edit' : 'Add'} Vehicle`}>

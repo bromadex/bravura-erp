@@ -8,13 +8,16 @@ import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 
 export default function Generators() {
-  const { generators, addGenerator, updateGenerator, deleteGenerator, addGenRunLog, genRunLogs, loading, fetchAll } = useFleet()
+  const { generators, addGenerator, updateGenerator, deleteGenerator, addGenRunLog, genRunLogs, reclassifyFleetAsset, categoryConfigs, loading, fetchAll } = useFleet()
   const canEdit   = useCanEdit('fleet', 'generators')
   const canDelete = useCanDelete('fleet', 'generators')
-  const [modalOpen,    setModalOpen]    = useState(false)
-  const [runModalOpen, setRunModalOpen] = useState(false)
-  const [editing,      setEditing]      = useState(null)
-  const [employees,    setEmployees]    = useState([])
+  const [modalOpen,      setModalOpen]      = useState(false)
+  const [runModalOpen,   setRunModalOpen]   = useState(false)
+  const [editing,        setEditing]        = useState(null)
+  const [employees,      setEmployees]      = useState([])
+  const [reclassAsset,   setReclassAsset]   = useState(null)
+  const [reclassForm,    setReclassForm]    = useState({ newCategory: '', reason: '' })
+  const [reclassLoading, setReclassLoading] = useState(false)
   const [form, setForm] = useState({
     gen_code: '', gen_name: '', location: '', capacity: '', status: 'Stopped',
     service_date: '', assigned_operator_id: '', assigned_operator_name: ''
@@ -140,12 +143,65 @@ export default function Generators() {
                 )}
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>⏱ Total hours: {totalHours.toFixed(1)}</div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  {canEdit && <button className="btn btn-secondary btn-sm" title="Reclassify" onClick={() => { setReclassAsset(g); setReclassForm({ newCategory: '', reason: '' }) }}><span className="material-icons">swap_horiz</span></button>}
                   {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => openEdit(g)}><span className="material-icons">edit</span></button>}
                   {canDelete && <button className="btn btn-danger btn-sm" onClick={async () => { if (window.confirm(`Delete ${g.gen_code}?`)) { await deleteGenerator(g.id); toast.success('Deleted') } }}><span className="material-icons">delete</span></button>}
                 </div>
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Reclassify Modal */}
+      {reclassAsset && (
+        <div className="overlay" onClick={() => setReclassAsset(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-title">Reclassify <span>Asset</span></div>
+            <div style={{ marginBottom: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 8, fontSize: 13 }}>
+              <strong>{reclassAsset.gen_code}</strong> is currently a <strong>Generator</strong>
+              {reclassAsset._legacy && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-dim)' }}>(legacy — will be migrated)</span>}
+            </div>
+            <div className="form-group">
+              <label>Move to Category *</label>
+              <select className="form-control" value={reclassForm.newCategory}
+                onChange={e => setReclassForm(f => ({ ...f, newCategory: e.target.value }))}>
+                <option value="">— Select target category —</option>
+                {(categoryConfigs.length
+                  ? categoryConfigs.filter(c => c.category !== 'Generator')
+                  : [
+                      { category: 'Vehicle',         measurement_type: 'km'    },
+                      { category: 'Heavy Equipment', measurement_type: 'hours' },
+                      { category: 'Light Equipment', measurement_type: 'hours' },
+                      { category: 'Water Pump',      measurement_type: 'hours' },
+                      { category: 'Compressor',      measurement_type: 'hours' },
+                      { category: 'Fixed Plant',     measurement_type: 'fixed' },
+                    ]
+                ).map(c => <option key={c.category} value={c.category}>{c.category} ({c.measurement_type})</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Reason *</label>
+              <textarea className="form-control" rows={3} value={reclassForm.reason}
+                onChange={e => setReclassForm(f => ({ ...f, reason: e.target.value }))}
+                placeholder="e.g. Unit repurposed as standby pump" />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setReclassAsset(null)}>Cancel</button>
+              <button className="btn btn-primary" disabled={!reclassForm.newCategory || !reclassForm.reason || reclassLoading}
+                onClick={async () => {
+                  setReclassLoading(true)
+                  try {
+                    const code = await reclassifyFleetAsset(reclassAsset.id, reclassForm.newCategory, reclassForm.reason)
+                    toast.success(`Reclassified → ${reclassForm.newCategory} (${code})`)
+                    setReclassAsset(null)
+                  } catch (err) { toast.error(err.message) }
+                  finally { setReclassLoading(false) }
+                }}>
+                {reclassLoading ? 'Processing…' : `Reclassify → ${reclassForm.newCategory || '…'}`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
