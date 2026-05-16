@@ -216,7 +216,8 @@ export function AssetRegistryProvider({ children }) {
     let count = 0
     for (const v of toImport) {
       const asset_code = await generateTxnCode('AS')
-      const id = generateId()
+      // Use source record's own ID so existing FK references (maintenance_logs, work_orders) still resolve
+      const id = v.id
       const payload = mapper(v, id, asset_code)
       const { error } = await supabase.from('asset_registry').insert([payload])
       if (!error) {
