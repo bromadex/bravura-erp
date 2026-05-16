@@ -6,7 +6,7 @@ import { generateTxnCode } from '../engine/transactionEngine'
 
 const FleetContext = createContext(null)
 
-const safe = (q) => q.catch(() => ({ data: [] }))
+const safe = (q) => Promise.resolve(q).catch(() => ({ data: [] }))
 
 export function FleetProvider({ children }) {
   const [vehicles, setVehicles] = useState([])

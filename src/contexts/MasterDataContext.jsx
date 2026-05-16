@@ -59,7 +59,7 @@ export function MasterDataProvider({ children }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const safe = (q) => q.catch(() => ({ data: [] }))
+    const safe = (q) => Promise.resolve(q).catch(() => ({ data: [] }))
     try {
       const [deptRes, desRes, supRes, ccRes, siteRes, statusRes, notifRes] = await Promise.all([
         safe(supabase.from('departments').select('*').order('name')),
