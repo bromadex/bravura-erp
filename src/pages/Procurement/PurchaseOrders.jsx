@@ -8,6 +8,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
@@ -53,16 +54,20 @@ export default function PurchaseOrders() {
     const supplier = suppliers.find(s => s.id === form.supplier_id)
     try {
       await createPurchaseOrder({
-        supplier_id:   form.supplier_id,
-        supplier_name: supplier?.name || '',
-        order_date:    form.order_date,
-        delivery_date: form.delivery_date,
-        items:         form.items,
-        total_amount:  totalAmount,
-        notes:         form.notes,
-        created_by_id: user?.id,
+        supplier_id:     form.supplier_id,
+        supplier_name:   supplier?.name || '',
+        order_date:      form.order_date,
+        delivery_date:   form.delivery_date,
+        items:           form.items,
+        total_amount:    totalAmount,
+        notes:           form.notes,
+        created_by_id:   user?.id,
         created_by_name: user?.full_name || user?.username,
-        status: 'draft',
+        status:          'draft',
+        rfq_id:          form.rfq_id          || null,
+        quotation_id:    form.quotation_id     || null,
+        budget_code:     form.budget_code      || '',
+        department:      form.department        || '',
       })
       toast.success('Purchase order created')
       setModalOpen(false)
@@ -189,6 +194,13 @@ export default function PurchaseOrders() {
               <div><span style={{ color: 'var(--text-dim)' }}>Delivery Date:</span> {viewPO.delivery_date || '—'}</div>
               <div><span style={{ color: 'var(--text-dim)' }}>Status:</span> {statusBadge(viewPO.status)}</div>
               <div><span style={{ color: 'var(--text-dim)' }}>Total:</span> <strong style={{ color: 'var(--teal)' }}>${parseFloat(viewPO.total_amount || 0).toFixed(2)}</strong></div>
+              {viewPO.department && <div><span style={{ color: 'var(--text-dim)' }}>Department:</span> {viewPO.department}</div>}
+              {viewPO.budget_code && <div><span style={{ color: 'var(--text-dim)' }}>Budget Code:</span> <code style={{ color: 'var(--gold)' }}>{viewPO.budget_code}</code></div>}
+              <div><span style={{ color: 'var(--text-dim)' }}>Finance:</span>
+                {viewPO.finance_approved
+                  ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓ Approved by {viewPO.finance_approver}</span>
+                  : <span style={{ color: 'var(--text-dim)' }}>Pending finance approval</span>}
+              </div>
               {viewPO.notes && <div style={{ gridColumn: 'span 2', color: 'var(--text-dim)', fontSize: 12 }}>{viewPO.notes}</div>}
             </div>
             <div className="table-wrap">
@@ -209,6 +221,20 @@ export default function PurchaseOrders() {
               </table>
             </div>
             <div className="modal-actions">
+              {user?.role_id === 'role_super_admin' && viewPO.status === 'approved' && !viewPO.finance_approved && (
+                <button className="btn btn-secondary" onClick={async () => {
+                  await supabase.from('purchase_orders').update({
+                    finance_approved: true,
+                    finance_approver: user.full_name || user.username,
+                    finance_approved_at: new Date().toISOString(),
+                  }).eq('id', viewPO.id)
+                  await fetchAll()
+                  setViewPO(null)
+                  toast.success('Finance approved')
+                }}>
+                  <span className="material-icons" style={{ fontSize: 16 }}>account_balance</span> Finance Approve
+                </button>
+              )}
               {canEdit && viewPO.status !== 'completed' && (
                 <button className="btn btn-primary" onClick={() => { handleReceive(viewPO); setViewPO(null) }}>
                   <span className="material-icons">move_to_inbox</span> Create GRN
@@ -329,4 +355,4 @@ export default function PurchaseOrders() {
       )}
     </div>
   )
-                     }
+}
