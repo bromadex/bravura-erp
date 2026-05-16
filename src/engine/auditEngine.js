@@ -41,6 +41,14 @@ export async function auditLog({
   status     = 'success',
   details    = '',
 }) {
+  // Resolve client IP (best-effort — fails silently)
+  let _clientIp = null
+  try {
+    const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(2000) })
+    const d = await r.json()
+    _clientIp = d.ip || null
+  } catch { /* ignore — IP not critical */ }
+
   // Resolve userName from session if not supplied
   if (!userName) {
     try {
