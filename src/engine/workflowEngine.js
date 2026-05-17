@@ -210,15 +210,22 @@ export async function approveStep(instanceId, actor, comment = null) {
   const currentStep = instance.current_step
   if (!currentStep) throw new Error('No active step found')
 
-  // Role validation — super admin always passes
-  if (actor.role_id !== 'role_super_admin') {
-    // Check specific user override first
-    if (currentStep.specific_user_id && currentStep.specific_user_id !== actor.id) {
-      throw new Error(`This step is assigned to a specific user`)
-    }
-    if (!currentStep.specific_user_id && actor.role_id !== currentStep.required_role) {
-      throw new Error(`This step requires role "${currentStep.required_role}"`)
-    }
+  // Resolve delegation for this step
+  let approveDelegation = null
+  const { data: delRows } = await supabase.from('workflow_actions')
+    .select('comment, actor_name').eq('instance_id', instanceId)
+    .eq('step_id', currentStep.id).eq('action', 'delegated')
+    .order('created_at', { ascending: false }).limit(1)
+  if (delRows?.length) {
+    try { const p = JSON.parse(delRows[0].comment || '{}'); approveDelegation = { toId: p.to_id, toName: p.to_name } } catch {}
+  }
+
+  if (!canActOnStep(currentStep, actor, approveDelegation)) {
+    throw new Error(
+      currentStep.specific_user_id
+        ? 'This step is assigned to a specific user'
+        : `This step requires role "${currentStep.required_role}"`
+    )
   }
 
   // Prevent duplicate
@@ -262,7 +269,16 @@ export async function rejectStep(instanceId, actor, reason) {
 
   const currentStep = instance.current_step
   if (!currentStep) throw new Error('No active step')
-  if (actor.role_id !== 'role_super_admin' && actor.role_id !== currentStep.required_role)
+
+  let rejectDelegation = null
+  const { data: rejDelRows } = await supabase.from('workflow_actions')
+    .select('comment').eq('instance_id', instanceId)
+    .eq('step_id', currentStep.id).eq('action', 'delegated')
+    .order('created_at', { ascending: false }).limit(1)
+  if (rejDelRows?.length) {
+    try { const p = JSON.parse(rejDelRows[0].comment || '{}'); rejectDelegation = { toId: p.to_id } } catch {}
+  }
+  if (!canActOnStep(currentStep, actor, rejectDelegation))
     throw new Error(`This step requires role "${currentStep.required_role}"`)
 
   const now = new Date().toISOString()
@@ -295,39 +311,78 @@ export async function cancelWorkflow(instanceId, actor, reason = 'Cancelled by s
 
 /**
  * GET STATE — Full workflow state for a record (used by ApprovalPanel).
+ * Returns activeDelegation and slaData in addition to the base state.
  */
 export async function getWorkflowState(entityType, entityId) {
   const instance = await getInstanceForEntity(entityType, entityId)
   if (!instance) return null
 
-  const [steps, actions] = await Promise.all([
+  const [steps, actionsResult] = await Promise.all([
     getStepsForWorkflow(instance.workflow_id),
     supabase.from('workflow_actions')
       .select('*').eq('instance_id', instance.id)
-      .order('created_at', { ascending: true })
-      .then(r => r.data || []),
+      .order('created_at', { ascending: true }),
   ])
+  const actions     = actionsResult.data || []
+  const stepIndex   = steps.findIndex(s => s.id === instance.current_step_id)
+  const currentStep = instance.current_step
 
-  const stepIndex = steps.findIndex(s => s.id === instance.current_step_id)
+  // Resolve active delegation for the current step
+  let activeDelegation = null
+  if (currentStep) {
+    const delegActions = actions.filter(a => a.action === 'delegated' && a.step_id === currentStep.id)
+    if (delegActions.length) {
+      try {
+        const p = JSON.parse(delegActions.at(-1).comment || '{}')
+        activeDelegation = { fromName: delegActions.at(-1).actor_name, toId: p.to_id, toName: p.to_name, reason: p.reason }
+      } catch {}
+    }
+  }
+
+  // SLA — use instance.updated_at as proxy for when the current step was entered
+  const isActive = !['approved', 'rejected', 'cancelled'].includes(instance.status)
+  const slaData  = (currentStep?.sla_hours && isActive)
+    ? calcStepSLA(currentStep.sla_hours, instance.updated_at)
+    : null
+
   return {
-    instance,
-    steps,
-    actions,
-    currentStep:   instance.current_step,
-    isCompleted:   ['approved', 'rejected', 'cancelled'].includes(instance.status),
-    isFinalStep:   instance.current_step?.is_final || false,
-    stepProgress:  stepIndex + 1,
-    totalSteps:    steps.length,
-    workflowName:  instance.workflow?.name || '',
+    instance, steps, actions, currentStep,
+    activeDelegation, slaData,
+    isCompleted:  ['approved', 'rejected', 'cancelled'].includes(instance.status),
+    isFinalStep:  currentStep?.is_final || false,
+    stepProgress: stepIndex + 1,
+    totalSteps:   steps.length,
+    workflowName: instance.workflow?.name || '',
   }
 }
 
 /**
- * CAN ACT — Role + user override check.
+ * Calculate SLA status for the current step.
+ * @param {number} slaHours  - hours allowed for this step (from workflow_steps.sla_hours)
+ * @param {string} enteredAt - ISO timestamp when the step was entered
+ * @returns {{ dueAt, urgency, overdueMins, remainingMins } | null}
  */
-export function canActOnStep(step, actor) {
+export function calcStepSLA(slaHours, enteredAt) {
+  if (!slaHours || !enteredAt) return null
+  const enteredMs = new Date(enteredAt).getTime()
+  const dueMs     = enteredMs + slaHours * 3600000
+  const nowMs     = Date.now()
+  const remaining = dueMs - nowMs
+  return {
+    dueAt:         new Date(dueMs).toISOString(),
+    urgency:       remaining < 0 ? 'overdue' : remaining < slaHours * 3600000 * 0.25 ? 'warning' : 'ok',
+    overdueMins:   remaining < 0 ? Math.round(-remaining / 60000) : 0,
+    remainingMins: remaining > 0 ? Math.round(remaining / 60000) : 0,
+  }
+}
+
+/**
+ * CAN ACT — Role + user override + delegation check.
+ */
+export function canActOnStep(step, actor, delegation = null) {
   if (!step || !actor) return false
   if (actor.role_id === 'role_super_admin') return true
+  if (delegation?.toId === actor.id) return true
   if (step.specific_user_id) return step.specific_user_id === actor.id
   return actor.role_id === step.required_role
 }
@@ -386,6 +441,7 @@ export async function saveWorkflow(workflow, steps) {
       step_name:        s.step_name,
       required_role:    s.required_role,
       approval_type:    s.approval_type || 'any',
+      sla_hours:        s.sla_hours     || null,
       specific_user_id: s.specific_user_id || null,
       description:      s.description || '',
       status_on_entry:  s.status_on_entry,
@@ -413,6 +469,83 @@ export async function saveWorkflow(workflow, steps) {
   }
 
   return workflowId
+}
+
+/**
+ * DELEGATE — Reassign current step to another user for this instance only.
+ * The delegate can then approve/reject in place of the original approver.
+ */
+export async function delegateStep(instanceId, fromActor, toUserId, toUserName, reason = '') {
+  const instance = await getInstance(instanceId)
+  if (!instance) throw new Error('Instance not found')
+  if (instance.status !== 'pending') throw new Error('Cannot delegate a completed workflow')
+  const currentStep = instance.current_step
+  if (!currentStep) throw new Error('No active step')
+  if (!canActOnStep(currentStep, fromActor)) throw new Error('You are not the assigned approver for this step')
+
+  await supabase.from('workflow_actions').insert([{
+    id:          crypto.randomUUID(),
+    instance_id: instanceId,
+    step_id:     currentStep.id,
+    actor_id:    fromActor.id,
+    actor_name:  fromActor.name || '',
+    actor_role:  fromActor.role_id || '',
+    action:      'delegated',
+    comment:     JSON.stringify({ to_id: toUserId, to_name: toUserName, reason }),
+    created_at:  new Date().toISOString(),
+  }])
+  await auditLog({
+    module: 'workflow', action: 'WORKFLOW_DELEGATED',
+    entityType: 'workflow_instance', entityId: instanceId,
+    entityName: `Step delegated to ${toUserName}`, userName: fromActor.name || '',
+  })
+  return { delegatedTo: toUserName }
+}
+
+/**
+ * GET INBOX — All pending instances where the current user can act.
+ * Returns instances sorted by SLA urgency then creation date.
+ */
+export async function getWorkflowInbox(actor) {
+  const { data: instances } = await supabase
+    .from('workflow_instances')
+    .select('*, current_step:workflow_steps(*), workflow:workflows(*)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (!instances?.length) return []
+
+  // For each instance, check if there's a delegation to this user
+  const filtered = []
+  for (const inst of instances) {
+    if (!inst.current_step) continue
+
+    let delegation = null
+    const { data: delRows } = await supabase.from('workflow_actions')
+      .select('comment').eq('instance_id', inst.id)
+      .eq('step_id', inst.current_step.id).eq('action', 'delegated')
+      .order('created_at', { ascending: false }).limit(1)
+    if (delRows?.length) {
+      try { const p = JSON.parse(delRows[0].comment || '{}'); delegation = { toId: p.to_id } } catch {}
+    }
+
+    if (canActOnStep(inst.current_step, actor, delegation)) {
+      const sla = inst.current_step.sla_hours
+        ? calcStepSLA(inst.current_step.sla_hours, inst.updated_at)
+        : null
+      filtered.push({ ...inst, sla })
+    }
+  }
+
+  // Sort: overdue first, then warning, then ok — each group by created_at desc
+  const urgencyOrder = { overdue: 0, warning: 1, ok: 2, none: 3 }
+  return filtered.sort((a, b) => {
+    const ua = urgencyOrder[a.sla?.urgency || 'none']
+    const ub = urgencyOrder[b.sla?.urgency || 'none']
+    if (ua !== ub) return ua - ub
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
 }
 
 /**

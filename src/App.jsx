@@ -50,6 +50,7 @@ const CampHeadcount   = lazy(() => import('./pages/Campsite/CampHeadcount'))
 // Settings / Workflow
 const WorkflowAdmin   = lazy(() => import('./components/workflow/WorkflowAdmin'))
 const WorkflowBuilder = lazy(() => import('./components/workflow/WorkflowBuilder'))
+const WorkflowInbox   = lazy(() => import('./pages/Workflow/WorkflowInbox'))
 const MasterData      = lazy(() => import('./pages/Settings/MasterData'))
 
 // Connect
@@ -222,6 +223,7 @@ function AppRoutes() {
         <Route path="/access-denied"   element={<AccessDenied />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
+        <Route path="/module/workflow/inbox" element={<ProtectedRoute><WorkflowInbox /></ProtectedRoute>} />
 
         {/* ── DASHBOARD ─────────────────────────────────────── */}
         <Route path="/module/dashboard" element={
