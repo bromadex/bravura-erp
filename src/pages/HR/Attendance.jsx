@@ -14,21 +14,23 @@
 //
 // 4. Badge classes use badge-green/yellow/red (not bg-*).
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useHR } from '../../contexts/HRContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useCanApprove } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
-import { PageHeader, KPICard, StatusBadge, EmptyState } from '../../components/ui'
+import { PageHeader, KPICard, StatusBadge, EmptyState, Pagination } from '../../components/ui'
+
+const PAGE_SIZE = 75
 
 export default function Attendance() {
   const {
-    employees, attendance,
+    employees,
     clockIn, clockOut, addAttendanceRecord,
     approveAttendance, rejectAttendance, bulkApproveAttendance,
-    updateAttendanceRecord, deleteAttendanceRecord, fetchAll
+    updateAttendanceRecord, deleteAttendanceRecord,
   } = useHR()
   const { user } = useAuth()
   const canApprove = useCanApprove('hr', 'attendance')
@@ -45,20 +47,75 @@ export default function Attendance() {
       .then(({ data }) => { if (data?.employee_id) setMyEmployeeId(data.employee_id) })
   }, [user])
 
-  // Today's record for the current user
-  const myTodayRecord = attendance.find(a => a.employee_id === myEmployeeId && a.date === today)
-  const isClockedIn   = myTodayRecord && !myTodayRecord.clock_out
+  // ── My today's record — fetched directly (not from context) ───
+  const [myTodayRecord, setMyTodayRecord] = useState(null)
+  const fetchMyTodayRecord = useCallback(async () => {
+    if (!myEmployeeId) return
+    const { data } = await supabase.from('employee_attendance')
+      .select('*').eq('employee_id', myEmployeeId).eq('date', today)
+      .order('created_at', { ascending: false }).limit(1).single()
+    setMyTodayRecord(data || null)
+  }, [myEmployeeId, today])
+  useEffect(() => { fetchMyTodayRecord() }, [fetchMyTodayRecord])
+
+  const isClockedIn = myTodayRecord && !myTodayRecord.clock_out
+
+  // ── Server-side paginated attendance list ──────────────────────
+  const [rows,         setRows]         = useState([])
+  const [total,        setTotal]        = useState(0)
+  const [page,         setPage]         = useState(0)
+  const [tableLoading, setTableLoading] = useState(true)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  // ── Filters ───────────────────────────────────────────────────
+  const [filterEmployee, setFilterEmployee] = useState('ALL')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo,   setFilterDateTo]   = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('ALL')
+
+  const fetchPage = useCallback(async (p = 0) => {
+    setTableLoading(true)
+    const from = p * PAGE_SIZE
+    const to   = from + PAGE_SIZE - 1
+
+    let q = supabase
+      .from('employee_attendance')
+      .select('*', { count: 'exact' })
+      .order('status',     { ascending: true })  // pending first
+      .order('date',       { ascending: false })
+      .range(from, to)
+
+    if (!canApprove && myEmployeeId) q = q.eq('employee_id', myEmployeeId)
+    if (filterEmployee !== 'ALL')    q = q.eq('employee_id', filterEmployee)
+    if (filterDateFrom)              q = q.gte('date', filterDateFrom)
+    if (filterDateTo)                q = q.lte('date', filterDateTo)
+    if (filterStatus !== 'ALL')      q = q.eq('status', filterStatus)
+
+    const { data, count, error } = await q
+    if (!error) { setRows(data || []); setTotal(count || 0); setPage(p) }
+    setTableLoading(false)
+  }, [canApprove, myEmployeeId, filterEmployee, filterDateFrom, filterDateTo, filterStatus])
+
+  useEffect(() => { fetchPage(0) }, [fetchPage])
+
+  // Pending count (separate lightweight query for KPI)
+  useEffect(() => {
+    supabase.from('employee_attendance').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+      .then(({ count }) => setPendingCount(count || 0))
+  }, [])
+
+  const refreshAll = async () => {
+    await Promise.all([fetchPage(0), fetchMyTodayRecord()])
+    // Refresh pending count
+    const { count } = await supabase.from('employee_attendance').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+    setPendingCount(count || 0)
+  }
 
   // Clock-in form state (with work description + attachments)
   const [clockForm, setClockForm] = useState({ shift_type: 'Day', work_description: '', attachment_urls: [] })
   const [uploading,    setUploading]    = useState(false)
   const [clocking,     setClocking]     = useState(false)
 
-  // Filters
-  const [filterEmployee, setFilterEmployee] = useState('ALL')
-  const [filterDateFrom, setFilterDateFrom] = useState('')
-  const [filterDateTo,   setFilterDateTo]   = useState('')
-  const [filterStatus,   setFilterStatus]   = useState('ALL')
   const [selectedRecords, setSelectedRecords] = useState([])
   const [rejectModal, setRejectModal] = useState({ open: false, recordId: null, reason: '' })
 
@@ -108,16 +165,19 @@ export default function Attendance() {
     setClocking(true)
     try {
       await clockIn(myEmployeeId, today, clockForm.shift_type)
-      // Also update with description + attachments
-      const record = attendance.find(a => a.employee_id === myEmployeeId && a.date === today && !a.clock_out)
-      if (record) {
+      // Fetch the newly created record directly and update description + attachments
+      const { data: newRecord } = await supabase.from('employee_attendance')
+        .select('*').eq('employee_id', myEmployeeId).eq('date', today).is('clock_out', null)
+        .order('created_at', { ascending: false }).limit(1).single()
+      if (newRecord) {
         await supabase.from('employee_attendance')
           .update({ work_description: clockForm.work_description, attachment_urls: clockForm.attachment_urls })
-          .eq('id', record.id)
+          .eq('id', newRecord.id)
+        setMyTodayRecord({ ...newRecord, work_description: clockForm.work_description, attachment_urls: clockForm.attachment_urls })
       }
       toast.success('Clocked in successfully')
       setClockForm({ shift_type: 'Day', work_description: '', attachment_urls: [] })
-      await fetchAll()
+      await fetchPage(0)
     } catch (err) { toast.error(err.message) }
     finally { setClocking(false) }
   }
@@ -129,34 +189,20 @@ export default function Attendance() {
     try {
       await clockOut(myEmployeeId, today)
       toast.success('Clocked out — your timesheet is pending approval.')
-      await fetchAll()
+      await fetchMyTodayRecord()
+      await fetchPage(0)
     } catch (err) { toast.error(err.message) }
     finally { setClocking(false) }
   }
 
-  // ── Filtered records ─────────────────────────────────────────────
-  const filteredAttendance = attendance.filter(record => {
-    if (!canApprove && record.employee_id !== myEmployeeId) return false
-    if (filterEmployee !== 'ALL' && record.employee_id !== filterEmployee) return false
-    if (filterDateFrom && record.date < filterDateFrom) return false
-    if (filterDateTo   && record.date > filterDateTo)   return false
-    if (filterStatus !== 'ALL' && record.status !== filterStatus) return false
-    return true
-  }).sort((a, b) => {
-    if (a.status === 'pending' && b.status !== 'pending') return -1
-    if (a.status !== 'pending' && b.status === 'pending') return  1
-    return new Date(b.date) - new Date(a.date)
-  })
-
-  // KPIs
-  const totalHours    = filteredAttendance.reduce((s, r) => s + (r.total_hours    || 0), 0)
-  const totalOvertime = filteredAttendance.reduce((s, r) => s + (r.overtime_hours || 0), 0)
-  const pendingCount  = attendance.filter(r => r.status === 'pending').length
+  // KPIs from current page rows (totals are approximate for filtered view)
+  const totalHours    = rows.reduce((s, r) => s + (r.total_hours    || 0), 0)
+  const totalOvertime = rows.reduce((s, r) => s + (r.overtime_hours || 0), 0)
   const getEmployeeName = (id) => employees.find(e => e.id === id)?.name || '—'
 
   // ── Approval handlers ────────────────────────────────────────────
   const handleApprove = async (recordId) => {
-    try { await approveAttendance(recordId, user?.full_name || user?.username, canApprove); toast.success('Approved'); await fetchAll() }
+    try { await approveAttendance(recordId, user?.full_name || user?.username, canApprove); toast.success('Approved'); await refreshAll() }
     catch (err) { toast.error(err.message) }
   }
 
@@ -166,13 +212,13 @@ export default function Attendance() {
       await rejectAttendance(rejectModal.recordId, user?.full_name || user?.username, rejectModal.reason, canApprove)
       toast.success('Rejected')
       setRejectModal({ open: false, recordId: null, reason: '' })
-      await fetchAll()
+      await refreshAll()
     } catch (err) { toast.error(err.message) }
   }
 
   const handleBulkApprove = async () => {
     if (!selectedRecords.length) return toast.error('No records selected')
-    try { await bulkApproveAttendance(selectedRecords, user?.full_name || user?.username, canApprove); toast.success(`${selectedRecords.length} records approved`); setSelectedRecords([]); await fetchAll() }
+    try { await bulkApproveAttendance(selectedRecords, user?.full_name || user?.username, canApprove); toast.success(`${selectedRecords.length} records approved`); setSelectedRecords([]); await refreshAll() }
     catch (err) { toast.error(err.message) }
   }
 
@@ -212,28 +258,35 @@ export default function Attendance() {
         await addAttendanceRecord(payload)
         toast.success('Record saved (pending approval)')
       }
-      setManualModal(false); setEditingRecord(null); await fetchAll()
+      setManualModal(false); setEditingRecord(null); await refreshAll()
     } catch (err) { toast.error(err.message) }
   }
 
   const handleDelete = async (record) => {
     if (record.status === 'approved') { toast.error('Approved records cannot be deleted'); return }
     if (!window.confirm(`Delete attendance for ${getEmployeeName(record.employee_id)} on ${record.date}?`)) return
-    try { await deleteAttendanceRecord(record.id, record.status); toast.success('Deleted'); await fetchAll() }
+    try { await deleteAttendanceRecord(record.id, record.status); toast.success('Deleted'); await refreshAll() }
     catch (err) { toast.error(err.message) }
   }
 
-  const exportToExcel = () => {
-    const data = filteredAttendance.map(r => ({
+  const exportToExcel = async () => {
+    let q = supabase.from('employee_attendance').select('*').order('date', { ascending: false })
+    if (!canApprove && myEmployeeId) q = q.eq('employee_id', myEmployeeId)
+    if (filterEmployee !== 'ALL')    q = q.eq('employee_id', filterEmployee)
+    if (filterDateFrom)              q = q.gte('date', filterDateFrom)
+    if (filterDateTo)                q = q.lte('date', filterDateTo)
+    if (filterStatus !== 'ALL')      q = q.eq('status', filterStatus)
+    const { data } = await q
+    if (!data?.length) return toast.error('No records to export')
+    exportXLSX(data.map(r => ({
       Date: r.date, Employee: getEmployeeName(r.employee_id),
       'Clock In': r.clock_in, 'Clock Out': r.clock_out || '—',
       Shift: r.shift_type, Hours: r.total_hours?.toFixed(1) || '—',
       Overtime: r.overtime_hours?.toFixed(1) || '—', Status: r.status,
       'Work Description': r.work_description || '—', Notes: r.notes || '—',
       'Approved By': r.approved_by || '—',
-    }))
-    exportXLSX(data, `Attendance_${today}`, 'Attendance')
-    toast.success('Exported')
+    })), `Attendance_${today}`, 'Attendance')
+    toast.success(`Exported ${data.length} records`)
   }
 
   const statusBadge = (s) => <StatusBadge status={s} />
@@ -343,9 +396,9 @@ export default function Attendance() {
 
       {/* ── KPIs ─────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <KPICard label="Total Hours" value={totalHours.toFixed(1)} sub="filtered" icon="schedule" color="teal" />
-        <KPICard label="Overtime" value={totalOvertime.toFixed(1)} sub="filtered" icon="more_time" color="yellow" />
-        <KPICard label="Records" value={filteredAttendance.length} sub="filtered" icon="list" color="blue" />
+        <KPICard label="Total Hours"    value={totalHours.toFixed(1)}    sub="this page" icon="schedule" color="teal" />
+        <KPICard label="Overtime"       value={totalOvertime.toFixed(1)} sub="this page" icon="more_time" color="yellow" />
+        <KPICard label="Records"        value={total.toLocaleString()}   sub="matching filters" icon="list" color="blue" />
         {canApprove && <KPICard label="Pending Approval" value={pendingCount} sub="awaiting review" icon="pending" color="yellow" />}
       </div>
 
@@ -396,7 +449,7 @@ export default function Attendance() {
           <table className="stock-table">
             <thead>
               <tr>
-                {canApprove && <th style={{ width: 32 }}><input type="checkbox" onChange={e => setSelectedRecords(e.target.checked ? filteredAttendance.filter(r => r.status === 'pending').map(r => r.id) : [])} /></th>}
+                {canApprove && <th style={{ width: 32 }}><input type="checkbox" onChange={e => setSelectedRecords(e.target.checked ? rows.filter(r => r.status === 'pending').map(r => r.id) : [])} /></th>}
                 <th>Date</th>
                 {canApprove && <th>Employee</th>}
                 <th>Clock In</th><th>Clock Out</th><th>Shift</th>
@@ -408,7 +461,11 @@ export default function Attendance() {
               </tr>
             </thead>
             <tbody>
-              {filteredAttendance.map(record => {
+              {tableLoading ? (
+                <tr><td colSpan={canApprove ? 12 : 9} style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={canApprove ? 12 : 9} className="empty-state">No attendance records found</td></tr>
+              ) : rows.map(record => {
                 const isPending  = record.status === 'pending'
                 const isApproved = record.status === 'approved'
                 const isSelected = selectedRecords.includes(record.id)
@@ -475,13 +532,12 @@ export default function Attendance() {
                   </tr>
                 )
               })}
-              {filteredAttendance.length === 0 && (
-                <tr><td colSpan={canApprove ? 12 : 9} className="empty-state">No attendance records found</td></tr>
-              )}
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={fetchPage} />
       </div>
+
 
       {/* ── Reject modal ─────────────────────────────────────────── */}
       {rejectModal.open && (

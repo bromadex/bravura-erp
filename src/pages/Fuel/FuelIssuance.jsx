@@ -1,49 +1,41 @@
 // src/pages/Fuel/FuelIssuance.jsx
-//
-// FIX: Removed useHR() — HRProvider is not in the Fuel route.
-// Employees are now fetched directly from Supabase (id, name, status only).
-//
-// MODERN REDESIGN:
-// - KPI bar: today's issued litres, total issuances, unique vehicles, drivers
-// - Card-based issuance log with search + date filter
-// - Fuel type badge colours
-// - Quick stats per issuance card
-// - Edit and delete (for admins)
+// Server-side paginated. Queries fuel_log directly for the table view;
+// uses FuelContext only for addIssuance (creation). KPIs run separate
+// lightweight queries so they stay accurate without a full table scan.
 
-import { useState, useEffect } from 'react'
-import { useFuel } from '../../contexts/FuelContext'
-import { useLeave } from '../../contexts/LeaveContext'
-import { useAuth } from '../../contexts/AuthContext'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useFuel }           from '../../contexts/FuelContext'
+import { useLeave }          from '../../contexts/LeaveContext'
+import { useAuth }           from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
-import { supabase } from '../../lib/supabase'
-import { generateTxnCode } from '../../utils/txnCode'
-import TxnCodeBadge from '../../components/TxnCodeBadge'
-import toast from 'react-hot-toast'
-import { exportXLSX } from '../../engine/reportingEngine'
-import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../../components/ui'
+import { supabase }          from '../../lib/supabase'
+import { generateTxnCode }   from '../../utils/txnCode'
+import TxnCodeBadge          from '../../components/TxnCodeBadge'
+import toast                 from 'react-hot-toast'
+import { exportXLSX }        from '../../engine/reportingEngine'
+import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions, Pagination } from '../../components/ui'
 
 const FUEL_COLORS = { DIESEL: 'badge-yellow', PETROL: 'badge-green', PARAFFIN: 'badge-blue' }
-const today = new Date().toISOString().split('T')[0]
+const today    = new Date().toISOString().split('T')[0]
+const PAGE_SIZE = 50
 
 export default function FuelIssuance() {
-  const { issuances, addIssuance, loading, fetchAll } = useFuel()
-  const { isOnLeave } = useLeave()
-  const { user } = useAuth()
+  const { addIssuance }  = useFuel()
+  const { isOnLeave }    = useLeave()
+  const { user }         = useAuth()
   const canEdit   = useCanEdit('fuel', 'issuance')
   const canDelete = useCanDelete('fuel', 'issuance')
 
-  // ✅ FIX: fetch employees directly — no HRProvider needed
-  const [employees, setEmployees] = useState([])
-  useEffect(() => {
-    supabase.from('employees').select('id, name, status').neq('status', 'Terminated').order('name')
-      .then(({ data }) => { if (data) setEmployees(data) })
-  }, [])
-
+  // ── Reference lookups (small, static-ish data) ────────────────
+  const [employees,   setEmployees]   = useState([])
   const [vehicles,    setVehicles]    = useState([])
   const [generators,  setGenerators]  = useState([])
   const [earthmovers, setEarthmovers] = useState([])
   const [contractors, setContractors] = useState([])
+
   useEffect(() => {
+    supabase.from('employees').select('id, name, status').neq('status', 'Terminated').order('name')
+      .then(({ data }) => { if (data) setEmployees(data) })
     Promise.all([
       supabase.from('fleet').select('reg, description').eq('status', 'Active'),
       supabase.from('generators').select('gen_code, gen_name'),
@@ -57,12 +49,77 @@ export default function FuelIssuance() {
     })
   }, [])
 
+  // ── Paginated table state ──────────────────────────────────────
+  const [rows,        setRows]        = useState([])
+  const [total,       setTotal]       = useState(0)
+  const [page,        setPage]        = useState(0)
+  const [tableLoading, setTableLoading] = useState(true)
+
+  // ── KPI state (separate lightweight queries) ───────────────────
+  const [kpiToday,   setKpiToday]   = useState(0)
+  const [kpiMonth,   setKpiMonth]   = useState(0)
+
+  // ── Filters ───────────────────────────────────────────────────
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm,  setSearchTerm]  = useState('')
+  const [dateFrom,    setDateFrom]    = useState('')
+  const [dateTo,      setDateTo]      = useState('')
+  const [fuelFilter,  setFuelFilter]  = useState('ALL')
+  const debounceRef = useRef(null)
+
+  // Debounce search input → searchTerm
+  const handleSearchChange = (v) => {
+    setSearchInput(v)
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setSearchTerm(v), 400)
+  }
+
+  // ── KPI queries (run once on mount) ───────────────────────────
+  useEffect(() => {
+    const monthStart = today.slice(0, 7) + '-01'
+    Promise.all([
+      supabase.from('fuel_log').select('amount').eq('date', today),
+      supabase.from('fuel_log').select('amount').gte('date', monthStart),
+    ]).then(([todayRes, monthRes]) => {
+      const sumToday = (todayRes.data || []).reduce((s, r) => s + (r.amount || 0), 0)
+      const sumMonth = (monthRes.data || []).reduce((s, r) => s + (r.amount || 0), 0)
+      setKpiToday(sumToday)
+      setKpiMonth(sumMonth)
+    })
+  }, [])
+
+  // ── Paginated fetch ────────────────────────────────────────────
+  const fetchPage = useCallback(async (p = 0) => {
+    setTableLoading(true)
+    const from = p * PAGE_SIZE
+    const to   = from + PAGE_SIZE - 1
+
+    let q = supabase
+      .from('fuel_log')
+      .select('*', { count: 'exact' })
+      .order('date',       { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (dateFrom)           q = q.gte('date', dateFrom)
+    if (dateTo)             q = q.lte('date', dateTo)
+    if (fuelFilter !== 'ALL') q = q.eq('fuel_type', fuelFilter)
+    if (searchTerm.trim())  q = q.or(`vehicle.ilike.%${searchTerm}%,driver.ilike.%${searchTerm}%,purpose.ilike.%${searchTerm}%`)
+
+    const { data, count, error } = await q
+    if (!error) {
+      setRows(data || [])
+      setTotal(count || 0)
+      setPage(p)
+    }
+    setTableLoading(false)
+  }, [dateFrom, dateTo, fuelFilter, searchTerm])
+
+  useEffect(() => { fetchPage(0) }, [fetchPage])
+
+  // ── Form state ─────────────────────────────────────────────────
   const [showModal,  setShowModal]  = useState(false)
   const [editRecord, setEditRecord] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [dateFrom,   setDateFrom]   = useState('')
-  const [dateTo,     setDateTo]     = useState('')
-  const [fuelFilter, setFuelFilter] = useState('ALL')
   const [equipType,  setEquipType]  = useState('vehicle')
 
   const BLANK = {
@@ -97,11 +154,12 @@ export default function FuelIssuance() {
         const { error } = await supabase.from('fuel_log').update(payload).eq('id', editRecord.id)
         if (error) throw error
         toast.success('Record updated')
-        await fetchAll()
+        await fetchPage(page)
       } else {
         const txnCode = await generateTxnCode('FI')
         await addIssuance({ ...payload, txn_code: txnCode })
         toast.success(`Issued ${form.amount} L — ${txnCode}`)
+        await fetchPage(0)
       }
       setShowModal(false)
       setForm(BLANK)
@@ -114,31 +172,23 @@ export default function FuelIssuance() {
     const { error } = await supabase.from('fuel_log').delete().eq('id', id)
     if (error) { toast.error(error.message); return }
     toast.success('Deleted')
-    await fetchAll()
+    await fetchPage(page)
   }
 
-  // Filtered list
-  const filtered = issuances.filter(r => {
-    if (fuelFilter !== 'ALL' && r.fuel_type !== fuelFilter) return false
-    if (dateFrom && r.date < dateFrom) return false
-    if (dateTo   && r.date > dateTo)   return false
-    if (searchTerm) {
-      const t = searchTerm.toLowerCase()
-      if (!(r.vehicle?.toLowerCase().includes(t) || r.driver?.toLowerCase().includes(t) || r.purpose?.toLowerCase().includes(t))) return false
-    }
-    return true
-  })
-
-  // KPIs
-  const issuedToday   = issuances.filter(r => r.date === today).reduce((s, r) => s + (r.amount || 0), 0)
-  const totalIssued   = issuances.reduce((s, r) => s + (r.amount || 0), 0)
-  const uniqueVehicles = new Set(issuances.map(r => r.vehicle).filter(Boolean)).size
-  const uniqueDrivers  = new Set(issuances.map(r => r.driver).filter(Boolean)).size
-
-  const handleExport = () => {
-    exportXLSX(filtered.map(r => ({ Date: r.date, Time: r.time, Type: r.fuel_type, Litres: r.amount, Vehicle: r.vehicle, Driver: r.driver, Odometer: r.odometer, Flowmeter: r.flowmeter, Purpose: r.purpose, AuthorisedBy: r.authorized_by })), `FuelIssuance_${today}`, 'Issuances')
-    toast.success('Exported')
+  // Export fetches all filtered records (no range cap)
+  const handleExport = async () => {
+    let q = supabase.from('fuel_log').select('*').order('date', { ascending: false })
+    if (dateFrom)             q = q.gte('date', dateFrom)
+    if (dateTo)               q = q.lte('date', dateTo)
+    if (fuelFilter !== 'ALL') q = q.eq('fuel_type', fuelFilter)
+    if (searchTerm.trim())    q = q.or(`vehicle.ilike.%${searchTerm}%,driver.ilike.%${searchTerm}%,purpose.ilike.%${searchTerm}%`)
+    const { data } = await q
+    if (!data?.length) return toast.error('No records to export')
+    exportXLSX(data.map(r => ({ Date: r.date, Time: r.time, Type: r.fuel_type, Litres: r.amount, Vehicle: r.vehicle, Driver: r.driver, Odometer: r.odometer, Flowmeter: r.flowmeter, Purpose: r.purpose, AuthorisedBy: r.authorized_by })), `FuelIssuance_${today}`, 'Issuances')
+    toast.success(`Exported ${data.length} records`)
   }
+
+  const clearFilters = () => { setSearchInput(''); setSearchTerm(''); setDateFrom(''); setDateTo(''); setFuelFilter('ALL') }
 
   return (
     <div>
@@ -155,11 +205,9 @@ export default function FuelIssuance() {
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <KPICard label="Issued Today" value={issuedToday.toLocaleString()} sub="litres" color="yellow" />
-        <KPICard label="Total Issued" value={totalIssued.toLocaleString()} sub="all time (L)" />
-        <KPICard label="Unique Vehicles" value={uniqueVehicles} sub="served" color="teal" />
-        <KPICard label="Drivers" value={uniqueDrivers} sub="recorded" color="blue" />
-        <KPICard label="Records" value={issuances.length} sub="total entries" />
+        <KPICard label="Issued Today"   value={kpiToday.toLocaleString()}  sub="litres" color="yellow" />
+        <KPICard label="Issued This Month" value={kpiMonth.toLocaleString()} sub="litres" color="teal" />
+        <KPICard label="Filtered Records"  value={total.toLocaleString()}   sub="matching filters" />
       </div>
 
       {/* Filters */}
@@ -167,29 +215,26 @@ export default function FuelIssuance() {
         <div className="form-row">
           <div className="form-group">
             <label>Search</label>
-            <input className="form-control" placeholder="Vehicle, driver, purpose…" value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)} />
+            <input className="form-control" placeholder="Vehicle, driver, purpose…" value={searchInput}
+              onChange={e => handleSearchChange(e.target.value)} />
           </div>
           <div className="form-group">
             <label>From</label>
-            <input type="date" className="form-control" value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)} />
+            <input type="date" className="form-control" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           </div>
           <div className="form-group">
             <label>To</label>
-            <input type="date" className="form-control" value={dateTo}
-              onChange={e => setDateTo(e.target.value)} />
+            <input type="date" className="form-control" value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </div>
           <div className="form-group">
             <label>Fuel Type</label>
-            <select className="form-control" value={fuelFilter}
-              onChange={e => setFuelFilter(e.target.value)}>
+            <select className="form-control" value={fuelFilter} onChange={e => setFuelFilter(e.target.value)}>
               <option value="ALL">All Types</option>
               <option>DIESEL</option><option>PETROL</option><option>PARAFFIN</option>
             </select>
           </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="btn btn-secondary" onClick={() => { setSearchTerm(''); setDateFrom(''); setDateTo(''); setFuelFilter('ALL') }}>
+            <button className="btn btn-secondary" onClick={clearFilters}>
               <span className="material-icons">clear</span>
             </button>
           </div>
@@ -200,7 +245,7 @@ export default function FuelIssuance() {
       <div className="card">
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>Issuance Records</span>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{filtered.length} of {issuances.length}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Page {page + 1}</span>
         </div>
         <div className="table-wrap">
           <table className="stock-table">
@@ -213,11 +258,11 @@ export default function FuelIssuance() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan="10" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan="10"><EmptyState icon="local_gas_station" message="No records match your filters" /></td></tr>
-              ) : filtered.map(r => (
+              {tableLoading ? (
+                <tr><td colSpan="11" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan="11"><EmptyState icon="local_gas_station" message="No records match your filters" /></td></tr>
+              ) : rows.map(r => (
                 <tr key={r.id}>
                   <td>{r.txn_code ? <TxnCodeBadge code={r.txn_code} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
@@ -242,6 +287,7 @@ export default function FuelIssuance() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={fetchPage} />
       </div>
 
       {/* Modal */}
