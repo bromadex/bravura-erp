@@ -17,8 +17,9 @@ import { HRProvider }             from './contexts/HRContext'
 import { LogisticsProvider }      from './contexts/LogisticsContext'
 import { CampsiteProvider }       from './contexts/CampsiteContext'
 import { AccountingProvider }     from './contexts/AccountingContext'
-import { MasterDataProvider }    from './contexts/MasterDataContext'
-import { AssetRegistryProvider } from './contexts/AssetRegistryContext'
+import { MasterDataProvider }       from './contexts/MasterDataContext'
+import { AssetRegistryProvider }    from './contexts/AssetRegistryContext'
+import { NotificationProvider }     from './contexts/NotificationContext'
 
 // Shell components — static (needed on every route)
 import Login           from './pages/Login'
@@ -530,6 +531,7 @@ export default function App() {
     <ThemeProvider>
     <AuthProvider>
       <PermissionProvider>
+        <NotificationProvider>
         <MasterDataProvider>
           <LeaveProvider>
             <BrowserRouter>
@@ -542,6 +544,7 @@ export default function App() {
             </BrowserRouter>
           </LeaveProvider>
         </MasterDataProvider>
+        </NotificationProvider>
       </PermissionProvider>
     </AuthProvider>
     </ThemeProvider>

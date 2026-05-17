@@ -82,6 +82,13 @@ function groupByDate(items) {
   return order.filter(g => groups[g]).map(g => ({ label: g, items: groups[g] }))
 }
 
+const PREF_KEY  = 'bravura_notif_prefs'
+const PREF_CATS = ['approval', 'reminder', 'announcement', 'escalation', 'general']
+
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}') } catch { return {} }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function NotificationCenter() {
   const { user }    = useAuth()
@@ -93,8 +100,18 @@ export default function NotificationCenter() {
   const [filterRead,    setFilterRead]    = useState('all')  // all | unread | read
   const [page,          setPage]          = useState(0)
   const [hasMore,       setHasMore]       = useState(false)
+  const [showPrefs,     setShowPrefs]     = useState(false)
+  const [mutedCats,     setMutedCats]     = useState(() => loadPrefs())
   const PAGE_SIZE = 40
   const channelRef = useRef(null)
+
+  const toggleMute = (cat) => {
+    setMutedCats(prev => {
+      const next = { ...prev, [cat]: !prev[cat] }
+      localStorage.setItem(PREF_KEY, JSON.stringify(next))
+      return next
+    })
+  }
 
   // ── Fetch ────────────────────────────────────────────────────────────
   const fetchPage = useCallback(async (pageNum = 0, replace = true) => {
@@ -200,8 +217,9 @@ export default function NotificationCenter() {
   }
 
   // ── Computed ─────────────────────────────────────────────────────────
-  const unreadInTab  = notifications.filter(n => !n.is_read).length
-  const grouped      = groupByDate(notifications)
+  const visibleNotifs = notifications.filter(n => !mutedCats[n.category || 'general'])
+  const unreadInTab   = visibleNotifs.filter(n => !n.is_read).length
+  const grouped       = groupByDate(visibleNotifs)
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -224,8 +242,44 @@ export default function NotificationCenter() {
           <button className="btn btn-secondary btn-sm" onClick={clearRead}>
             <span className="material-icons" style={{ fontSize: 14 }}>delete_sweep</span> Clear read
           </button>
+          <button className={`btn btn-sm ${showPrefs ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowPrefs(p => !p)} title="Notification preferences">
+            <span className="material-icons" style={{ fontSize: 14 }}>tune</span>
+          </button>
         </div>
       </div>
+
+      {/* Preferences panel */}
+      {showPrefs && (
+        <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+            Category Preferences — muted categories are hidden from this view
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {PREF_CATS.map(cat => {
+              const isMuted = !!mutedCats[cat]
+              return (
+                <button key={cat} onClick={() => toggleMute(cat)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)',
+                    background: isMuted ? 'var(--surface)'  : 'rgba(251,191,36,.12)',
+                    color:      isMuted ? 'var(--text-dim)' : 'var(--gold)',
+                    textDecoration: isMuted ? 'line-through' : 'none',
+                    opacity: isMuted ? 0.6 : 1,
+                  }}>
+                  <span className="material-icons" style={{ fontSize: 13 }}>
+                    {isMuted ? 'notifications_off' : 'notifications_active'}
+                  </span>
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+            Preferences are saved locally. Muting does not stop notifications from being delivered — it only hides them here.
+          </div>
+        </div>
+      )}
 
       {/* Category tabs */}
       <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 16, paddingBottom: 4 }}>

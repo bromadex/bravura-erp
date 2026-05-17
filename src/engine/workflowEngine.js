@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase'
 import { auditLog } from './auditEngine'
+import { pushNotification, pushNotificationToRole } from './notificationEngine'
 
 // ── Internal helpers ─────────────────────────────────────────
 
@@ -84,6 +85,32 @@ async function getInstanceForEntity(entityType, entityId) {
     .limit(1)
     .single()
   return data || null
+}
+
+// ── Notification helpers ──────────────────────────────────────
+
+const ENTITY_LABEL = {
+  leave_requests:            'Leave Request',
+  travel_requests:           'Travel Request',
+  store_requisitions:        'Store Requisition',
+  purchase_requisitions:     'Purchase Requisition',
+  purchase_orders:           'Purchase Order',
+  contractor_usage_logs:     'Contractor Usage Log',
+  petty_cash_transactions:   'Petty Cash Transaction',
+  petty_cash_reconciliations:'PC Reconciliation',
+  employee_attendance:       'Attendance Record',
+}
+
+const ENTITY_LINK = {
+  leave_requests:            '/module/hr/leave',
+  travel_requests:           '/module/hr/leave',
+  store_requisitions:        '/module/procurement/store-requisitions',
+  purchase_requisitions:     '/module/procurement/purchase-requisitions',
+  purchase_orders:           '/module/procurement/purchase-orders',
+  contractor_usage_logs:     '/module/fleet',
+  petty_cash_transactions:   '/module/accounting/petty-cash',
+  petty_cash_reconciliations:'/module/accounting/petty-cash',
+  employee_attendance:       '/module/hr/attendance',
 }
 
 const TABLE_MAP = {
@@ -195,6 +222,21 @@ export async function startWorkflow(entityType, entityId, actor, departmentId = 
   }
 
   await writeAuditLog(instanceId, firstStep.id, actor, 'submitted', null)
+
+  // Notify the first-step approver(s) that action is needed
+  const _label = ENTITY_LABEL[entityType] || entityType.replace(/_/g, ' ')
+  const _link  = ENTITY_LINK[entityType]  || null
+  const _notif = {
+    type: 'po_approval_required', category: 'approval', link: _link,
+    title:   `Approval Required: ${_label}`,
+    message: `${actor.name || 'A user'} submitted a ${_label} requiring your approval — Step: ${firstStep.step_name}`,
+  }
+  if (firstStep.specific_user_id) {
+    pushNotification(firstStep.specific_user_id, _notif).catch(() => {})
+  } else if (firstStep.required_role) {
+    pushNotificationToRole(firstStep.required_role, _notif).catch(() => {})
+  }
+
   return { instanceId, status: firstStep.status_on_entry, currentStep: firstStep }
 }
 
@@ -242,6 +284,16 @@ export async function approveStep(instanceId, actor, comment = null) {
     }).eq('id', instanceId)
     await mirrorStatusToEntity(instance.entity_type, instance.entity_id, currentStep.status_on_pass)
     await writeAuditLog(instanceId, currentStep.id, actor, 'approved', comment)
+    // Notify submitter: fully approved
+    if (instance.initiated_by) {
+      const _lbl = ENTITY_LABEL[instance.entity_type] || 'Request'
+      pushNotification(instance.initiated_by, {
+        type: 'requisition_approved', category: 'approval',
+        link: ENTITY_LINK[instance.entity_type] || null,
+        title:   `${_lbl} Approved`,
+        message: `Your ${_lbl} has been fully approved by ${actor.name}.`,
+      }).catch(() => {})
+    }
     return { status: currentStep.status_on_pass, completed: true, currentStep: null }
   }
 
@@ -254,6 +306,27 @@ export async function approveStep(instanceId, actor, comment = null) {
   }).eq('id', instanceId)
   await mirrorStatusToEntity(instance.entity_type, instance.entity_id, nextStep.status_on_entry)
   await writeAuditLog(instanceId, currentStep.id, actor, 'approved', comment)
+  // Notify next-step approver(s)
+  const _lbl = ENTITY_LABEL[instance.entity_type] || 'Request'
+  const _lnk = ENTITY_LINK[instance.entity_type]  || null
+  const _nextNotif = {
+    type: 'po_approval_required', category: 'approval', link: _lnk,
+    title:   `Approval Required: ${_lbl}`,
+    message: `${instance.initiated_by_name}'s ${_lbl} has passed "${currentStep.step_name}" — now at "${nextStep.step_name}".`,
+  }
+  if (nextStep.specific_user_id) {
+    pushNotification(nextStep.specific_user_id, _nextNotif).catch(() => {})
+  } else if (nextStep.required_role) {
+    pushNotificationToRole(nextStep.required_role, _nextNotif).catch(() => {})
+  }
+  // Notify submitter of progress
+  if (instance.initiated_by) {
+    pushNotification(instance.initiated_by, {
+      type: 'leave_forwarded', category: 'approval', link: _lnk,
+      title:   `${_lbl} Forwarded`,
+      message: `Your ${_lbl} passed "${currentStep.step_name}" and is now awaiting "${nextStep.step_name}".`,
+    }).catch(() => {})
+  }
   return { status: nextStep.status_on_entry, completed: false, currentStep: nextStep }
 }
 
@@ -287,6 +360,16 @@ export async function rejectStep(instanceId, actor, reason) {
   }).eq('id', instanceId)
   await mirrorStatusToEntity(instance.entity_type, instance.entity_id, 'rejected')
   await writeAuditLog(instanceId, currentStep.id, actor, 'rejected', reason)
+  // Notify submitter of rejection
+  if (instance.initiated_by) {
+    const _lbl = ENTITY_LABEL[instance.entity_type] || 'Request'
+    pushNotification(instance.initiated_by, {
+      type: 'leave_rejected', category: 'approval',
+      link: ENTITY_LINK[instance.entity_type] || null,
+      title:   `${_lbl} Rejected`,
+      message: `Your ${_lbl} was rejected by ${actor.name}${reason ? `: "${reason}"` : '.'}`,
+    }).catch(() => {})
+  }
   return { status: 'rejected' }
 }
 
@@ -499,6 +582,13 @@ export async function delegateStep(instanceId, fromActor, toUserId, toUserName, 
     entityType: 'workflow_instance', entityId: instanceId,
     entityName: `Step delegated to ${toUserName}`, userName: fromActor.name || '',
   })
+  // Notify the delegate that they've been assigned
+  pushNotification(toUserId, {
+    type: 'po_approval_required', category: 'approval',
+    link: ENTITY_LINK[instance.entity_type] || null,
+    title:   'Approval Step Delegated to You',
+    message: `${fromActor.name || 'An approver'} delegated "${currentStep.step_name}" to you${reason ? ` — "${reason}"` : ''}. Your action is required.`,
+  }).catch(() => {})
   return { delegatedTo: toUserName }
 }
 
