@@ -80,14 +80,20 @@ export default function DashboardOverview() {
     fuelLevel: 0, fuelMax: 10103, fuelPct: 0, fuelIssuedToday: 0, latestDip: null,
     pendingPOs: 0, pendingReqs: 0,
     openPeriod: null,
+    activePCFunds: 0, pcTotalBalance: 0,
+    pcExpensesMonth: 0, pcPendingExpenses: 0,
+    pendingRecons: 0, highVarianceRecons: 0,
+    activeContractors: 0,
     alerts: [],
     activity: [],
   })
 
   const load = async () => {
     setLoading(true)
+    const monthStart = today.slice(0, 7) + '-01'
     try {
-      const [empR, attR, leaveR, invR, issR, dipR, poR, srR, payR, logR] = await Promise.all([
+      const [empR, attR, leaveR, invR, issR, dipR, poR, srR, payR, logR,
+             pcFundsR, pcTxnsR, reconR, contractorR] = await Promise.all([
         supabase.from('employees').select('id, status'),
         supabase.from('employee_attendance').select('id, employee_id, status, clock_in, date').gte('date', today),
         supabase.from('leave_requests').select('id, status, employee_id, start_date, end_date').in('status', ['pending_supervisor','pending_hr','approved']),
@@ -98,6 +104,10 @@ export default function DashboardOverview() {
         supabase.from('store_requisitions').select('id').eq('status', 'pending'),
         supabase.from('payroll_periods').select('id, period_label, status').eq('status', 'open').limit(1),
         supabase.from('hr_audit_logs').select('action, entity_name, user_name, created_at').order('created_at', { ascending: false }).limit(8),
+        Promise.resolve(supabase.from('petty_cash_funds').select('id, status, current_balance')).then(r => r, () => ({ data: [] })),
+        Promise.resolve(supabase.from('petty_cash_transactions').select('id, amount, status, date').gte('date', monthStart)).then(r => r, () => ({ data: [] })),
+        Promise.resolve(supabase.from('petty_cash_reconciliations').select('id, status, variance_pct')).then(r => r, () => ({ data: [] })),
+        Promise.resolve(supabase.from('contractor_equipment').select('id, status')).then(r => r, () => ({ data: [] })),
       ])
 
       const employees      = empR.data || []
@@ -128,6 +138,21 @@ export default function DashboardOverview() {
       const pendingReqs  = (srR.data  || []).length
       const openPeriod   = (payR.data || [])[0] || null
 
+      // ── Projects & Finance ────────────────────────────────────────────
+      const pcFunds          = pcFundsR.data || []
+      const activePCFunds    = pcFunds.filter(f => (f.status || '').toLowerCase() === 'active').length
+      const pcTotalBalance   = pcFunds.reduce((s, f) => s + (parseFloat(f.current_balance) || 0), 0)
+
+      const pcTxns           = pcTxnsR.data || []
+      const pcExpensesMonth  = pcTxns.filter(t => t.status === 'approved').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+      const pcPendingExpenses = pcTxns.filter(t => ['submitted', 'pending'].includes(t.status)).length
+
+      const recons           = reconR.data || []
+      const pendingRecons    = recons.filter(r => ['submitted', 'pending'].includes(r.status)).length
+      const highVarianceRecons = recons.filter(r => Math.abs(parseFloat(r.variance_pct) || 0) > 10 && r.status !== 'approved').length
+
+      const activeContractors = (contractorR.data || []).filter(c => c.status === 'Active').length
+
       // Alerts
       const alerts = []
       if (pendingAttendance > 0)  alerts.push({ icon: 'schedule',          color: 'var(--yellow)', text: `${pendingAttendance} timesheet${pendingAttendance !== 1 ? 's' : ''} awaiting approval`,           route: '/module/hr/attendance' })
@@ -137,6 +162,9 @@ export default function DashboardOverview() {
       else if (fuelPct < 20)      alerts.push({ icon: 'local_gas_station', color: 'var(--yellow)', text: `Fuel tank low — ${fuelPct.toFixed(0)}% (${Math.round(fuelLevel).toLocaleString()} L remaining)`, route: '/module/fuel/tanks' })
       if (pendingPOs > 0)         alerts.push({ icon: 'shopping_bag',      color: 'var(--blue)',   text: `${pendingPOs} purchase order${pendingPOs !== 1 ? 's' : ''} pending approval`,                       route: '/module/procurement/purchase-orders' })
       if (openPeriod)             alerts.push({ icon: 'payments',          color: 'var(--purple)', text: `Open payroll period: ${openPeriod.period_label}`,                                                    route: '/module/hr/payroll'    })
+      if (pcPendingExpenses > 0)  alerts.push({ icon: 'receipt_long',      color: 'var(--teal)',   text: `${pcPendingExpenses} petty cash expense${pcPendingExpenses !== 1 ? 's' : ''} pending approval`,    route: '/module/projects/petty-cash-expenses' })
+      if (highVarianceRecons > 0) alerts.push({ icon: 'balance',           color: 'var(--red)',    text: `${highVarianceRecons} reconciliation${highVarianceRecons !== 1 ? 's' : ''} with >10% cash variance — review required`, route: '/module/projects/petty-cash-reconciliation' })
+      if (pendingRecons > 0)      alerts.push({ icon: 'pending_actions',   color: 'var(--blue)',   text: `${pendingRecons} reconciliation${pendingRecons !== 1 ? 's' : ''} submitted and awaiting approval`,  route: '/module/projects/petty-cash-reconciliation' })
 
       // Recent activity from audit log
       const actionIcons = {
@@ -159,7 +187,7 @@ export default function DashboardOverview() {
         return { ...mapped, text, time }
       })
 
-      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: TANK_MAX, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, alerts, activity, latestDip })
+      setD({ totalEmployees, activeEmployees, onLeaveToday, attendanceToday, pendingAttendance, pendingLeave, totalItems, lowStockItems, fuelLevel: Math.round(fuelLevel), fuelMax: TANK_MAX, fuelPct, fuelIssuedToday, pendingPOs, pendingReqs, openPeriod, activePCFunds, pcTotalBalance, pcExpensesMonth, pcPendingExpenses, pendingRecons, highVarianceRecons, activeContractors, alerts, activity, latestDip })
     } catch (err) {
       console.error('Dashboard load error:', err)
     } finally {
@@ -215,10 +243,13 @@ export default function DashboardOverview() {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
-              { label: 'HR',        icon: 'badge',             route: '/module/hr'          },
-              { label: 'Inventory', icon: 'inventory',         route: '/module/inventory'   },
-              { label: 'Fuel',      icon: 'local_gas_station', route: '/module/fuel'        },
-              { label: 'Fleet',     icon: 'directions_car',    route: '/module/fleet'       },
+              { label: 'HR',          icon: 'badge',             route: '/module/hr'          },
+              { label: 'Inventory',   icon: 'inventory',         route: '/module/inventory'   },
+              { label: 'Fuel',        icon: 'local_gas_station', route: '/module/fuel'        },
+              { label: 'Fleet',       icon: 'directions_car',    route: '/module/fleet'       },
+              { label: 'Projects',    icon: 'folder_open',       route: '/module/projects'    },
+              { label: 'Accounting',  icon: 'receipt',           route: '/module/accounting'  },
+              { label: 'Procurement', icon: 'shopping_cart',     route: '/module/procurement' },
             ].map(b => (
               <button key={b.label} className="btn btn-secondary btn-sm" onClick={() => navigate(b.route)}>
                 <span className="material-icons" style={{ fontSize: 14 }}>{b.icon}</span>{b.label}
@@ -335,6 +366,61 @@ export default function DashboardOverview() {
               </div>
             </div>
 
+            {/* Projects & Finance KPIs */}
+            <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>Projects &amp; Finance</div>
+            <div className="kpi-grid" style={{ marginBottom: 24 }}>
+              <StatCard
+                label="Active Petty Cash Funds"
+                value={d.activePCFunds}
+                sub="funds open & running"
+                icon="account_balance_wallet"
+                color="var(--teal)"
+                onClick={() => navigate('/module/projects/petty-cash-funds')}
+              />
+              <StatCard
+                label="PC Balance (Total)"
+                value={`$${Number(d.pcTotalBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                sub="across all active funds"
+                icon="savings"
+                color="var(--green)"
+                onClick={() => navigate('/module/projects/petty-cash-funds')}
+              />
+              <StatCard
+                label="PC Spend This Month"
+                value={`$${Number(d.pcExpensesMonth).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                sub="approved expenses"
+                icon="receipt_long"
+                color="var(--yellow)"
+                onClick={() => navigate('/module/projects/petty-cash-expenses')}
+              />
+              <StatCard
+                label="Pending PC Approvals"
+                value={d.pcPendingExpenses}
+                sub="expenses awaiting sign-off"
+                icon="approval"
+                color={d.pcPendingExpenses > 0 ? 'var(--yellow)' : 'var(--green)'}
+                alert={d.pcPendingExpenses > 0}
+                onClick={() => navigate('/module/projects/petty-cash-expenses')}
+              />
+              <StatCard
+                label="Pending Reconciliations"
+                value={d.pendingRecons}
+                sub={d.highVarianceRecons > 0 ? `${d.highVarianceRecons} with >10% variance` : 'submitted & awaiting approval'}
+                icon="balance"
+                color={d.highVarianceRecons > 0 ? 'var(--red)' : d.pendingRecons > 0 ? 'var(--blue)' : 'var(--green)'}
+                alert={d.pendingRecons > 0 || d.highVarianceRecons > 0}
+                onClick={() => navigate('/module/projects/petty-cash-reconciliation')}
+              />
+              <StatCard
+                label="Active Contractors"
+                value={d.activeContractors}
+                sub="contracted equipment"
+                icon="handshake"
+                color="var(--blue)"
+                onClick={() => navigate('/module/fleet/contractor-equipment')}
+              />
+            </div>
+
             {/* Bottom row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
@@ -368,12 +454,14 @@ export default function DashboardOverview() {
                   <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Quick Actions</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {[
-                      { label: 'Clock In',       icon: 'login',                color: 'var(--green)',  route: '/module/hr/attendance'        },
-                      { label: 'Apply Leave',    icon: 'event_note',           color: 'var(--yellow)', route: '/module/hr/leave'             },
-                      { label: 'Stock Out',      icon: 'remove_circle',        color: 'var(--red)',    route: '/module/inventory/stock-out'  },
-                      { label: 'Fuel Issuance',  icon: 'local_gas_station',    color: 'var(--yellow)', route: '/module/fuel/issuance'        },
-                      { label: 'Travel Request', icon: 'flight_takeoff',       color: 'var(--blue)',   route: '/module/hr/travel'            },
-                      { label: 'Leave Balance',  icon: 'account_balance_wallet',color: 'var(--teal)', route: '/module/hr/leave-balance'     },
+                      { label: 'Clock In',        icon: 'login',                color: 'var(--green)',  route: '/module/hr/attendance'                   },
+                      { label: 'Apply Leave',     icon: 'event_note',           color: 'var(--yellow)', route: '/module/hr/leave'                        },
+                      { label: 'Stock Out',       icon: 'remove_circle',        color: 'var(--red)',    route: '/module/inventory/stock-out'             },
+                      { label: 'Fuel Issuance',   icon: 'local_gas_station',    color: 'var(--yellow)', route: '/module/fuel/issuance'                   },
+                      { label: 'PC Expense',      icon: 'receipt_long',         color: 'var(--teal)',   route: '/module/projects/petty-cash-expenses'    },
+                      { label: 'Travel Request',  icon: 'flight_takeoff',       color: 'var(--blue)',   route: '/module/hr/travel'                       },
+                      { label: 'Leave Balance',   icon: 'account_balance_wallet',color: 'var(--teal)', route: '/module/hr/leave-balance'                },
+                      { label: 'Contractors',     icon: 'handshake',            color: 'var(--blue)',   route: '/module/fleet/contractor-equipment'      },
                     ].map(btn => (
                       <button key={btn.label} className="btn btn-secondary" onClick={() => navigate(btn.route)}
                         style={{ justifyContent: 'flex-start', gap: 8, fontSize: 12, padding: '10px 12px' }}>
