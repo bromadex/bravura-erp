@@ -72,15 +72,17 @@ export default function PettyCashFunds() {
   const [savingTopup, setSavingTopup] = useState(false)
 
   // ── Employee lookup ───────────────────────────────────────────────────────
-  const [employees, setEmployees] = useState([])
+  const [employees,   setEmployees]   = useState([])
+  const [departments, setDepartments] = useState([])
 
   useEffect(() => {
-    supabase
-      .from('employees')
-      .select('id, name, employee_number')
-      .eq('status', 'Active')
-      .order('name')
-      .then(({ data }) => { if (data) setEmployees(data) })
+    Promise.all([
+      supabase.from('employees').select('id, name, employee_number').eq('status', 'Active').order('name'),
+      supabase.from('departments').select('id, name').order('name'),
+    ]).then(([empRes, deptRes]) => {
+      if (empRes.data)  setEmployees(empRes.data)
+      if (deptRes.data) setDepartments(deptRes.data)
+    })
   }, [])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -97,7 +99,7 @@ export default function PettyCashFunds() {
       custodian_id:   fund.custodian_id   || '',
       project:        fund.project        || '',
       department:     fund.department     || '',
-      opening_amount: fund.opening_amount || '',
+      opening_amount: fund.opening_balance || '',
       currency:       fund.currency       || 'USD',
       notes:          fund.notes          || '',
     })
@@ -187,7 +189,7 @@ export default function PettyCashFunds() {
   const enrichedFunds = useMemo(() =>
     funds.map(f => {
       const current = getFundBalance ? getFundBalance(f.id) : (parseFloat(f.current_balance) || 0)
-      const opening = parseFloat(f.opening_amount) || 0
+      const opening = parseFloat(f.opening_balance) || 0
       const pct     = opening > 0 ? Math.min(100, (current / opening) * 100) : 0
       const color   = balanceColor(current, opening)
       return { ...f, current, opening, pct, color }
@@ -466,12 +468,16 @@ export default function PettyCashFunds() {
               </div>
               <div className="form-group">
                 <label>DEPARTMENT</label>
-                <input
+                <select
                   className="form-control"
                   value={fundForm.department}
                   onChange={e => setFF('department', e.target.value)}
-                  placeholder="e.g. Operations"
-                />
+                >
+                  <option value="">— Select Department —</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="form-row" style={{ marginTop: 14 }}>
