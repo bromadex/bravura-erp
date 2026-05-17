@@ -14,6 +14,7 @@ import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { supabase } from '../../lib/supabase'
+import { postToGL, hasGLEntry, getChartOfAccounts } from '../../engine/accountingEngine'
 import toast from 'react-hot-toast'
 
 export default function GoodsReceived() {
@@ -28,11 +29,27 @@ export default function GoodsReceived() {
   const [searchTerm, setSearchTerm] = useState('')
   const [employees,  setEmployees]  = useState([])
 
+  const [grnGLPosted,   setGrnGLPosted]   = useState(false)
+  const [grnGLModal,    setGrnGLModal]    = useState(false)
+  const [grnPosting,    setGrnPosting]    = useState(false)
+  const [grnGLAccounts, setGrnGLAccounts] = useState([])
+  const [grnGLLines,    setGrnGLLines]    = useState({ inventory: '', grni: '' })
+
   useEffect(() => {
     supabase.from('employees').select('id, name, employee_number')
       .neq('status', 'Terminated').order('name')
       .then(({ data }) => { if (data) setEmployees(data) })
   }, [])
+
+  useEffect(() => {
+    getChartOfAccounts().then(setGrnGLAccounts).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!viewGRN?.id) { setGrnGLPosted(false); return }
+    setGrnGLLines({ inventory: '', grni: '' })
+    hasGLEntry(`GRN-${viewGRN.id}`).then(({ exists }) => setGrnGLPosted(exists))
+  }, [viewGRN?.id])
 
   const emptyForm = () => ({
     date: new Date().toISOString().split('T')[0],
@@ -98,6 +115,32 @@ export default function GoodsReceived() {
       setModalOpen(false)
     } catch (err) { toast.error(err.message) }
     finally { setSaving(false) }
+  }
+
+  const handleGRNPostToGL = async () => {
+    if (!grnGLLines.inventory || !grnGLLines.grni) return toast.error('Select all accounts before posting')
+    setGrnPosting(true)
+    const session = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
+    const grnItems = parseItems(viewGRN.items)
+    const grnTotal = grnItems.reduce((s, it) => s + ((it.received || 0) * (it.unit_cost || 0)), 0)
+    try {
+      await postToGL({
+        sourceModule: 'procurement', sourceType: 'goods_received',
+        sourceId:    viewGRN.id,
+        entryDate:   viewGRN.date,
+        description: `GRN ${viewGRN.grn_number} — ${viewGRN.supplier_name}`,
+        reference:   `GRN-${viewGRN.id}`,
+        lines: [
+          { account_id: grnGLLines.inventory, debit: grnTotal, credit: 0,        description: 'Stock received' },
+          { account_id: grnGLLines.grni,      debit: 0,        credit: grnTotal, description: 'GRNI — pending invoice' },
+        ],
+        postedBy: session?.full_name || session?.username || '',
+      })
+      setGrnGLPosted(true)
+      setGrnGLModal(false)
+      toast.success('GRN posted to General Ledger')
+    } catch (err) { toast.error(err.message) }
+    finally { setGrnPosting(false) }
   }
 
   const filtered = goodsReceived.filter(grn => {
@@ -394,7 +437,54 @@ export default function GoodsReceived() {
               </table>
             </div>
             <div className="modal-actions">
+              {grnGLPosted
+                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
+                : <button className="btn btn-secondary" onClick={() => setGrnGLModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>}
               <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GRN GL Posting Modal */}
+      {grnGLModal && viewGRN && (
+        <div className="overlay" onClick={() => setGrnGLModal(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8, color: 'var(--purple)' }}>account_balance</span>
+              Post GRN to General Ledger
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8 }}>
+              {viewGRN.grn_number} · {viewGRN.supplier_name} · {viewGRN.date}
+              {' · '}Total: <strong style={{ color: 'var(--teal)' }}>
+                ${parseItems(viewGRN.items).reduce((s, it) => s + ((it.received || 0) * (it.unit_cost || 0)), 0).toFixed(2)}
+              </strong>
+            </div>
+            {[
+              { key: 'inventory', side: 'DR', label: 'Inventory / Stock Account' },
+              { key: 'grni',      side: 'CR', label: 'Goods Received Not Invoiced (GRNI)' },
+            ].map(l => {
+              const total = parseItems(viewGRN.items).reduce((s, it) => s + ((it.received || 0) * (it.unit_cost || 0)), 0)
+              return (
+                <div key={l.key} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 110px', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 0', borderRadius: 4, textAlign: 'center', background: l.side === 'DR' ? 'rgba(52,211,153,.15)' : 'rgba(239,68,68,.12)', color: l.side === 'DR' ? 'var(--green)' : 'var(--red)' }}>{l.side}</span>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{l.label}</div>
+                    <select className="form-control" value={grnGLLines[l.key]} onChange={e => setGrnGLLines(p => ({ ...p, [l.key]: e.target.value }))}>
+                      <option value="">— Select account —</option>
+                      {grnGLAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                    </select>
+                  </div>
+                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, textAlign: 'right', fontSize: 13, color: l.side === 'DR' ? 'var(--green)' : 'var(--red)' }}>${total.toFixed(2)}</span>
+                </div>
+              )
+            })}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setGrnGLModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleGRNPostToGL} disabled={grnPosting}>
+                <span className="material-icons">account_balance</span>
+                {grnPosting ? 'Posting…' : 'Post to General Ledger'}
+              </button>
             </div>
           </div>
         </div>

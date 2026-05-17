@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase'
 import { getPayrollPeriod, buildTimesheetSummary, WORK_SCHEDULE } from '../../utils/attendanceUtils'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { postToGL, hasGLEntry, getChartOfAccounts } from '../../engine/accountingEngine'
 import { PageHeader, KPICard, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
 // Zimbabwe PAYE brackets 2024/2025 (rough progressive estimate)
@@ -42,6 +43,12 @@ export default function Payroll() {
   const [activeTab,      setActiveTab]      = useState('payroll')  // 'payroll' | 'history'
   const [historyEmployee, setHistoryEmployee] = useState(null)
   const [historyRecords,  setHistoryRecords]  = useState([])
+
+  const [glModal,    setGlModal]    = useState(false)
+  const [glPosted,   setGlPosted]   = useState(false)
+  const [posting,    setPosting]    = useState(false)
+  const [glAccounts, setGlAccounts] = useState([])
+  const [glLines,    setGlLines]    = useState({ expense: '', netPay: '', paye: '', nssa: '', aids: '', other: '' })
 
   useEffect(() => {
     const load = async () => {
@@ -80,6 +87,16 @@ export default function Payroll() {
     }
     load()
   }, [historyEmployee])
+
+  useEffect(() => {
+    getChartOfAccounts().then(setGlAccounts).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!selectedPeriod?.id) { setGlPosted(false); return }
+    setGlLines({ expense: '', netPay: '', paye: '', nssa: '', aids: '', other: '' })
+    hasGLEntry(`PAYROLL-${selectedPeriod.id}`).then(({ exists }) => setGlPosted(exists))
+  }, [selectedPeriod?.id])
 
   const createPeriod = async () => {
     const { start, end, label } = getPayrollPeriod()
@@ -214,6 +231,42 @@ export default function Payroll() {
     toast.success('Exported')
   }
 
+  const handlePostToGL = async () => {
+    const totalPaye  = records.reduce((s, r) => s + (r.paye             || 0), 0)
+    const totalNssa  = records.reduce((s, r) => s + (r.nssa             || 0), 0)
+    const totalAids  = records.reduce((s, r) => s + (r.aids_levy        || 0), 0)
+    const totalOther = records.reduce((s, r) => s + (r.other_deductions || 0), 0)
+    const totalGross = records.reduce((s, r) => s + (r.gross_pay        || 0), 0)
+    const totalNet   = records.reduce((s, r) => s + (r.net_pay          || 0), 0)
+    const required = ['expense', 'netPay', 'paye', 'nssa']
+    const conditional = [...(totalAids > 0.001 ? ['aids'] : []), ...(totalOther > 0.001 ? ['other'] : [])]
+    if ([...required, ...conditional].some(k => !glLines[k])) return toast.error('Select all accounts before posting')
+    setPosting(true)
+    const session = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
+    const lines = [
+      { account_id: glLines.expense, debit: totalGross, credit: 0,         description: 'Salaries & Wages Expense' },
+      { account_id: glLines.netPay,  debit: 0,          credit: totalNet,  description: 'Net Salaries Payable' },
+      { account_id: glLines.paye,    debit: 0,          credit: totalPaye, description: 'PAYE Payable (ZIMRA)' },
+      { account_id: glLines.nssa,    debit: 0,          credit: totalNssa, description: 'NSSA Payable' },
+      ...(totalAids  > 0.001 ? [{ account_id: glLines.aids,  debit: 0, credit: totalAids,  description: 'Aids Levy Payable' }] : []),
+      ...(totalOther > 0.001 ? [{ account_id: glLines.other, debit: 0, credit: totalOther, description: 'Other Deductions Payable' }] : []),
+    ]
+    try {
+      await postToGL({
+        sourceModule: 'payroll', sourceType: 'payroll_period',
+        sourceId:    selectedPeriod.id,
+        entryDate:   selectedPeriod.end_date,
+        description: `Payroll — ${selectedPeriod.period_label} (${records.length} employees)`,
+        reference:   `PAYROLL-${selectedPeriod.id}`,
+        lines, postedBy: session?.full_name || session?.username || '',
+      })
+      setGlPosted(true)
+      setGlModal(false)
+      toast.success('Payroll posted to General Ledger')
+    } catch (err) { toast.error(err.message) }
+    finally { setPosting(false) }
+  }
+
   // Print payslip
   const printPayslip = (record) => {
     const period = selectedPeriod || {}
@@ -263,6 +316,11 @@ export default function Payroll() {
     gross: acc.gross + (r.gross_pay || 0), net: acc.net + (r.net_pay || 0), deduct: acc.deduct + (r.total_deductions || 0),
   }), { gross: 0, net: 0, deduct: 0 })
 
+  const totalPaye  = records.reduce((s, r) => s + (r.paye             || 0), 0)
+  const totalNssa  = records.reduce((s, r) => s + (r.nssa             || 0), 0)
+  const totalAids  = records.reduce((s, r) => s + (r.aids_levy        || 0), 0)
+  const totalOther = records.reduce((s, r) => s + (r.other_deductions || 0), 0)
+
   const isLocked = selectedPeriod?.status === 'approved' || selectedPeriod?.status === 'paid'
 
   const statusBadge = (s) => <StatusBadge status={s} />
@@ -274,6 +332,10 @@ export default function Payroll() {
         {selectedPeriod && !isLocked && canEdit && <button className="btn btn-secondary" onClick={generateRecords} disabled={generating}><span className="material-icons">autorenew</span>{generating ? 'Generating…' : 'Generate'}</button>}
         {records.length > 0 && <button className="btn btn-secondary" onClick={exportToExcel}><span className="material-icons">table_chart</span> Export</button>}
         {selectedPeriod && !isLocked && canApprove && records.length > 0 && <button className="btn btn-primary" onClick={approvePeriod}><span className="material-icons">check_circle</span> Approve</button>}
+        {isLocked && records.length > 0 && canApprove && (glPosted
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
+          : <button className="btn btn-primary" onClick={() => setGlModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>
+        )}
       </PageHeader>
 
       {/* Tabs */}
@@ -315,7 +377,7 @@ export default function Payroll() {
           ) : (
             <div className="card">
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 14 }}>
-                Payroll Records — {selectedPeriod.period_label}{isLocked && <span className="badge badge-green" style={{ marginLeft: 10 }}>Locked</span>}
+                Payroll Records — {selectedPeriod.period_label}{isLocked && <span className="badge badge-green" style={{ marginLeft: 10 }}>Locked</span>}{glPosted && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--green)', background: 'rgba(52,211,153,.12)', border: '1px solid rgba(52,211,153,.3)', padding: '2px 8px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}><span className="material-icons" style={{ fontSize: 12 }}>account_balance</span>GL Posted</span>}
               </div>
               <div className="table-wrap" style={{ overflowX: 'auto' }}>
                 <table className="stock-table" style={{ minWidth: 900 }}>
@@ -394,6 +456,50 @@ export default function Payroll() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* GL Posting Modal */}
+      {glModal && (
+        <div className="overlay" onClick={() => setGlModal(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8, color: 'var(--green)' }}>account_balance</span>
+              Post Payroll to GL — {selectedPeriod?.period_label}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8 }}>
+              {records.length} employees · Gross <strong style={{ color: 'var(--text)' }}>${totals.gross.toFixed(2)}</strong>
+              {' → '}Net <strong style={{ color: 'var(--green)' }}>${totals.net.toFixed(2)}</strong>
+              {' · '}Deductions <strong style={{ color: 'var(--red)' }}>${totals.deduct.toFixed(2)}</strong>
+            </div>
+            {[
+              { key: 'expense', side: 'DR', label: 'Salaries & Wages Expense',      amount: totals.gross, show: true },
+              { key: 'netPay',  side: 'CR', label: 'Net Salaries Payable',           amount: totals.net,  show: true },
+              { key: 'paye',    side: 'CR', label: 'PAYE Payable (ZIMRA)',            amount: totalPaye,   show: true },
+              { key: 'nssa',    side: 'CR', label: 'NSSA Payable',                   amount: totalNssa,   show: true },
+              { key: 'aids',    side: 'CR', label: 'Aids Levy Payable',              amount: totalAids,   show: totalAids > 0.001 },
+              { key: 'other',   side: 'CR', label: 'Other Deductions Payable',       amount: totalOther,  show: totalOther > 0.001 },
+            ].filter(l => l.show).map(l => (
+              <div key={l.key} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 110px', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 0', borderRadius: 4, textAlign: 'center', background: l.side === 'DR' ? 'rgba(52,211,153,.15)' : 'rgba(239,68,68,.12)', color: l.side === 'DR' ? 'var(--green)' : 'var(--red)' }}>{l.side}</span>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{l.label}</div>
+                  <select className="form-control" value={glLines[l.key]} onChange={e => setGlLines(p => ({ ...p, [l.key]: e.target.value }))}>
+                    <option value="">— Select account —</option>
+                    {glAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                  </select>
+                </div>
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, textAlign: 'right', fontSize: 13, color: l.side === 'DR' ? 'var(--green)' : 'var(--red)' }}>${l.amount.toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setGlModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handlePostToGL} disabled={posting}>
+                <span className="material-icons">account_balance</span>
+                {posting ? 'Posting to GL…' : 'Post to General Ledger'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
