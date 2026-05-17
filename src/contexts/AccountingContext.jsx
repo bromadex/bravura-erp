@@ -12,7 +12,10 @@ export function AccountingProvider({ children }) {
   const [journalLines,   setJournalLines]   = useState([])
   const [loading,        setLoading]        = useState(true)
 
-  const generateId = () => crypto.randomUUID ? generateId() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+  const generateId = () =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : (Date.now().toString(36) + Math.random().toString(36).slice(2))
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -20,7 +23,7 @@ export function AccountingProvider({ children }) {
       const [aR, eR, lR] = await Promise.all([
         supabase.from('accounts').select('*').eq('is_active', true).order('code'),
         supabase.from('journal_entries').select('*').order('entry_date', { ascending: false }).limit(200),
-        supabase.from('journal_lines').select('*').order('created_at', { ascending: true }),
+        supabase.from('journal_lines').select('*').order('created_at', { ascending: true }).limit(2000),
       ])
       if (aR.data) setAccounts(aR.data)
       if (eR.data) setJournalEntries(eR.data)
@@ -94,17 +97,17 @@ export function AccountingProvider({ children }) {
     )
     if (le) throw le
 
-    // Update account balances
-    for (const l of lines) {
+    // Update account balances — parallel, handle both field names
+    await Promise.all(lines.map(l => {
       const acct = accounts.find(a => a.id === l.account_id)
-      if (!acct) continue
-      // Normal balance: Assets/Expenses debit-normal; Liabilities/Equity/Revenue credit-normal
-      const isDebitNormal = ['Asset', 'Expense'].includes(acct.type)
+      if (!acct) return Promise.resolve()
+      const acctType = acct.type || acct.account_type || ''
+      const isDebitNormal = ['Asset', 'Expense'].includes(acctType)
       const delta = isDebitNormal
         ? (l.debit || 0) - (l.credit || 0)
         : (l.credit || 0) - (l.debit || 0)
-      await supabase.from('accounts').update({ balance: acct.balance + delta }).eq('id', acct.id)
-    }
+      return supabase.from('accounts').update({ balance: acct.balance + delta }).eq('id', acct.id)
+    }))
 
     auditLog({ module: 'accounting', action: 'POST', entityType: 'journal_entry', entityId: entryId, entityName: description, userName: createdBy || '', txnCode: reference || '' })
     await fetchAll()
