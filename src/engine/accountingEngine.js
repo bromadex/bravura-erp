@@ -9,8 +9,9 @@
 //   • Full audit trail
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { supabase }  from '../lib/supabase'
-import { auditLog }  from './auditEngine'
+import { supabase }               from '../lib/supabase'
+import { auditLog }               from './auditEngine'
+import { pushNotificationToRole } from './notificationEngine'
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -142,6 +143,16 @@ export async function postToGL({ sourceModule, sourceType, sourceId, entryDate, 
     entityType: sourceType || 'journal_entry', entityId: sourceId || entryId,
     entityName: description, userName: postedBy || '', txnCode: ref,
   })
+
+  // 10. Notify finance team (non-blocking)
+  pushNotificationToRole('role_finance_manager', {
+    type:     'success',
+    title:    `GL Entry Posted — ${(sourceModule || '').toUpperCase()}`,
+    message:  `${description} · $${totalDebit.toFixed(2)} DR/CR (Ref: ${ref})`,
+    link:     '/module/accounting',
+    category: 'general',
+    metadata: { sourceModule, sourceType, sourceId, reference: ref },
+  }).catch(() => {})
 
   return entryId
 }
