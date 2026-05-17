@@ -15,15 +15,19 @@ import toast from 'react-hot-toast'
 const MODULE_OPTIONS = [
   { value: 'hr',          label: '👥 Human Resources'  },
   { value: 'procurement', label: '🛒 Procurement'       },
+  { value: 'inventory',   label: '📦 Inventory'         },
   { value: 'fuel',        label: '⛽ Fuel'              },
   { value: 'fleet',       label: '🚛 Fleet'             },
+  { value: 'projects',    label: '📁 Projects'          },
+  { value: 'accounting',  label: '🧾 Accounting'        },
   { value: 'campsite',    label: '🏕 Campsite'          },
-  { value: 'inventory',   label: '📦 Inventory'         },
-  { value: 'finance',     label: '💰 Finance'           },
+  { value: 'logistics',   label: '🚚 Logistics'         },
+  { value: 'governance',  label: '📜 Governance'        },
+  { value: 'settings',    label: '⚙️ Settings'          },
 ]
 
 const ENTITY_OPTIONS = {
-  hr:          [
+  hr: [
     { value: 'leave_requests',      label: 'Leave Requests'     },
     { value: 'travel_requests',     label: 'Travel Requests'    },
     { value: 'employee_attendance', label: 'Timesheets'         },
@@ -33,11 +37,33 @@ const ENTITY_OPTIONS = {
     { value: 'purchase_requisitions', label: 'Purchase Requisitions' },
     { value: 'purchase_orders',       label: 'Purchase Orders'       },
   ],
-  fuel:    [{ value: 'fuel_requests', label: 'Fuel Requests' }],
-  fleet:   [{ value: 'fleet_requests', label: 'Fleet Requests' }],
-  campsite:[{ value: 'camp_assignments', label: 'Camp Assignments' }],
-  inventory:[{ value: 'stock_adjustments', label: 'Stock Adjustments' }],
-  finance: [{ value: 'payment_requests', label: 'Payment Requests' }],
+  inventory: [
+    { value: 'stock_adjustments', label: 'Stock Adjustments' },
+  ],
+  fuel: [
+    { value: 'fuel_requests', label: 'Fuel Requests' },
+  ],
+  fleet: [
+    { value: 'contractor_usage_logs', label: 'Contractor Usage Logs' },
+    { value: 'fleet_requests',        label: 'Fleet Requests'        },
+  ],
+  projects: [
+    { value: 'petty_cash_transactions',    label: 'Petty Cash Expenses'        },
+    { value: 'petty_cash_reconciliations', label: 'Petty Cash Reconciliations' },
+  ],
+  accounting: [
+    { value: 'journal_entries', label: 'Journal Entries' },
+  ],
+  campsite: [
+    { value: 'camp_assignments', label: 'Camp Assignments' },
+  ],
+  logistics: [
+    { value: 'delivery_notes', label: 'Delivery Notes' },
+  ],
+  governance: [
+    { value: 'governance_memos', label: 'Governance Memos / Policies' },
+  ],
+  settings: [],
 }
 
 const ROLES = [
@@ -50,12 +76,16 @@ const ROLES = [
 ]
 
 const STATUS_PRESETS = {
-  leave_requests:        ['draft','pending_supervisor','pending_hr','approved','rejected'],
-  travel_requests:       ['draft','pending_supervisor','pending_hr','approved','rejected'],
-  employee_attendance:   ['pending','approved','rejected'],
-  store_requisitions:    ['draft','submitted','approved','rejected','fulfilled'],
-  purchase_requisitions: ['draft','submitted','approved','rejected'],
-  purchase_orders:       ['draft','pending','approved','rejected','received'],
+  leave_requests:              ['draft','pending_supervisor','pending_hr','approved','rejected'],
+  travel_requests:             ['draft','pending_supervisor','pending_hr','approved','rejected'],
+  employee_attendance:         ['pending','approved','rejected'],
+  store_requisitions:          ['draft','submitted','pending','approved','rejected','fulfilled'],
+  purchase_requisitions:       ['draft','submitted','pending','approved','rejected'],
+  purchase_orders:             ['draft','pending','approved','rejected','received'],
+  contractor_usage_logs:       ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_transactions:     ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_reconciliations:  ['draft','submitted','pending','approved','rejected'],
+  journal_entries:             ['draft','submitted','posted','rejected'],
 }
 
 const DEFAULT_STEP = () => ({
@@ -86,9 +116,20 @@ function StatusBadge({ active }) {
 
 // ── MODULE ICON ───────────────────────────────────────────────
 function moduleIcon(module) {
-  return { hr: 'people', procurement: 'shopping_cart', fuel: 'local_gas_station',
-           fleet: 'directions_car', campsite: 'hotel', inventory: 'inventory_2',
-           finance: 'receipt_long' }[module] || 'settings'
+  return {
+    hr:          'people',
+    procurement: 'shopping_cart',
+    inventory:   'inventory_2',
+    fuel:        'local_gas_station',
+    fleet:       'directions_car',
+    projects:    'folder_open',
+    accounting:  'receipt',
+    campsite:    'hotel',
+    logistics:   'local_shipping',
+    governance:  'policy',
+    settings:    'admin_panel_settings',
+    finance:     'receipt_long',
+  }[module] || 'settings'
 }
 
 // ── STEP CARD ─────────────────────────────────────────────────
@@ -350,7 +391,7 @@ export default function WorkflowBuilder() {
     toast.success(wf.is_active ? 'Workflow deactivated' : 'Workflow activated')
   }
 
-  const entityOptions = ENTITY_OPTIONS[wfModule] || []
+  const entityOptions = ENTITY_OPTIONS[wfModule] ?? []
 
   return (
     <div>

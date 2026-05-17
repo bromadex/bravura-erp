@@ -15,13 +15,19 @@ import { ROLE_LABELS } from '../../constants/roles'
 
 const MODULES = [
   { name: 'dashboard',   pages: ['overview'] },
-  { name: 'inventory',   pages: ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories'] },
+  { name: 'hr',          pages: ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet'] },
   { name: 'procurement', pages: ['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'] },
+  { name: 'inventory',   pages: ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories','locations'] },
   { name: 'fuel',        pages: ['tanks','dipstick','issuance','deliveries','reports'] },
-  { name: 'fleet',       pages: ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues'] },
-  { name: 'hr',          pages: ['dashboard','employees','departments','designations','permissions','attendance','leave','leave-balance','travel'] },
+  { name: 'fleet',       pages: ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues','contractor-equipment','asset-registry','registry','reclass-log','asset-import','category-config'] },
+  { name: 'logistics',   pages: ['dashboard','camp','batch-plant','deliveries'] },
+  { name: 'campsite',    pages: ['overview','blocks','rooms','assignments'] },
+  { name: 'projects',    pages: ['petty-cash-dashboard','petty-cash-funds','petty-cash-expenses','petty-cash-reconciliation'] },
   { name: 'accounting',  pages: ['chart-of-accounts','journal-entries','reports'] },
+  { name: 'governance',  pages: ['announcements','policies','ethics'] },
+  { name: 'connect',     pages: ['chats'] },
   { name: 'reports',     pages: ['overview','audit-log','drafts'] },
+  { name: 'settings',    pages: ['workflows'] },
 ]
 
 const emptyPermState = () => {

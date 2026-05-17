@@ -63,6 +63,9 @@ export const ACTIONS = {
   LOG_VEHICLE_TRIP:          'LOG_VEHICLE_TRIP',
   LOG_MAINTENANCE:           'LOG_MAINTENANCE',
   MANAGE_ASSET_ISSUES:       'MANAGE_ASSET_ISSUES',
+  MANAGE_CONTRACTOR_EQUIPMENT: 'MANAGE_CONTRACTOR_EQUIPMENT',
+  APPROVE_CONTRACTOR_USAGE:    'APPROVE_CONTRACTOR_USAGE',
+  POST_CONTRACTOR_INVOICE:     'POST_CONTRACTOR_INVOICE',
 
   // Campsite
   ASSIGN_ROOM:               'ASSIGN_ROOM',
@@ -87,6 +90,13 @@ export const ACTIONS = {
   DELETE_MEMO:               'DELETE_MEMO',
   CREATE_ANNOUNCEMENT:       'CREATE_ANNOUNCEMENT',
   PUBLISH_POLICY:            'PUBLISH_POLICY',
+
+  // Projects — Petty Cash
+  MANAGE_PETTY_CASH_FUNDS:   'MANAGE_PETTY_CASH_FUNDS',
+  RECORD_PETTY_CASH_EXPENSE: 'RECORD_PETTY_CASH_EXPENSE',
+  APPROVE_PETTY_CASH:        'APPROVE_PETTY_CASH',
+  RECONCILE_PETTY_CASH:      'RECONCILE_PETTY_CASH',
+  POST_PETTY_CASH_GL:        'POST_PETTY_CASH_GL',
 
   // Reports & Settings
   VIEW_AUDIT_LOG:            'VIEW_AUDIT_LOG',
@@ -134,10 +144,13 @@ export const ACTION_LABELS = {
   [ACTIONS.ISSUE_FUEL]:                 { label: 'Issue Fuel',                   module: 'Fuel' },
   [ACTIONS.RECORD_FUEL_DELIVERY]:       { label: 'Record Fuel Delivery',         module: 'Fuel' },
   [ACTIONS.RECORD_DIPSTICK]:            { label: 'Record Dipstick Reading',      module: 'Fuel' },
-  [ACTIONS.MANAGE_VEHICLES]:            { label: 'Manage Vehicles & Equipment',  module: 'Fleet' },
-  [ACTIONS.LOG_VEHICLE_TRIP]:           { label: 'Log Vehicle Trip',             module: 'Fleet' },
-  [ACTIONS.LOG_MAINTENANCE]:            { label: 'Log Maintenance',              module: 'Fleet' },
-  [ACTIONS.MANAGE_ASSET_ISSUES]:        { label: 'Manage Asset Issues',          module: 'Fleet' },
+  [ACTIONS.MANAGE_VEHICLES]:               { label: 'Manage Vehicles & Equipment',   module: 'Fleet' },
+  [ACTIONS.LOG_VEHICLE_TRIP]:              { label: 'Log Vehicle Trip',              module: 'Fleet' },
+  [ACTIONS.LOG_MAINTENANCE]:               { label: 'Log Maintenance',               module: 'Fleet' },
+  [ACTIONS.MANAGE_ASSET_ISSUES]:           { label: 'Manage Asset Issues',           module: 'Fleet' },
+  [ACTIONS.MANAGE_CONTRACTOR_EQUIPMENT]:   { label: 'Manage Contractor Equipment',   module: 'Fleet' },
+  [ACTIONS.APPROVE_CONTRACTOR_USAGE]:      { label: 'Approve Contractor Usage Logs', module: 'Fleet' },
+  [ACTIONS.POST_CONTRACTOR_INVOICE]:       { label: 'Post Contractor Invoice to GL', module: 'Fleet' },
   [ACTIONS.ASSIGN_ROOM]:                { label: 'Assign Room',                  module: 'Campsite' },
   [ACTIONS.TRANSFER_ROOM]:              { label: 'Transfer Room Assignment',     module: 'Campsite' },
   [ACTIONS.VACATE_ROOM]:                { label: 'Vacate Room',                  module: 'Campsite' },
@@ -154,6 +167,11 @@ export const ACTION_LABELS = {
   [ACTIONS.DELETE_MEMO]:                { label: 'Delete Memo',                  module: 'Governance' },
   [ACTIONS.CREATE_ANNOUNCEMENT]:        { label: 'Create Announcement',          module: 'Governance' },
   [ACTIONS.PUBLISH_POLICY]:             { label: 'Publish Policy',               module: 'Governance' },
+  [ACTIONS.MANAGE_PETTY_CASH_FUNDS]:    { label: 'Manage Petty Cash Funds',      module: 'Projects' },
+  [ACTIONS.RECORD_PETTY_CASH_EXPENSE]:  { label: 'Record Petty Cash Expense',    module: 'Projects' },
+  [ACTIONS.APPROVE_PETTY_CASH]:         { label: 'Approve Petty Cash Expenses',  module: 'Projects' },
+  [ACTIONS.RECONCILE_PETTY_CASH]:       { label: 'Create/Submit Reconciliation', module: 'Projects' },
+  [ACTIONS.POST_PETTY_CASH_GL]:         { label: 'Post Petty Cash to GL',        module: 'Projects' },
   [ACTIONS.VIEW_AUDIT_LOG]:             { label: 'View Audit Log',               module: 'Reports' },
   [ACTIONS.EXPORT_REPORTS]:             { label: 'Export Reports',               module: 'Reports' },
   [ACTIONS.MANAGE_MASTER_DATA]:         { label: 'Manage Master Data',           module: 'Settings' },
@@ -173,6 +191,8 @@ export const DEFAULT_ROLE_ACTIONS = {
     ACTIONS.CREATE_TRAVEL_REQUEST, ACTIONS.APPROVE_TRAVEL,
     ACTIONS.RUN_PAYROLL, ACTIONS.VIEW_PAYROLL_AMOUNTS, ACTIONS.APPROVE_PAYROLL, ACTIONS.EXPORT_PAYROLL,
     ACTIONS.VIEW_AUDIT_LOG, ACTIONS.EXPORT_REPORTS,
+    ACTIONS.MANAGE_PETTY_CASH_FUNDS, ACTIONS.APPROVE_PETTY_CASH, ACTIONS.RECONCILE_PETTY_CASH, ACTIONS.POST_PETTY_CASH_GL,
+    ACTIONS.MANAGE_CONTRACTOR_EQUIPMENT, ACTIONS.APPROVE_CONTRACTOR_USAGE, ACTIONS.POST_CONTRACTOR_INVOICE,
   ],
 
   [ROLES.DEPT_MANAGER]: [
@@ -181,19 +201,26 @@ export const DEFAULT_ROLE_ACTIONS = {
     ACTIONS.CREATE_STORE_REQUISITION, ACTIONS.CREATE_PURCHASE_REQUISITION,
     ACTIONS.APPROVE_STORE_REQUISITION, ACTIONS.APPROVE_PURCHASE_REQUISITION,
     ACTIONS.CREATE_MEMO, ACTIONS.CREATE_ANNOUNCEMENT,
+    ACTIONS.MANAGE_PETTY_CASH_FUNDS, ACTIONS.APPROVE_PETTY_CASH, ACTIONS.RECONCILE_PETTY_CASH,
+    ACTIONS.APPROVE_CONTRACTOR_USAGE,
   ],
 
   [ROLES.STOREKEEPER]: [
     ACTIONS.STOCK_IN, ACTIONS.STOCK_OUT, ACTIONS.CONDUCT_STOCK_TAKE,
     ACTIONS.FULFILL_STORE_REQUISITION, ACTIONS.RECEIVE_GOODS,
     ACTIONS.MANAGE_CAMP_STOCK, ACTIONS.ISSUE_PPE, ACTIONS.MANAGE_HEADCOUNT,
+    ACTIONS.RECORD_PETTY_CASH_EXPENSE,
   ],
 
   [ROLES.FUEL_ATTENDANT]: [
     ACTIONS.ISSUE_FUEL, ACTIONS.RECORD_FUEL_DELIVERY, ACTIONS.RECORD_DIPSTICK,
+    ACTIONS.RECORD_PETTY_CASH_EXPENSE,
   ],
+
+
 
   [ROLES.VIEWER]: [
     ACTIONS.CREATE_LEAVE_REQUEST, ACTIONS.CREATE_TRAVEL_REQUEST,
+    ACTIONS.RECORD_PETTY_CASH_EXPENSE,
   ],
 }
