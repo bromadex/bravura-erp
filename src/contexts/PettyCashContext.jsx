@@ -78,7 +78,7 @@ export function PettyCashProvider({ children }) {
     const id       = genId()
     const pcf_code = await Promise.resolve(generateTxnCode('PCF')).catch(() => `PCF-${Date.now()}`)
     const now      = new Date().toISOString()
-    const amount   = parseFloat(data.amount) || 0
+    const amount   = parseFloat(data.opening_amount || data.amount) || 0
 
     const { error } = await supabase.from('petty_cash_funds').insert([{
       id,
