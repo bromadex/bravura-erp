@@ -2,6 +2,7 @@
 // Petty Cash — Expense entry and management (Expenses + Exceptions tabs)
 
 import { useState, useMemo, useCallback } from 'react'
+import { supabase } from '../../lib/supabase'
 import { usePettyCash } from '../../contexts/PettyCashContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
@@ -25,7 +26,7 @@ const WORKFLOW_STATUSES = ['draft', 'submitted', 'approved', 'rejected']
 
 const EMPTY_EXPENSE = {
   fund_id: '', date: TODAY, supplier: '', category: '', purpose: '', amount: '',
-  has_receipt: true, receipt_lines: [],
+  has_receipt: true, receipt_lines: [], attachment_url: '',
   no_receipt_reason: '', no_receipt_explanation: '', approver_name: '',
 }
 
@@ -52,6 +53,7 @@ export default function PettyCashExpenses() {
   const [form,       setForm]       = useState(EMPTY_EXPENSE)
   const [lineItems,  setLineItems]  = useState([newLine()])
   const [saving,     setSaving]     = useState(false)
+  const [receiptFile, setReceiptFile] = useState(null)
 
   // ── Reject modal ──────────────────────────────────────────────────────────
   const [rejectTarget, setRejectTarget] = useState(null)
@@ -77,6 +79,7 @@ export default function PettyCashExpenses() {
     setEditingTxn(null)
     setForm(EMPTY_EXPENSE)
     setLineItems([newLine()])
+    setReceiptFile(null)
     setShowModal(true)
   }
 
@@ -91,10 +94,12 @@ export default function PettyCashExpenses() {
       amount:                 txn.amount                 || '',
       has_receipt:            txn.has_receipt            ?? true,
       receipt_lines:          [],
+      attachment_url:         txn.attachment_url         || '',
       no_receipt_reason:      txn.no_receipt_reason      || '',
       no_receipt_explanation: txn.no_receipt_explanation || '',
       approver_name:          txn.approver_name          || '',
     })
+    setReceiptFile(null)
     // Map stored receipt lines
     const stored = receiptLines.filter(l => l.transaction_id === txn.id)
     setLineItems(stored.length > 0
@@ -134,23 +139,35 @@ export default function PettyCashExpenses() {
       ? lineItems.filter(li => li.item_description.trim())
       : []
 
-    const payload = {
-      fund_id:                form.fund_id,
-      date:                   form.date,
-      supplier:               form.supplier.trim()  || null,
-      category:               form.category,
-      purpose:                form.purpose.trim(),
-      amount:                 parseFloat(form.amount),
-      has_receipt:            form.has_receipt,
-      receipt_lines:          lines,
-      no_receipt_reason:      !form.has_receipt ? form.no_receipt_reason          : null,
-      no_receipt_explanation: !form.has_receipt ? form.no_receipt_explanation     : null,
-      approver_name:          !form.has_receipt ? form.approver_name              : null,
-      entered_by:             user?.full_name || user?.username || null,
-    }
-
     setSaving(true)
     try {
+      // Upload receipt file to Supabase Storage if provided
+      let attachmentUrl = form.attachment_url || null
+      if (receiptFile) {
+        const ext  = receiptFile.name.split('.').pop().toLowerCase()
+        const path = `petty-cash/${form.fund_id || 'misc'}/${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage.from('receipts').upload(path, receiptFile, { upsert: true })
+        if (upErr) throw new Error(`Receipt upload failed: ${upErr.message}`)
+        const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+        attachmentUrl = urlData?.publicUrl || null
+      }
+
+      const payload = {
+        fund_id:                form.fund_id,
+        date:                   form.date,
+        supplier:               form.supplier.trim()  || null,
+        category:               form.category,
+        purpose:                form.purpose.trim(),
+        amount:                 parseFloat(form.amount),
+        has_receipt:            form.has_receipt,
+        receipt_lines:          lines,
+        attachment_url:         attachmentUrl,
+        no_receipt_reason:      !form.has_receipt ? form.no_receipt_reason          : null,
+        no_receipt_explanation: !form.has_receipt ? form.no_receipt_explanation     : null,
+        approver_name:          !form.has_receipt ? form.approver_name              : null,
+        entered_by:             user?.full_name || user?.username || null,
+      }
+
       if (editingTxn) {
         await updateTransaction(editingTxn.id, payload)
         toast.success('Expense updated')
@@ -363,7 +380,11 @@ export default function PettyCashExpenses() {
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             {txn.has_receipt
-                              ? <span className="material-icons" style={{ fontSize: 16, color: 'var(--green)' }} title="Receipt">receipt</span>
+                              ? txn.attachment_url
+                                ? <a href={txn.attachment_url} target="_blank" rel="noreferrer" title="View receipt attachment">
+                                    <span className="material-icons" style={{ fontSize: 16, color: 'var(--green)' }}>receipt</span>
+                                  </a>
+                                : <span className="material-icons" style={{ fontSize: 16, color: 'var(--yellow)', opacity: 0.7 }} title="Receipt declared – no file attached">receipt_long</span>
                               : <span className="material-icons" style={{ fontSize: 16, color: hasExc ? 'var(--red)' : 'var(--text-dim)' }} title="No receipt">no_transfer</span>
                             }
                           </td>
@@ -663,6 +684,45 @@ export default function PettyCashExpenses() {
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* Receipt attachment upload */}
+          {form.has_receipt && (
+            <div className="form-section">
+              <div className="form-section-title" style={{ marginBottom: 10 }}>Receipt Attachment</div>
+              {form.attachment_url && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 12px', background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.3)', borderRadius: 7 }}>
+                  <span className="material-icons" style={{ fontSize: 16, color: 'var(--green)' }}>attachment</span>
+                  <a href={form.attachment_url} target="_blank" rel="noreferrer"
+                    style={{ flex: 1, fontSize: 12, color: 'var(--teal)', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                    View existing receipt attachment
+                  </a>
+                  <button type="button" className="btn btn-danger btn-sm btn-icon" title="Remove attachment"
+                    onClick={() => setF('attachment_url', '')}>
+                    <span className="material-icons" style={{ fontSize: 12 }}>close</span>
+                  </button>
+                </div>
+              )}
+              <div className="form-group" style={{ marginBottom: 4 }}>
+                <label>{form.attachment_url ? 'REPLACE RECEIPT' : 'UPLOAD RECEIPT'}</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="form-control"
+                  onChange={e => setReceiptFile(e.target.files[0] || null)}
+                  style={{ fontSize: 12, padding: '8px 12px' }}
+                />
+                {receiptFile && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span className="material-icons" style={{ fontSize: 13 }}>check_circle</span>
+                    Ready to upload: {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                  Accepted: JPG, PNG, PDF. Max 5 MB.
+                </div>
+              </div>
             </div>
           )}
 

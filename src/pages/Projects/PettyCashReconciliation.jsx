@@ -385,7 +385,44 @@ export default function PettyCashReconciliation() {
             Approved reconciliations ready to post to the General Ledger.
           </div>
           {readyToPost.length === 0 ? (
-            <EmptyState icon="account_balance" message="No approved reconciliations awaiting posting" />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', gap: 20 }}>
+              <span className="material-icons" style={{ fontSize: 56, color: 'var(--text-dim)', opacity: 0.4 }}>account_balance</span>
+              <div style={{ textAlign: 'center', maxWidth: 480 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>No approved reconciliations ready to post</div>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7, marginBottom: 20 }}>
+                  To post petty cash expenses to the General Ledger, follow this workflow:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left', background: 'var(--surface2)', borderRadius: 10, padding: '16px 20px', marginBottom: 20 }}>
+                  {[
+                    { step: 1, icon: 'receipt_long',      color: 'var(--teal)',   label: 'Record expenses',      sub: 'Add petty cash expenses in the Expenses page' },
+                    { step: 2, icon: 'send',              color: 'var(--blue)',   label: 'Submit for approval',  sub: 'Click the send button on each draft expense' },
+                    { step: 3, icon: 'check_circle',      color: 'var(--green)',  label: 'Approve expenses',     sub: 'An approver must approve each expense' },
+                    { step: 4, icon: 'balance',           color: 'var(--yellow)', label: 'Create reconciliation',sub: 'Click "New Reconciliation" — it captures all approved expenses in the period' },
+                    { step: 5, icon: 'approval',          color: 'var(--purple)', label: 'Submit & approve',     sub: 'Submit the reconciliation, then approve it' },
+                    { step: 6, icon: 'account_balance',   color: 'var(--gold)',   label: 'Post to GL',           sub: 'The approved reconciliation will appear here for posting' },
+                  ].map(({ step, icon, color, label, sub }) => (
+                    <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${color}22`, border: `1px solid ${color}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color }}>{step}</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="material-icons" style={{ fontSize: 14, color }}>{icon}</span>
+                          {label}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {canEdit && (
+                  <button className="btn btn-primary" onClick={() => { setReconForm(BLANK_RECON); setShowNewModal(true) }}>
+                    <span className="material-icons" style={{ fontSize: 15 }}>add</span>
+                    New Reconciliation
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px,1fr))', gap: 16 }}>
               {readyToPost.map(r => (
