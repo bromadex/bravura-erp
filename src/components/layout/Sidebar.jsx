@@ -205,6 +205,17 @@ const ALL_MODULES = {
       ],
     }],
   },
+  projects: {
+    label: 'Projects', icon: 'folder_open', color: '#f59e0b',
+    sections: [{
+      label: 'Petty Cash', pages: [
+        { id: 'petty-cash-dashboard',      label: 'PC Dashboard',      icon: 'dashboard'         },
+        { id: 'petty-cash-funds',          label: 'Funds & Top-ups',   icon: 'account_balance_wallet' },
+        { id: 'petty-cash-expenses',       label: 'Expenses',          icon: 'receipt_long'      },
+        { id: 'petty-cash-reconciliation', label: 'Reconciliation',    icon: 'balance'           },
+      ],
+    }],
+  },
   reports: {
     label: 'Reports', icon: 'bar_chart', color: '#38bdf8',
     sections: [{

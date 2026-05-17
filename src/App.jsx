@@ -11,6 +11,7 @@ import { ProcurementProvider }     from './contexts/ProcurementContext'
 import { FuelProvider }            from './contexts/FuelContext'
 import { FleetProvider }           from './contexts/FleetContext'
 import { ContractorProvider }      from './contexts/ContractorContext'
+import { PettyCashProvider }       from './contexts/PettyCashContext'
 import { HRProvider }              from './contexts/HRContext'
 import { LogisticsProvider }       from './contexts/LogisticsContext'
 import { CampsiteProvider }        from './contexts/CampsiteContext'
@@ -115,6 +116,12 @@ import LeaveReports    from './pages/HR/LeaveReports'
 import Travel          from './pages/HR/Travel'
 import Payroll         from './pages/HR/Payroll'
 import TimesheetSummary from './pages/HR/TimesheetSummary'
+
+// ── Projects / Petty Cash ─────────────────────────────────────
+import PettyCashDashboard      from './pages/Projects/PettyCashDashboard'
+import PettyCashFunds          from './pages/Projects/PettyCashFunds'
+import PettyCashExpenses       from './pages/Projects/PettyCashExpenses'
+import PettyCashReconciliation from './pages/Projects/PettyCashReconciliation'
 
 // ── Accounting ────────────────────────────────────────────────
 import ChartOfAccounts  from './pages/Accounting/ChartOfAccounts'
@@ -424,6 +431,25 @@ function AppRoutes() {
           ))}
         </Route>
       ))}
+
+      {/* ── PROJECTS / PETTY CASH ───────────────────────── */}
+      <Route path="/module/projects" element={
+        <ProtectedRoute>
+          <PermissionRoute module="projects" page="petty-cash-dashboard">
+            <AccountingProvider>
+              <PettyCashProvider>
+                <Layout module="projects" />
+              </PettyCashProvider>
+            </AccountingProvider>
+          </PermissionRoute>
+        </ProtectedRoute>
+      }>
+        <Route index                             element={<PettyCashDashboard />}      />
+        <Route path="petty-cash-dashboard"       element={<PettyCashDashboard />}      />
+        <Route path="petty-cash-funds"           element={<PettyCashFunds />}          />
+        <Route path="petty-cash-expenses"        element={<PettyCashExpenses />}       />
+        <Route path="petty-cash-reconciliation"  element={<PettyCashReconciliation />} />
+      </Route>
 
       {/* ── ACCOUNTING ───────────────────────────────────── */}
       <Route path="/module/accounting" element={
