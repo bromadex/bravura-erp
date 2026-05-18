@@ -28,7 +28,6 @@ const MODULE_PAGES = {
   fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
   fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues','asset-registry','registry','reclass-log','asset-import','category-config'],
   hr:          ['dashboard','analytics','employees','departments','designations','permissions','attendance','attendance-requests','leave','leave-policies','leave-allocation','compensatory-leave','leave-encashment','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet','shift-types','shift-assignments','holiday-lists'],
-  expenses:    ['dashboard','claims','advances','types'],
   campsite:    ['overview','blocks','rooms','assignments'],
   connect:     ['chats'],
   settings:    ['workflows'],
@@ -41,7 +40,6 @@ const MODULE_PAGES = {
 const ALL_MODULES = [
   { id: 'dashboard',   icon: 'dashboard',          label: 'Dashboard',          color: '#f4a261', desc: 'KPIs & overview',         route: '/module/dashboard',   moduleName: 'dashboard'   },
   { id: 'hr',          icon: 'badge',               label: 'Human Resources',    color: '#f87171', desc: 'Employees & payroll',     route: '/module/hr',          moduleName: 'hr'          },
-  { id: 'expenses',    icon: 'receipt_long',        label: 'Expenses',           color: '#fb923c', desc: 'Claims & advances',       route: '/module/expenses',    moduleName: 'expenses'    },
   { id: 'procurement', icon: 'shopping_cart',       label: 'Procurement',        color: '#a78bfa', desc: 'Suppliers & orders',      route: '/module/procurement', moduleName: 'procurement' },
   { id: 'inventory',   icon: 'inventory',           label: 'Inventory',          color: '#2dd4bf', desc: 'Stock & warehouse',       route: '/module/inventory',   moduleName: 'inventory'   },
   { id: 'fuel',        icon: 'local_gas_station',   label: 'Fuel Management',    color: '#fbbf24', desc: 'Tanks & issuance',        route: '/module/fuel',        moduleName: 'fuel'        },
