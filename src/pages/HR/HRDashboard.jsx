@@ -96,6 +96,24 @@ const CATEGORIES = [
     pages: ['grievances'],
   },
   {
+    id: 'training',
+    icon: 'school',
+    label: 'Training',
+    desc: 'Training types, schedules & employee training log',
+    color: '#0ea5e9',
+    route: '/module/hr/training',
+    pages: ['training'],
+  },
+  {
+    id: 'referrals',
+    icon: 'share',
+    label: 'Referrals',
+    desc: 'Employee referral programs & bonus tracking',
+    color: '#8b5cf6',
+    route: '/module/hr/referrals',
+    pages: ['referrals'],
+  },
+  {
     id: 'expenses',
     icon: 'receipt_long',
     label: 'Expenses',
@@ -121,6 +139,15 @@ const CATEGORIES = [
     color: '#10b981',
     route: '/module/hr/analytics',
     pages: ['dashboard'],
+  },
+  {
+    id: 'hr-settings',
+    icon: 'settings',
+    label: 'HR Settings',
+    desc: 'Company, payroll, leave & notification configuration',
+    color: '#64748b',
+    route: '/module/hr/hr-settings',
+    pages: ['hr-settings'],
   },
 ]
 

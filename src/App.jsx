@@ -172,6 +172,10 @@ const OvertimeSlips      = lazy(() => import('./pages/HR/OvertimeSlips'))
 const EmployeeGrievances = lazy(() => import('./pages/HR/EmployeeGrievances'))
 // HR Phase 3 — Notifications
 const ScheduledNotifications = lazy(() => import('./pages/HR/ScheduledNotifications'))
+// HR Phase 4 — Training, Referrals, Settings
+const TrainingManagement  = lazy(() => import('./pages/HR/TrainingManagement'))
+const EmployeeReferrals   = lazy(() => import('./pages/HR/EmployeeReferrals'))
+const HRSettings          = lazy(() => import('./pages/HR/HRSettings'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -489,6 +493,10 @@ function AppRoutes() {
             <Route path="grievances"          element={<EmployeeGrievances />} />
             {/* Phase 3 — Notifications */}
             <Route path="scheduled-notifications" element={<ScheduledNotifications />} />
+            {/* Phase 4 — Training, Referrals, Settings */}
+            <Route path="training"                element={<TrainingManagement />} />
+            <Route path="referrals"               element={<EmployeeReferrals />} />
+            <Route path="hr-settings"             element={<HRSettings />} />
           </Route>
         </Route>
 

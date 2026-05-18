@@ -26,8 +26,8 @@ const HR_PAGE_SECTION = {
   'job-postings': 'Recruitment', applicants: 'Recruitment', interviews: 'Recruitment', 'job-requisitions': 'Recruitment',
   'appraisal-periods': 'Performance', 'performance-reviews': 'Performance', 'kpi-templates': 'Performance',
   kras: 'Performance', 'appraisal-templates': 'Performance',
-  'hr-reports': 'Reports',
-  analytics: 'Overview',
+  'hr-reports': 'Reports', 'scheduled-notifications': 'Reports', analytics: 'Reports',
+  training: 'Training', referrals: 'Referrals', 'hr-settings': 'HR Settings',
 }
 
 const ALL_MODULES = {
@@ -243,11 +243,29 @@ const ALL_MODULES = {
         ],
       },
       {
+        label: 'Training',
+        pages: [
+          { id: 'training', label: 'Training Management', icon: 'school' },
+        ],
+      },
+      {
+        label: 'Referrals',
+        pages: [
+          { id: 'referrals', label: 'Employee Referrals', icon: 'share' },
+        ],
+      },
+      {
         label: 'Reports',
         pages: [
-          { id: 'hr-reports',               label: 'HR Reports',              icon: 'bar_chart'        },
-          { id: 'scheduled-notifications',  label: 'Scheduled Notifications', icon: 'notifications'    },
-          { id: 'analytics',                label: 'Analytics',               icon: 'insights'         },
+          { id: 'hr-reports',              label: 'HR Reports',              icon: 'bar_chart'     },
+          { id: 'scheduled-notifications', label: 'Scheduled Notifications', icon: 'notifications' },
+          { id: 'analytics',               label: 'Analytics',               icon: 'insights'      },
+        ],
+      },
+      {
+        label: 'HR Settings',
+        pages: [
+          { id: 'hr-settings', label: 'HR Settings', icon: 'settings' },
         ],
       },
     ],
