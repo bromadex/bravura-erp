@@ -55,7 +55,7 @@ ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS late_entry             
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS early_exit             BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS late_entry_mins        INT     DEFAULT 0;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS early_exit_mins        INT     DEFAULT 0;
-ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS leave_type_id          UUID;
+ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS leave_type_id          TEXT;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS attendance_request_id  UUID;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS leave_policies (
 CREATE TABLE IF NOT EXISTS leave_policy_details (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   policy_id           UUID        NOT NULL REFERENCES leave_policies(id) ON DELETE CASCADE,
-  leave_type_id       UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id       TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   annual_allocation   NUMERIC(6,2) NOT NULL DEFAULT 0,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -143,7 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_policy_assignments_period   ON leave_policy
 CREATE TABLE IF NOT EXISTS leave_allocations (
   id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id             UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type_id           UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id           TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   leave_period_id         UUID        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
   from_date               DATE        NOT NULL,
   to_date                 DATE        NOT NULL,
@@ -166,7 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_allocations_status     ON leave_allocations
 CREATE TABLE IF NOT EXISTS leave_ledger_entries (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id       UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type_id     UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id     TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   transaction_type  TEXT        NOT NULL,  -- 'Allocation' | 'Leave Application' | 'Adjustment' | 'Carry Forward'
   transaction_name  TEXT        NOT NULL,
   from_date         DATE        NOT NULL,
@@ -206,7 +206,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_block_list_dates_date ON leave_block_list_d
 CREATE TABLE IF NOT EXISTS compensatory_leave_requests (
   id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id           UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type_id         UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id         TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   work_from_date        DATE        NOT NULL,
   work_end_date         DATE        NOT NULL,
   half_day              BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -225,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_comp_leave_status   ON compensatory_leave_request
 CREATE TABLE IF NOT EXISTS leave_encashments (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id       UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type_id     UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id     TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   leave_period_id   UUID        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
   leave_balance     NUMERIC(6,2) NOT NULL DEFAULT 0,
   encashment_days   NUMERIC(6,2) NOT NULL DEFAULT 0,
@@ -244,7 +244,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_encashments_status   ON leave_encashments(s
 CREATE TABLE IF NOT EXISTS leave_adjustments (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id      UUID        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_type_id    UUID        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+  leave_type_id    TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   adjustment_days  NUMERIC(6,2) NOT NULL,  -- positive = add, negative = deduct
   reason           TEXT        NOT NULL,
   effective_date   DATE        NOT NULL,
