@@ -12,9 +12,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ── 1a. employees ─────────────────────────────────────────────────────────────
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS holiday_list_id         UUID;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS grade_id                UUID;
-ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type_id      UUID;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS holiday_list_id         TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS grade_id                TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type_id      TEXT;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS date_of_birth           DATE;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS gender                  TEXT;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality             TEXT;
@@ -50,13 +50,13 @@ ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_balance    NUMERIC(6,2
 
 -- ── 1d. employee_attendance ───────────────────────────────────────────────────
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS attendance_type        TEXT    DEFAULT 'Present';
-ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS shift_type_id          UUID;
+ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS shift_type_id          TEXT;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS late_entry             BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS early_exit             BOOLEAN DEFAULT FALSE;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS late_entry_mins        INT     DEFAULT 0;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS early_exit_mins        INT     DEFAULT 0;
 ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS leave_type_id          TEXT;
-ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS attendance_request_id  UUID;
+ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS attendance_request_id  TEXT;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- SECTION 2 — LEAVE ENGINE TABLES
@@ -64,7 +64,7 @@ ALTER TABLE employee_attendance ADD COLUMN IF NOT EXISTS attendance_request_id  
 
 -- ── 2a. holiday_lists ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS holiday_lists (
-  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id          TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name        TEXT        NOT NULL,
   from_date   DATE        NOT NULL,
   to_date     DATE        NOT NULL,
@@ -77,8 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_holiday_lists_is_default ON holiday_lists(is_defa
 
 -- ── 2b. holiday_list_dates ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS holiday_list_dates (
-  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  holiday_list_id  UUID        NOT NULL REFERENCES holiday_lists(id) ON DELETE CASCADE,
+  id               TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  holiday_list_id  TEXT        NOT NULL REFERENCES holiday_lists(id) ON DELETE CASCADE,
   holiday_date     DATE        NOT NULL,
   description      TEXT,
   weekly_off       BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -90,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_holiday_list_dates_date    ON holiday_list_dates(
 
 -- ── 2c. leave_periods ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_periods (
-  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id          TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name        TEXT        NOT NULL,
   from_date   DATE        NOT NULL,
   to_date     DATE        NOT NULL,
@@ -103,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_periods_is_active ON leave_periods(is_activ
 
 -- ── 2d. leave_policies ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_policies (
-  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id          TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name        TEXT        NOT NULL,
   description TEXT,
   is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -113,8 +113,8 @@ CREATE TABLE IF NOT EXISTS leave_policies (
 
 -- ── 2e. leave_policy_details ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_policy_details (
-  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  policy_id           UUID        NOT NULL REFERENCES leave_policies(id) ON DELETE CASCADE,
+  id                  TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  policy_id           TEXT        NOT NULL REFERENCES leave_policies(id) ON DELETE CASCADE,
   leave_type_id       TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   annual_allocation   NUMERIC(6,2) NOT NULL DEFAULT 0,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -125,10 +125,10 @@ CREATE INDEX IF NOT EXISTS idx_leave_policy_details_leave_type_id ON leave_polic
 
 -- ── 2f. leave_policy_assignments ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_policy_assignments (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id       TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  leave_policy_id   UUID        NOT NULL REFERENCES leave_policies(id) ON DELETE RESTRICT,
-  leave_period_id   UUID        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
+  leave_policy_id   TEXT        NOT NULL REFERENCES leave_policies(id) ON DELETE RESTRICT,
+  leave_period_id   TEXT        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
   effective_from    DATE        NOT NULL,
   status            TEXT        NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -141,10 +141,10 @@ CREATE INDEX IF NOT EXISTS idx_leave_policy_assignments_period   ON leave_policy
 
 -- ── 2g. leave_allocations ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_allocations (
-  id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                      TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id             TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   leave_type_id           TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
-  leave_period_id         UUID        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
+  leave_period_id         TEXT        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
   from_date               DATE        NOT NULL,
   to_date                 DATE        NOT NULL,
   new_leaves_allocated    NUMERIC(6,2) NOT NULL DEFAULT 0,
@@ -164,7 +164,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_allocations_status     ON leave_allocations
 -- ── 2h. leave_ledger_entries ──────────────────────────────────────────────────
 -- Positive leaves = credit (allocation), Negative leaves = debit (leave taken)
 CREATE TABLE IF NOT EXISTS leave_ledger_entries (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id       TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   leave_type_id     TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   transaction_type  TEXT        NOT NULL,  -- 'Allocation' | 'Leave Application' | 'Adjustment' | 'Carry Forward'
@@ -183,7 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_ledger_emp_type_date ON leave_ledger_entrie
 
 -- ── 2i. leave_block_lists ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_block_lists (
-  id                       UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                       TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name                     TEXT        NOT NULL,
   applies_to_all_departments BOOLEAN   NOT NULL DEFAULT TRUE,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -192,8 +192,8 @@ CREATE TABLE IF NOT EXISTS leave_block_lists (
 
 -- ── 2j. leave_block_list_dates ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_block_list_dates (
-  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  block_list_id   UUID        NOT NULL REFERENCES leave_block_lists(id) ON DELETE CASCADE,
+  id              TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  block_list_id   TEXT        NOT NULL REFERENCES leave_block_lists(id) ON DELETE CASCADE,
   block_date      DATE        NOT NULL,
   reason          TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -204,7 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_block_list_dates_date ON leave_block_list_d
 
 -- ── 2k. compensatory_leave_requests ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS compensatory_leave_requests (
-  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                    TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id           TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   leave_type_id         TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   work_from_date        DATE        NOT NULL,
@@ -212,8 +212,8 @@ CREATE TABLE IF NOT EXISTS compensatory_leave_requests (
   half_day              BOOLEAN     NOT NULL DEFAULT FALSE,
   reason                TEXT        NOT NULL,
   status                TEXT        NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Submitted', 'Approved', 'Rejected', 'Cancelled')),
-  leave_allocation_id   UUID        REFERENCES leave_allocations(id),
-  workflow_instance_id  UUID,
+  leave_allocation_id   TEXT        REFERENCES leave_allocations(id),
+  workflow_instance_id  TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -223,10 +223,10 @@ CREATE INDEX IF NOT EXISTS idx_comp_leave_status   ON compensatory_leave_request
 
 -- ── 2l. leave_encashments ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_encashments (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id       TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   leave_type_id     TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
-  leave_period_id   UUID        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
+  leave_period_id   TEXT        NOT NULL REFERENCES leave_periods(id) ON DELETE RESTRICT,
   leave_balance     NUMERIC(6,2) NOT NULL DEFAULT 0,
   encashment_days   NUMERIC(6,2) NOT NULL DEFAULT 0,
   encashment_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -242,7 +242,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_encashments_status   ON leave_encashments(s
 
 -- ── 2m. leave_adjustments ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS leave_adjustments (
-  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id               TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id      TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   leave_type_id    TEXT        NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
   adjustment_days  NUMERIC(6,2) NOT NULL,  -- positive = add, negative = deduct
@@ -261,7 +261,7 @@ CREATE INDEX IF NOT EXISTS idx_leave_adjustments_date     ON leave_adjustments(e
 
 -- ── 3a. shift_types ──────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS shift_types (
-  id                                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                                      TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name                                    TEXT        NOT NULL UNIQUE,
   start_time                              TIME        NOT NULL,
   end_time                                TIME        NOT NULL,
@@ -284,7 +284,7 @@ CREATE INDEX IF NOT EXISTS idx_shift_types_is_active ON shift_types(is_active);
 
 -- ── 3b. shift_locations ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS shift_locations (
-  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id             TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name           TEXT        NOT NULL,
   latitude       NUMERIC(10,7) NOT NULL,
   longitude      NUMERIC(10,7) NOT NULL,
@@ -295,10 +295,10 @@ CREATE TABLE IF NOT EXISTS shift_locations (
 
 -- ── 3c. shift_assignments ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS shift_assignments (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id       TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  shift_type_id     UUID        NOT NULL REFERENCES shift_types(id) ON DELETE RESTRICT,
-  shift_location_id UUID                 REFERENCES shift_locations(id) ON DELETE SET NULL,
+  shift_type_id     TEXT        NOT NULL REFERENCES shift_types(id) ON DELETE RESTRICT,
+  shift_location_id TEXT                 REFERENCES shift_locations(id) ON DELETE SET NULL,
   start_date        DATE        NOT NULL,
   end_date          DATE,
   status            TEXT        NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Expired')),
@@ -314,11 +314,11 @@ CREATE INDEX IF NOT EXISTS idx_shift_assignments_dates      ON shift_assignments
 
 -- ── 3d. employee_checkins ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS employee_checkins (
-  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                    TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id           TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   log_type              TEXT        NOT NULL CHECK (log_type IN ('IN', 'OUT')),
   time                  TIMESTAMPTZ NOT NULL,
-  shift_assignment_id   UUID                 REFERENCES shift_assignments(id) ON DELETE SET NULL,
+  shift_assignment_id   TEXT                 REFERENCES shift_assignments(id) ON DELETE SET NULL,
   attendance_id         TEXT                 REFERENCES employee_attendance(id) ON DELETE SET NULL,
   latitude              NUMERIC(10,7),
   longitude             NUMERIC(10,7),
@@ -335,7 +335,7 @@ CREATE INDEX IF NOT EXISTS idx_employee_checkins_emp_time ON employee_checkins(e
 
 -- ── 3e. attendance_requests ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS attendance_requests (
-  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                    TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   employee_id           TEXT        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   from_date             DATE        NOT NULL,
   to_date               DATE        NOT NULL,
@@ -343,10 +343,10 @@ CREATE TABLE IF NOT EXISTS attendance_requests (
   half_day_date         DATE,
   reason                TEXT        NOT NULL,
   explanation           TEXT,
-  shift_type_id         UUID                 REFERENCES shift_types(id) ON DELETE SET NULL,
+  shift_type_id         TEXT                 REFERENCES shift_types(id) ON DELETE SET NULL,
   include_holidays      BOOLEAN     NOT NULL DEFAULT FALSE,
   status                TEXT        NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Submitted', 'Approved', 'Rejected', 'Cancelled')),
-  workflow_instance_id  UUID,
+  workflow_instance_id  TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -361,7 +361,7 @@ CREATE INDEX IF NOT EXISTS idx_attendance_requests_dates    ON attendance_reques
 
 -- ── 4a. expense_types ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS expense_types (
-  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                    TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   name                  TEXT        NOT NULL UNIQUE,
   description           TEXT,
   default_account_code  TEXT        NOT NULL,
@@ -376,11 +376,11 @@ CREATE INDEX IF NOT EXISTS idx_expense_types_is_active ON expense_types(is_activ
 
 -- ── 4b. expense_claims ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS expense_claims (
-  id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                      TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   claim_number            TEXT        NOT NULL UNIQUE,
   employee_id             TEXT        NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
   posting_date            DATE        NOT NULL,
-  department_id           UUID,
+  department_id           TEXT,
   expense_approver_id     TEXT,
   expense_approver_name   TEXT,
   total_claimed_amount    NUMERIC(14,2) NOT NULL DEFAULT 0,
@@ -395,8 +395,8 @@ CREATE TABLE IF NOT EXISTS expense_claims (
   is_paid                 BOOLEAN     NOT NULL DEFAULT FALSE,
   remark                  TEXT,
   payable_account_code    TEXT,
-  workflow_instance_id    UUID,
-  gl_entry_id             UUID,
+  workflow_instance_id    TEXT,
+  gl_entry_id             TEXT,
   created_by              TEXT,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -409,7 +409,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='claim_number') THEN ALTER TABLE expense_claims ADD COLUMN claim_number TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='employee_id') THEN ALTER TABLE expense_claims ADD COLUMN employee_id TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='posting_date') THEN ALTER TABLE expense_claims ADD COLUMN posting_date DATE; END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='department_id') THEN ALTER TABLE expense_claims ADD COLUMN department_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='department_id') THEN ALTER TABLE expense_claims ADD COLUMN department_id TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='expense_approver_id') THEN ALTER TABLE expense_claims ADD COLUMN expense_approver_id TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='expense_approver_name') THEN ALTER TABLE expense_claims ADD COLUMN expense_approver_name TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='total_claimed_amount') THEN ALTER TABLE expense_claims ADD COLUMN total_claimed_amount NUMERIC(14,2) DEFAULT 0; END IF;
@@ -422,8 +422,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='is_paid') THEN ALTER TABLE expense_claims ADD COLUMN is_paid BOOLEAN DEFAULT FALSE; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='remark') THEN ALTER TABLE expense_claims ADD COLUMN remark TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='payable_account_code') THEN ALTER TABLE expense_claims ADD COLUMN payable_account_code TEXT; END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE expense_claims ADD COLUMN workflow_instance_id UUID; END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='gl_entry_id') THEN ALTER TABLE expense_claims ADD COLUMN gl_entry_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE expense_claims ADD COLUMN workflow_instance_id TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='gl_entry_id') THEN ALTER TABLE expense_claims ADD COLUMN gl_entry_id TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_by') THEN ALTER TABLE expense_claims ADD COLUMN created_by TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_at') THEN ALTER TABLE expense_claims ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='updated_at') THEN ALTER TABLE expense_claims ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW(); END IF;
@@ -436,9 +436,9 @@ CREATE INDEX IF NOT EXISTS idx_expense_claims_posting_date    ON expense_claims(
 
 -- ── 4c. expense_claim_details ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS expense_claim_details (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  claim_id          UUID        NOT NULL REFERENCES expense_claims(id) ON DELETE CASCADE,
-  expense_type_id   UUID        NOT NULL REFERENCES expense_types(id) ON DELETE RESTRICT,
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  claim_id          TEXT        NOT NULL REFERENCES expense_claims(id) ON DELETE CASCADE,
+  expense_type_id   TEXT        NOT NULL REFERENCES expense_types(id) ON DELETE RESTRICT,
   expense_date      DATE        NOT NULL,
   description       TEXT,
   claimed_amount    NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -454,7 +454,7 @@ CREATE INDEX IF NOT EXISTS idx_expense_claim_details_expense_type ON expense_cla
 
 -- ── 4d. employee_advances ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS employee_advances (
-  id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  id                    TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
   advance_number        TEXT        NOT NULL UNIQUE,
   employee_id           TEXT        NOT NULL REFERENCES employees(id) ON DELETE RESTRICT,
   posting_date          DATE        NOT NULL,
@@ -467,7 +467,7 @@ CREATE TABLE IF NOT EXISTS employee_advances (
   repay_from_salary     BOOLEAN     NOT NULL DEFAULT FALSE,
   status                TEXT        NOT NULL DEFAULT 'Draft'
     CHECK (status IN ('Draft', 'Unpaid', 'Paid', 'Claimed', 'Returned', 'Partly Claimed and Returned', 'Cancelled')),
-  workflow_instance_id  UUID,
+  workflow_instance_id  TEXT,
   created_by            TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -487,7 +487,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='pending_amount') THEN ALTER TABLE employee_advances ADD COLUMN pending_amount NUMERIC(14,2) DEFAULT 0; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='repay_from_salary') THEN ALTER TABLE employee_advances ADD COLUMN repay_from_salary BOOLEAN DEFAULT FALSE; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='status') THEN ALTER TABLE employee_advances ADD COLUMN status TEXT DEFAULT 'Draft'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE employee_advances ADD COLUMN workflow_instance_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE employee_advances ADD COLUMN workflow_instance_id TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_by') THEN ALTER TABLE employee_advances ADD COLUMN created_by TEXT; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_at') THEN ALTER TABLE employee_advances ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='updated_at') THEN ALTER TABLE employee_advances ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW(); END IF;
@@ -498,9 +498,9 @@ CREATE INDEX IF NOT EXISTS idx_employee_advances_status   ON employee_advances(s
 
 -- ── 4e. expense_claim_advances ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS expense_claim_advances (
-  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  claim_id          UUID        NOT NULL REFERENCES expense_claims(id) ON DELETE CASCADE,
-  advance_id        UUID        NOT NULL REFERENCES employee_advances(id) ON DELETE RESTRICT,
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  claim_id          TEXT        NOT NULL REFERENCES expense_claims(id) ON DELETE CASCADE,
+  advance_id        TEXT        NOT NULL REFERENCES employee_advances(id) ON DELETE RESTRICT,
   allocated_amount  NUMERIC(14,2) NOT NULL DEFAULT 0,
   unclaimed_amount  NUMERIC(14,2) NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
