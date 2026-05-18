@@ -14,6 +14,8 @@ import { FleetProvider }          from './contexts/FleetContext'
 import { ContractorProvider }     from './contexts/ContractorContext'
 import { PettyCashProvider }      from './contexts/PettyCashContext'
 import { HRProvider }             from './contexts/HRContext'
+import { ShiftProvider }          from './contexts/ShiftContext'
+import { ExpenseProvider }        from './contexts/ExpenseContext'
 import { LogisticsProvider }      from './contexts/LogisticsContext'
 import { CampsiteProvider }       from './contexts/CampsiteContext'
 import { AccountingProvider }     from './contexts/AccountingContext'
@@ -110,19 +112,42 @@ const DowntimeAnalytics     = lazy(() => import('./pages/Fleet/DowntimeAnalytics
 const FleetCostAnalysis     = lazy(() => import('./pages/Fleet/FleetCostAnalysis'))
 
 // HR
-const HRDashboard      = lazy(() => import('./pages/HR/HRDashboard'))
-const Employees        = lazy(() => import('./pages/HR/Employees'))
-const Departments      = lazy(() => import('./pages/HR/Departments'))
-const Designations     = lazy(() => import('./pages/HR/Designations'))
-const UserPermissions  = lazy(() => import('./pages/HR/UserPermissions'))
-const Attendance       = lazy(() => import('./pages/HR/Attendance'))
-const Leave            = lazy(() => import('./pages/HR/Leave'))
-const LeaveBalance     = lazy(() => import('./pages/HR/LeaveBalance'))
-const LeaveCalendar    = lazy(() => import('./pages/HR/LeaveCalendar'))
-const LeaveReports     = lazy(() => import('./pages/HR/LeaveReports'))
-const Travel           = lazy(() => import('./pages/HR/Travel'))
-const Payroll          = lazy(() => import('./pages/HR/Payroll'))
-const TimesheetSummary = lazy(() => import('./pages/HR/TimesheetSummary'))
+const HRDashboard        = lazy(() => import('./pages/HR/HRDashboard'))
+const Employees          = lazy(() => import('./pages/HR/Employees'))
+const Departments        = lazy(() => import('./pages/HR/Departments'))
+const Designations       = lazy(() => import('./pages/HR/Designations'))
+const UserPermissions    = lazy(() => import('./pages/HR/UserPermissions'))
+const Attendance         = lazy(() => import('./pages/HR/Attendance'))
+const Leave              = lazy(() => import('./pages/HR/Leave'))
+const LeaveBalance       = lazy(() => import('./pages/HR/LeaveBalance'))
+const LeaveCalendar      = lazy(() => import('./pages/HR/LeaveCalendar'))
+const LeaveReports       = lazy(() => import('./pages/HR/LeaveReports'))
+const Travel             = lazy(() => import('./pages/HR/Travel'))
+const Payroll            = lazy(() => import('./pages/HR/Payroll'))
+const TimesheetSummary   = lazy(() => import('./pages/HR/TimesheetSummary'))
+// HR Phase 1 — Shifts
+const ShiftTypes         = lazy(() => import('./pages/HR/ShiftTypes'))
+const ShiftAssignments   = lazy(() => import('./pages/HR/ShiftAssignments'))
+const HolidayLists       = lazy(() => import('./pages/HR/HolidayLists'))
+const AttendanceRequests = lazy(() => import('./pages/HR/AttendanceRequests'))
+// HR Phase 1 — Leave v2
+const LeavePolicies      = lazy(() => import('./pages/HR/LeavePolicies'))
+const LeaveAllocation    = lazy(() => import('./pages/HR/LeaveAllocation'))
+const CompensatoryLeave  = lazy(() => import('./pages/HR/CompensatoryLeave'))
+const LeaveEncashment    = lazy(() => import('./pages/HR/LeaveEncashment'))
+
+// Expenses
+const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
+const ExpenseClaims      = lazy(() => import('./pages/Expenses/ExpenseClaims'))
+const ExpenseAdvances    = lazy(() => import('./pages/Expenses/ExpenseAdvances'))
+const ExpenseTypes       = lazy(() => import('./pages/Expenses/ExpenseTypes'))
+
+// ESS
+const ESSLayout          = lazy(() => import('./pages/ESS/ESSLayout'))
+const ESSDashboard       = lazy(() => import('./pages/ESS/ESSDashboard'))
+const ESSAttendance      = lazy(() => import('./pages/ESS/ESSAttendance'))
+const ESSLeave           = lazy(() => import('./pages/ESS/ESSLeave'))
+const ESSPayslips        = lazy(() => import('./pages/ESS/ESSPayslips'))
 
 // Projects / Petty Cash
 const PettyCashDashboard      = lazy(() => import('./pages/Projects/PettyCashDashboard'))
@@ -346,27 +371,70 @@ function AppRoutes() {
           <ProtectedRoute>
             <PermissionRoute module="hr" page="dashboard">
               <HRProvider>
-                <LeaveProvider>
-                  <Layout module="hr" />
-                </LeaveProvider>
+                <ShiftProvider>
+                  <LeaveProvider>
+                    <Layout module="hr" />
+                  </LeaveProvider>
+                </ShiftProvider>
               </HRProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>
-          <Route index                 element={<HRDashboard />} />
-          <Route path="dashboard"      element={<HRDashboard />} />
-          <Route path="employees"      element={<Employees />} />
-          <Route path="departments"    element={<Departments />} />
-          <Route path="designations"   element={<Designations />} />
-          <Route path="permissions"    element={<UserPermissions />} />
-          <Route path="attendance"     element={<Attendance />} />
-          <Route path="leave"          element={<Leave />} />
-          <Route path="leave-balance"  element={<LeaveBalance />} />
-          <Route path="leave-calendar" element={<LeaveCalendar />} />
-          <Route path="leave-reports"  element={<LeaveReports />} />
-          <Route path="travel"         element={<Travel />} />
-          <Route path="payroll"        element={<Payroll />} />
-          <Route path="timesheet"      element={<TimesheetSummary />} />
+          <Route index                      element={<HRDashboard />} />
+          <Route path="dashboard"           element={<HRDashboard />} />
+          <Route path="employees"           element={<Employees />} />
+          <Route path="departments"         element={<Departments />} />
+          <Route path="designations"        element={<Designations />} />
+          <Route path="permissions"         element={<UserPermissions />} />
+          {/* Shifts & Attendance */}
+          <Route path="shift-types"         element={<ShiftTypes />} />
+          <Route path="shift-assignments"   element={<ShiftAssignments />} />
+          <Route path="holiday-lists"       element={<HolidayLists />} />
+          <Route path="attendance"          element={<Attendance />} />
+          <Route path="attendance-requests" element={<AttendanceRequests />} />
+          {/* Leave Management */}
+          <Route path="leave"               element={<Leave />} />
+          <Route path="leave-policies"      element={<LeavePolicies />} />
+          <Route path="leave-allocation"    element={<LeaveAllocation />} />
+          <Route path="compensatory-leave"  element={<CompensatoryLeave />} />
+          <Route path="leave-encashment"    element={<LeaveEncashment />} />
+          <Route path="leave-balance"       element={<LeaveBalance />} />
+          <Route path="leave-calendar"      element={<LeaveCalendar />} />
+          <Route path="leave-reports"       element={<LeaveReports />} />
+          {/* Payroll & Travel */}
+          <Route path="travel"              element={<Travel />} />
+          <Route path="payroll"             element={<Payroll />} />
+          <Route path="timesheet"           element={<TimesheetSummary />} />
+        </Route>
+
+        {/* ── EXPENSES ─────────────────────────────────────── */}
+        <Route path="/module/expenses" element={
+          <ProtectedRoute>
+            <PermissionRoute module="expenses" page="dashboard">
+              <ExpenseProvider>
+                <Layout module="expenses" />
+              </ExpenseProvider>
+            </PermissionRoute>
+          </ProtectedRoute>
+        }>
+          <Route index            element={<ExpenseDashboard />} />
+          <Route path="dashboard" element={<ExpenseDashboard />} />
+          <Route path="claims"    element={<ExpenseClaims />} />
+          <Route path="advances"  element={<ExpenseAdvances />} />
+          <Route path="types"     element={<ExpenseTypes />} />
+        </Route>
+
+        {/* ── ESS (Employee Self-Service) ───────────────────── */}
+        <Route path="/ess" element={
+          <ProtectedRoute>
+            <ESSLayout />
+          </ProtectedRoute>
+        }>
+          <Route index              element={<ESSDashboard />} />
+          <Route path="dashboard"   element={<ESSDashboard />} />
+          <Route path="attendance"  element={<ESSAttendance />} />
+          <Route path="leave"       element={<ESSLeave />} />
+          <Route path="payslips"    element={<ESSPayslips />} />
         </Route>
 
         {/* ── LOGISTICS ────────────────────────────────────── */}
