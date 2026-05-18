@@ -15,9 +15,11 @@ const HR_PAGE_SECTION = {
   'leave-encashment': 'Leave Management', 'leave-balance': 'Leave Management',
   'leave-calendar': 'Leave Management', 'leave-reports': 'Leave Management',
   payroll: 'Payroll & Travel', travel: 'Payroll & Travel', timesheet: 'Payroll & Travel',
-  'salary-structures': 'Payroll & Travel',
-  'job-postings': 'Recruitment', applicants: 'Recruitment', interviews: 'Recruitment',
+  'salary-structures': 'Payroll & Travel', 'salary-slips': 'Payroll & Travel', 'payroll-entry': 'Payroll & Travel',
+  'job-postings': 'Recruitment', applicants: 'Recruitment', interviews: 'Recruitment', 'job-requisitions': 'Recruitment',
   'appraisal-periods': 'Performance', 'performance-reviews': 'Performance', 'kpi-templates': 'Performance',
+  kras: 'Performance', 'appraisal-templates': 'Performance',
+  'hr-reports': 'Reports',
   analytics: 'Overview',
 }
 
@@ -179,6 +181,8 @@ const ALL_MODULES = {
         pages: [
           { id: 'salary-structures', label: 'Salary Structures',  icon: 'account_balance_wallet' },
           { id: 'payroll',           label: 'Payroll',            icon: 'payments'               },
+          { id: 'salary-slips',      label: 'Salary Slips',       icon: 'receipt_long'           },
+          { id: 'payroll-entry',     label: 'Payroll Entry',      icon: 'batch_prediction'       },
           { id: 'travel',            label: 'Travel',             icon: 'flight'                 },
           { id: 'timesheet',         label: 'Timesheet Summary',  icon: 'fact_check'             },
         ],
@@ -186,17 +190,26 @@ const ALL_MODULES = {
       {
         label: 'Recruitment',
         pages: [
-          { id: 'job-postings', label: 'Job Openings',  icon: 'work_outline'   },
-          { id: 'applicants',   label: 'Applicants',    icon: 'people_outline' },
-          { id: 'interviews',   label: 'Interviews',    icon: 'event_note'     },
+          { id: 'job-requisitions', label: 'Job Requisitions', icon: 'description'    },
+          { id: 'job-postings',     label: 'Job Openings',     icon: 'work_outline'   },
+          { id: 'applicants',       label: 'Applicants',       icon: 'people_outline' },
+          { id: 'interviews',       label: 'Interviews',       icon: 'event_note'     },
         ],
       },
       {
         label: 'Performance',
         pages: [
           { id: 'appraisal-periods',   label: 'Appraisal Periods',   icon: 'calendar_month'    },
-          { id: 'performance-reviews', label: 'Performance Reviews', icon: 'rate_review'       },
-          { id: 'kpi-templates',       label: 'KPI Templates',       icon: 'checklist'         },
+          { id: 'appraisal-templates', label: 'Appraisal Templates', icon: 'assignment'         },
+          { id: 'kras',                label: 'Key Result Areas',    icon: 'flag'               },
+          { id: 'performance-reviews', label: 'Performance Reviews', icon: 'rate_review'        },
+          { id: 'kpi-templates',       label: 'KPI Templates',       icon: 'checklist'          },
+        ],
+      },
+      {
+        label: 'Reports',
+        pages: [
+          { id: 'hr-reports', label: 'HR Reports', icon: 'bar_chart' },
         ],
       },
     ],

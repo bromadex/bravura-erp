@@ -148,6 +148,15 @@ const PerformanceReviews = lazy(() => import('./pages/HR/PerformanceReviews'))
 const KPITemplates       = lazy(() => import('./pages/HR/KPITemplates'))
 // HR Phase 2 — Payroll v2
 const SalaryStructures   = lazy(() => import('./pages/HR/SalaryStructures'))
+const SalarySlips        = lazy(() => import('./pages/HR/SalarySlips'))
+const PayrollEntry       = lazy(() => import('./pages/HR/PayrollEntry'))
+// HR Phase 2 — Recruitment addendum
+const JobRequisitions    = lazy(() => import('./pages/HR/JobRequisitions'))
+// HR Phase 2 — Performance addendum
+const KRAs               = lazy(() => import('./pages/HR/KRAs'))
+const AppraisalTemplates = lazy(() => import('./pages/HR/AppraisalTemplates'))
+// HR Reports
+const HRReports          = lazy(() => import('./pages/HR/HRReports'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -436,10 +445,19 @@ function AppRoutes() {
             <Route path="job-postings"        element={<JobPostings />} />
             <Route path="applicants"          element={<Applicants />} />
             <Route path="interviews"          element={<Interviews />} />
+            {/* Payroll addendum */}
+            <Route path="salary-slips"        element={<SalarySlips />} />
+            <Route path="payroll-entry"       element={<PayrollEntry />} />
+            {/* Recruitment addendum */}
+            <Route path="job-requisitions"    element={<JobRequisitions />} />
             {/* Performance */}
             <Route path="appraisal-periods"   element={<AppraisalPeriods />} />
             <Route path="performance-reviews" element={<PerformanceReviews />} />
             <Route path="kpi-templates"       element={<KPITemplates />} />
+            <Route path="kras"                element={<KRAs />} />
+            <Route path="appraisal-templates" element={<AppraisalTemplates />} />
+            {/* HR Reports */}
+            <Route path="hr-reports"          element={<HRReports />} />
           </Route>
         </Route>
 
