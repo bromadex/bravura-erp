@@ -130,6 +130,8 @@ const ShiftTypes         = lazy(() => import('./pages/HR/ShiftTypes'))
 const ShiftAssignments   = lazy(() => import('./pages/HR/ShiftAssignments'))
 const HolidayLists       = lazy(() => import('./pages/HR/HolidayLists'))
 const AttendanceRequests = lazy(() => import('./pages/HR/AttendanceRequests'))
+// HR Analytics (KPI dashboard)
+const HRAnalytics        = lazy(() => import('./pages/HR/HRAnalytics'))
 // HR Phase 1 — Leave v2
 const LeavePolicies      = lazy(() => import('./pages/HR/LeavePolicies'))
 const LeaveAllocation    = lazy(() => import('./pages/HR/LeaveAllocation'))
@@ -405,6 +407,8 @@ function AppRoutes() {
           <Route path="travel"              element={<Travel />} />
           <Route path="payroll"             element={<Payroll />} />
           <Route path="timesheet"           element={<TimesheetSummary />} />
+          {/* Analytics */}
+          <Route path="analytics"           element={<HRAnalytics />} />
         </Route>
 
         {/* ── EXPENSES ─────────────────────────────────────── */}

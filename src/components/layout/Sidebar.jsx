@@ -119,7 +119,10 @@ const ALL_MODULES = {
     sections: [
       {
         label: 'Overview',
-        pages: [{ id: 'dashboard', label: 'HR Dashboard', icon: 'dashboard' }],
+        pages: [
+          { id: 'dashboard',  label: 'HR Home',    icon: 'home'      },
+          { id: 'analytics',  label: 'Analytics',  icon: 'bar_chart' },
+        ],
       },
       {
         label: 'Organisation',
