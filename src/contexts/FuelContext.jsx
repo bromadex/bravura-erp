@@ -175,9 +175,10 @@ export function FuelProvider({ children }) {
   }
 
   const updateDipstick = async (id, record) => {
+    const before = dipstickLog.find(d => d.id === id)
     const { error } = await supabase.from('dipstick_log').update(record).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'fuel', action: 'UPDATE', entityType: 'dipstick', entityId: id })
+    auditLog({ module: 'fuel', action: 'UPDATE', entityType: 'dipstick', entityId: id, entityName: before?.date || '', oldValues: before, newValues: { ...before, ...record } })
     await fetchAll()
   }
 

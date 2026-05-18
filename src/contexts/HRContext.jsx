@@ -25,6 +25,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtils'
+import { auditLog } from '../engine/auditEngine'
 
 const HRContext = createContext(null)
 
@@ -63,22 +64,9 @@ export function HRProvider({ children }) {
     return `BRA${maxNum + 1}`
   }
 
-  // ── Audit log helper ───────────────────────────────────────────
-  const logHRAction = async (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-      await supabase.from('hr_audit_logs').insert([{
-        id:          generateId(),
-        user_name:   user?.full_name || user?.username || 'System',
-        action,
-        entity_type: entityType,
-        entity_id:   entityId,
-        entity_name: entityName,
-        old_values:  oldValues ? JSON.stringify(oldValues) : null,
-        new_values:  newValues ? JSON.stringify(newValues) : null,
-        created_at:  new Date().toISOString()
-      }])
-    } catch (err) { console.warn('Audit log failed:', err) }
+  // ── Audit log helper — thin wrapper around the central auditEngine ────────
+  const logHRAction = (action, entityType, entityId, entityName, oldValues = null, newValues = null) => {
+    auditLog({ module: 'hr', action, entityType, entityId: entityId || '', entityName: entityName || '', oldValues, newValues }).catch(() => {})
   }
 
   // ── Notification helper (non-fatal) ────────────────────────────

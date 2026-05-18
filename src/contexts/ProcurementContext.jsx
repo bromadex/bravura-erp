@@ -72,14 +72,18 @@ export function ProcurementProvider({ children }) {
   }
 
   const updateSupplier = async (id, updates) => {
+    const before = suppliers.find(s => s.id === id)
     const { error } = await supabase.from('suppliers').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw error
+    auditLog({ module: 'procurement', action: 'UPDATE', entityType: 'supplier', entityId: id, entityName: before?.name || id, oldValues: before, newValues: { ...before, ...updates } })
     await fetchAll()
   }
 
   const deleteSupplier = async (id) => {
+    const before = suppliers.find(s => s.id === id)
     const { error } = await supabase.from('suppliers').delete().eq('id', id)
     if (error) throw error
+    auditLog({ module: 'procurement', action: 'DELETE', entityType: 'supplier', entityId: id, entityName: before?.name || id, oldValues: before })
     await fetchAll()
   }
 

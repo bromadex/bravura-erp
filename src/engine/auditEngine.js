@@ -120,6 +120,29 @@ export async function auditLogout({ userName = '', userId = '' }) {
 }
 
 /**
+ * Fetch before-state, perform an update, then fire an audit log with old/new values.
+ * Returns the updated row. Throws on DB error.
+ */
+export async function auditedUpdate(table, id, updates, auditPayload) {
+  const { data: before } = await supabase.from(table).select('*').eq('id', id).single()
+  const { data: after, error } = await supabase.from(table).update(updates).eq('id', id).select().single()
+  if (error) throw new Error(error.message)
+  auditLog({ ...auditPayload, action: auditPayload.action || 'UPDATE', oldValues: before, newValues: after }).catch(() => {})
+  return after
+}
+
+/**
+ * Fetch before-state, perform a delete, then fire an audit log with oldValues.
+ * Throws on DB error.
+ */
+export async function auditedDelete(table, id, auditPayload) {
+  const { data: before } = await supabase.from(table).select('*').eq('id', id).single()
+  const { error } = await supabase.from(table).delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  auditLog({ ...auditPayload, action: auditPayload.action || 'DELETE', oldValues: before }).catch(() => {})
+}
+
+/**
  * Convenience wrapper — logs a bulk operation (e.g. batch stock import).
  */
 export async function auditLogBatch(entries) {

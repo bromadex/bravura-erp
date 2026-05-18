@@ -57,7 +57,7 @@ export function InventoryProvider({ children }) {
     const item = items.find(i => i.id === id)
     const { error } = await supabase.from('items').update(updates).eq('id', id)
     if (error) throw error
-    auditLog({ module: 'inventory', action: 'UPDATE', entityType: 'item', entityId: id, entityName: item?.name || id })
+    auditLog({ module: 'inventory', action: 'UPDATE', entityType: 'item', entityId: id, entityName: item?.name || id, oldValues: item, newValues: { ...item, ...updates } })
     await fetchAll()
   }
 
@@ -65,7 +65,7 @@ export function InventoryProvider({ children }) {
     const item = items.find(i => i.id === id)
     const { error } = await supabase.from('items').delete().eq('id', id)
     if (error) throw error
-    auditLog({ module: 'inventory', action: 'DELETE', entityType: 'item', entityId: id, entityName: item?.name || id })
+    auditLog({ module: 'inventory', action: 'DELETE', entityType: 'item', entityId: id, entityName: item?.name || id, oldValues: item })
     await fetchAll()
   }
 
