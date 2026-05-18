@@ -1,6 +1,6 @@
 // src/App.jsx
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
 import { ThemeProvider }           from './contexts/ThemeContext'
