@@ -15,6 +15,9 @@ const HR_PAGE_SECTION = {
   'leave-encashment': 'Leave Management', 'leave-balance': 'Leave Management',
   'leave-calendar': 'Leave Management', 'leave-reports': 'Leave Management',
   payroll: 'Payroll & Travel', travel: 'Payroll & Travel', timesheet: 'Payroll & Travel',
+  'salary-structures': 'Payroll & Travel',
+  'job-postings': 'Recruitment', applicants: 'Recruitment', interviews: 'Recruitment',
+  'appraisal-periods': 'Performance', 'performance-reviews': 'Performance', 'kpi-templates': 'Performance',
   analytics: 'Overview',
 }
 
@@ -174,9 +177,26 @@ const ALL_MODULES = {
       {
         label: 'Payroll & Travel',
         pages: [
-          { id: 'payroll',    label: 'Payroll',           icon: 'payments'   },
-          { id: 'travel',     label: 'Travel',            icon: 'flight'     },
-          { id: 'timesheet',  label: 'Timesheet Summary', icon: 'fact_check' },
+          { id: 'salary-structures', label: 'Salary Structures',  icon: 'account_balance_wallet' },
+          { id: 'payroll',           label: 'Payroll',            icon: 'payments'               },
+          { id: 'travel',            label: 'Travel',             icon: 'flight'                 },
+          { id: 'timesheet',         label: 'Timesheet Summary',  icon: 'fact_check'             },
+        ],
+      },
+      {
+        label: 'Recruitment',
+        pages: [
+          { id: 'job-postings', label: 'Job Openings',  icon: 'work_outline'   },
+          { id: 'applicants',   label: 'Applicants',    icon: 'people_outline' },
+          { id: 'interviews',   label: 'Interviews',    icon: 'event_note'     },
+        ],
+      },
+      {
+        label: 'Performance',
+        pages: [
+          { id: 'appraisal-periods',   label: 'Appraisal Periods',   icon: 'calendar_month'    },
+          { id: 'performance-reviews', label: 'Performance Reviews', icon: 'rate_review'       },
+          { id: 'kpi-templates',       label: 'KPI Templates',       icon: 'checklist'         },
         ],
       },
     ],

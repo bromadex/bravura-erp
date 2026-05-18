@@ -138,6 +138,16 @@ const LeavePolicies      = lazy(() => import('./pages/HR/LeavePolicies'))
 const LeaveAllocation    = lazy(() => import('./pages/HR/LeaveAllocation'))
 const CompensatoryLeave  = lazy(() => import('./pages/HR/CompensatoryLeave'))
 const LeaveEncashment    = lazy(() => import('./pages/HR/LeaveEncashment'))
+// HR Phase 2 — Recruitment
+const JobPostings        = lazy(() => import('./pages/HR/JobPostings'))
+const Applicants         = lazy(() => import('./pages/HR/Applicants'))
+const Interviews         = lazy(() => import('./pages/HR/Interviews'))
+// HR Phase 2 — Performance
+const AppraisalPeriods   = lazy(() => import('./pages/HR/AppraisalPeriods'))
+const PerformanceReviews = lazy(() => import('./pages/HR/PerformanceReviews'))
+const KPITemplates       = lazy(() => import('./pages/HR/KPITemplates'))
+// HR Phase 2 — Payroll v2
+const SalaryStructures   = lazy(() => import('./pages/HR/SalaryStructures'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -421,6 +431,15 @@ function AppRoutes() {
             <Route path="travel"              element={<Travel />} />
             <Route path="payroll"             element={<Payroll />} />
             <Route path="timesheet"           element={<TimesheetSummary />} />
+            <Route path="salary-structures"   element={<SalaryStructures />} />
+            {/* Recruitment */}
+            <Route path="job-postings"        element={<JobPostings />} />
+            <Route path="applicants"          element={<Applicants />} />
+            <Route path="interviews"          element={<Interviews />} />
+            {/* Performance */}
+            <Route path="appraisal-periods"   element={<AppraisalPeriods />} />
+            <Route path="performance-reviews" element={<PerformanceReviews />} />
+            <Route path="kpi-templates"       element={<KPITemplates />} />
           </Route>
         </Route>
 

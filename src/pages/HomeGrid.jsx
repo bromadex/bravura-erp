@@ -27,7 +27,7 @@ const MODULE_PAGES = {
   logistics:   ['dashboard','camp','batch-plant','deliveries'],
   fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
   fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues','asset-registry','registry','reclass-log','asset-import','category-config'],
-  hr:          ['dashboard','analytics','employees','departments','designations','permissions','attendance','attendance-requests','leave','leave-policies','leave-allocation','compensatory-leave','leave-encashment','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet','shift-types','shift-assignments','holiday-lists'],
+  hr:          ['dashboard','analytics','employees','departments','designations','permissions','attendance','attendance-requests','leave','leave-policies','leave-allocation','compensatory-leave','leave-encashment','leave-balance','leave-calendar','leave-reports','travel','payroll','timesheet','shift-types','shift-assignments','holiday-lists','salary-structures','job-postings','applicants','interviews','appraisal-periods','performance-reviews','kpi-templates'],
   campsite:    ['overview','blocks','rooms','assignments'],
   connect:     ['chats'],
   settings:    ['workflows'],
