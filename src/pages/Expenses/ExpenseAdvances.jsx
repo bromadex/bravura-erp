@@ -9,7 +9,7 @@ import { useExpense } from '../../contexts/ExpenseContext'
 import { useHR } from '../../contexts/HRContext'
 import {
   createEmployeeAdvance,
-  approveAndDisbureAdvance,
+  approveAndDisburseAdvance,
 } from '../../engine/expenseEngine'
 import toast from 'react-hot-toast'
 import {
@@ -145,7 +145,7 @@ export default function ExpenseAdvances() {
     if (!detailAdv) return
     setDisbursing(true)
     try {
-      await approveAndDisbureAdvance(detailAdv.id, {
+      await approveAndDisburseAdvance(detailAdv.id, {
         approver_name: user?.full_name || user?.username || '',
       })
       toast.success('Advance approved and disbursed')
