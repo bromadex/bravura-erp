@@ -6,18 +6,24 @@ import { exportXLSX, dateTag } from '../../engine/reportingEngine'
 
 export default function OrgChart() {
   const [employees, setEmployees] = useState([])
+  const [desgMap,   setDesgMap]   = useState({})
   const [loading, setLoading] = useState(true)
   const [filterDept, setFilterDept] = useState('')
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, name, designation_id, designations:designation_id(title), department_id, departments:department_id(name), status')
-      .eq('status', 'Active')
-      .order('name')
+    const [{ data: emps, error }, { data: desgs }] = await Promise.all([
+      supabase.from('employees')
+        .select('id, name, designation_id, department_id, departments:department_id(name), status')
+        .eq('status', 'Active')
+        .order('name'),
+      supabase.from('designations').select('id, title'),
+    ])
     if (error) toast.error(error.message)
-    setEmployees(data || [])
+    const map = {}
+    ;(desgs || []).forEach(d => { map[d.id] = d.title })
+    setDesgMap(map)
+    setEmployees(emps || [])
     setLoading(false)
   }, [])
 
@@ -55,7 +61,7 @@ export default function OrgChart() {
     const rows = employees.map(e => ({
       Name: e.name,
       Department: e.departments?.name || '—',
-      Designation: e.designations?.title || '—',
+      Designation: desgMap[e.designation_id] || '—',
       Status: e.status,
     }))
     exportXLSX(rows, `OrgChart_${dateTag()}`)
@@ -160,7 +166,7 @@ export default function OrgChart() {
                             </div>
                             <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{emp.name}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                              {emp.designations?.title || '—'}
+                              {desgMap[emp.designation_id] || '—'}
                             </div>
                           </div>
                         ))}
@@ -220,7 +226,7 @@ export default function OrgChart() {
                         </div>
                         <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{emp.name}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                          {emp.designations?.title || '—'}
+                          {desgMap[emp.designation_id] || '—'}
                         </div>
                       </div>
                     ))}
