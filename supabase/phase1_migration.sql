@@ -402,6 +402,17 @@ CREATE TABLE IF NOT EXISTS expense_claims (
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Guard: if table existed before this migration, ensure new columns are present
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'Draft';
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS is_paid         BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS remark          TEXT;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS payable_account_code TEXT;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS workflow_instance_id UUID;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS gl_entry_id     UUID;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS total_advance_amount    NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS total_amount_reimbursed NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE expense_claims ADD COLUMN IF NOT EXISTS total_sanctioned_amount NUMERIC(14,2) NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_expense_claims_employee        ON expense_claims(employee_id);
 CREATE INDEX IF NOT EXISTS idx_expense_claims_approval_status ON expense_claims(approval_status);
 CREATE INDEX IF NOT EXISTS idx_expense_claims_status          ON expense_claims(status);
@@ -445,6 +456,13 @@ CREATE TABLE IF NOT EXISTS employee_advances (
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS paid_amount      NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS claimed_amount   NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS return_amount    NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS pending_amount   NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS repay_from_salary BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE employee_advances ADD COLUMN IF NOT EXISTS workflow_instance_id UUID;
 
 CREATE INDEX IF NOT EXISTS idx_employee_advances_employee ON employee_advances(employee_id);
 CREATE INDEX IF NOT EXISTS idx_employee_advances_status   ON employee_advances(status);
