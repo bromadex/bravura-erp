@@ -131,13 +131,26 @@ const ALL_MODULES = {
         ],
       },
       {
-        label: 'Time & Attendance',
+        label: 'Shifts & Attendance',
         pages: [
-          { id: 'attendance',     label: 'Attendance',     icon: 'schedule'               },
-          { id: 'leave',          label: 'Leave',           icon: 'event_busy'             },
-          { id: 'leave-balance',  label: 'Leave Balance',   icon: 'account_balance_wallet' },
-          { id: 'leave-calendar', label: 'Leave Calendar',  icon: 'calendar_month'         },
-          { id: 'leave-reports',  label: 'Leave Reports',   icon: 'bar_chart'              },
+          { id: 'shift-types',          label: 'Shift Types',          icon: 'pending_actions'        },
+          { id: 'shift-assignments',    label: 'Shift Assignments',    icon: 'assignment_ind'         },
+          { id: 'holiday-lists',        label: 'Holiday Lists',        icon: 'beach_access'           },
+          { id: 'attendance',           label: 'Attendance',           icon: 'schedule'               },
+          { id: 'attendance-requests',  label: 'Attendance Requests',  icon: 'edit_calendar'          },
+        ],
+      },
+      {
+        label: 'Leave Management',
+        pages: [
+          { id: 'leave',              label: 'Leave',               icon: 'event_busy'             },
+          { id: 'leave-policies',     label: 'Leave Policies',      icon: 'policy'                 },
+          { id: 'leave-allocation',   label: 'Leave Allocation',    icon: 'calendar_month'         },
+          { id: 'compensatory-leave', label: 'Compensatory Leave',  icon: 'swap_horiz'             },
+          { id: 'leave-encashment',   label: 'Leave Encashment',    icon: 'payments'               },
+          { id: 'leave-balance',      label: 'Leave Balance',       icon: 'account_balance_wallet' },
+          { id: 'leave-calendar',     label: 'Leave Calendar',      icon: 'calendar_today'         },
+          { id: 'leave-reports',      label: 'Leave Reports',       icon: 'bar_chart'              },
         ],
       },
       {
@@ -146,6 +159,28 @@ const ALL_MODULES = {
           { id: 'payroll',    label: 'Payroll',           icon: 'payments'   },
           { id: 'travel',     label: 'Travel',            icon: 'flight'     },
           { id: 'timesheet',  label: 'Timesheet Summary', icon: 'fact_check' },
+        ],
+      },
+    ],
+  },
+  expenses: {
+    label: 'Expenses', icon: 'receipt_long', color: '#fb923c',
+    sections: [
+      {
+        label: 'Overview',
+        pages: [{ id: 'dashboard', label: 'Expense Dashboard', icon: 'dashboard' }],
+      },
+      {
+        label: 'Claims & Advances',
+        pages: [
+          { id: 'claims',   label: 'Expense Claims',    icon: 'receipt'            },
+          { id: 'advances', label: 'Employee Advances', icon: 'account_balance'    },
+        ],
+      },
+      {
+        label: 'Configuration',
+        pages: [
+          { id: 'types', label: 'Expense Types', icon: 'category' },
         ],
       },
     ],
