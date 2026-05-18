@@ -27,6 +27,7 @@ import { NotificationProvider }     from './contexts/NotificationContext'
 import Login           from './pages/Login'
 import HomeGrid        from './pages/HomeGrid'
 import Layout          from './components/layout/Layout'
+import TopBar          from './components/layout/TopBar'
 import PermissionRoute from './components/PermissionRoute'
 import AccessDenied    from './pages/Errors/AccessDenied'
 import ChangePassword  from './pages/ChangePassword'
@@ -238,6 +239,18 @@ function ModulePlaceholder({ module, page }) {
 // No more placeholder modules — all are implemented
 const OTHER_MODULES = []
 
+// HR module picker page — full-page layout with TopBar, no sidebar
+function HRPickerPage() {
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      <TopBar />
+      <div style={{ flex: 1, padding: '32px 24px', maxWidth: 1100, margin: '0 auto', width: '100%' }}>
+        <HRDashboard />
+      </div>
+    </div>
+  )
+}
+
 // ───────────────────────────────────────────────────────────────
 // Routes
 // ───────────────────────────────────────────────────────────────
@@ -369,46 +382,46 @@ function AppRoutes() {
         </Route>
 
         {/* ── HR ───────────────────────────────────────────── */}
+        {/* index = full-page picker (no sidebar); sub-routes use Layout */}
         <Route path="/module/hr" element={
           <ProtectedRoute>
             <PermissionRoute module="hr" page="dashboard">
               <HRProvider>
                 <ShiftProvider>
                   <LeaveProvider>
-                    <Layout module="hr" />
+                    <Outlet />
                   </LeaveProvider>
                 </ShiftProvider>
               </HRProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>
-          <Route index                      element={<HRDashboard />} />
-          <Route path="dashboard"           element={<HRDashboard />} />
-          <Route path="employees"           element={<Employees />} />
-          <Route path="departments"         element={<Departments />} />
-          <Route path="designations"        element={<Designations />} />
-          <Route path="permissions"         element={<UserPermissions />} />
-          {/* Shifts & Attendance */}
-          <Route path="shift-types"         element={<ShiftTypes />} />
-          <Route path="shift-assignments"   element={<ShiftAssignments />} />
-          <Route path="holiday-lists"       element={<HolidayLists />} />
-          <Route path="attendance"          element={<Attendance />} />
-          <Route path="attendance-requests" element={<AttendanceRequests />} />
-          {/* Leave Management */}
-          <Route path="leave"               element={<Leave />} />
-          <Route path="leave-policies"      element={<LeavePolicies />} />
-          <Route path="leave-allocation"    element={<LeaveAllocation />} />
-          <Route path="compensatory-leave"  element={<CompensatoryLeave />} />
-          <Route path="leave-encashment"    element={<LeaveEncashment />} />
-          <Route path="leave-balance"       element={<LeaveBalance />} />
-          <Route path="leave-calendar"      element={<LeaveCalendar />} />
-          <Route path="leave-reports"       element={<LeaveReports />} />
-          {/* Payroll & Travel */}
-          <Route path="travel"              element={<Travel />} />
-          <Route path="payroll"             element={<Payroll />} />
-          <Route path="timesheet"           element={<TimesheetSummary />} />
-          {/* Analytics */}
-          <Route path="analytics"           element={<HRAnalytics />} />
+          <Route index element={<HRPickerPage />} />
+          <Route path="dashboard" element={<Navigate to="/module/hr" replace />} />
+
+          <Route element={<Layout module="hr" />}>
+            <Route path="analytics"           element={<HRAnalytics />} />
+            <Route path="employees"           element={<Employees />} />
+            <Route path="departments"         element={<Departments />} />
+            <Route path="designations"        element={<Designations />} />
+            <Route path="permissions"         element={<UserPermissions />} />
+            <Route path="shift-types"         element={<ShiftTypes />} />
+            <Route path="shift-assignments"   element={<ShiftAssignments />} />
+            <Route path="holiday-lists"       element={<HolidayLists />} />
+            <Route path="attendance"          element={<Attendance />} />
+            <Route path="attendance-requests" element={<AttendanceRequests />} />
+            <Route path="leave"               element={<Leave />} />
+            <Route path="leave-policies"      element={<LeavePolicies />} />
+            <Route path="leave-allocation"    element={<LeaveAllocation />} />
+            <Route path="compensatory-leave"  element={<CompensatoryLeave />} />
+            <Route path="leave-encashment"    element={<LeaveEncashment />} />
+            <Route path="leave-balance"       element={<LeaveBalance />} />
+            <Route path="leave-calendar"      element={<LeaveCalendar />} />
+            <Route path="leave-reports"       element={<LeaveReports />} />
+            <Route path="travel"              element={<Travel />} />
+            <Route path="payroll"             element={<Payroll />} />
+            <Route path="timesheet"           element={<TimesheetSummary />} />
+          </Route>
         </Route>
 
         {/* ── EXPENSES ─────────────────────────────────────── */}

@@ -3,6 +3,21 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { usePermission } from '../../contexts/PermissionContext'
 
+// Maps HR page IDs to their section label so the sidebar can auto-filter
+const HR_PAGE_SECTION = {
+  employees: 'Organisation', departments: 'Organisation',
+  designations: 'Organisation', permissions: 'Organisation',
+  attendance: 'Shifts & Attendance', 'attendance-requests': 'Shifts & Attendance',
+  'shift-types': 'Shifts & Attendance', 'shift-assignments': 'Shifts & Attendance',
+  'holiday-lists': 'Shifts & Attendance',
+  leave: 'Leave Management', 'leave-policies': 'Leave Management',
+  'leave-allocation': 'Leave Management', 'compensatory-leave': 'Leave Management',
+  'leave-encashment': 'Leave Management', 'leave-balance': 'Leave Management',
+  'leave-calendar': 'Leave Management', 'leave-reports': 'Leave Management',
+  payroll: 'Payroll & Travel', travel: 'Payroll & Travel', timesheet: 'Payroll & Travel',
+  analytics: 'Overview',
+}
+
 const ALL_MODULES = {
   dashboard: {
     label: 'Dashboard', icon: 'dashboard', color: '#b83232',
@@ -320,7 +335,17 @@ export default function Sidebar({ module }) {
 
   const currentPage = location.pathname.split('/').pop()
 
+  // For HR: show only the section the active page belongs to
+  const activeSectionLabel = module === 'hr' ? HR_PAGE_SECTION[currentPage] : null
+  const visibleSections = activeSectionLabel
+    ? config.sections.filter(s => s.label === activeSectionLabel)
+    : config.sections
+
   const toggleSection = (label) => setExpanded(prev => ({ ...prev, [label]: !prev[label] }))
+
+  const btnStyle = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border2)', cursor: 'pointer', color: 'var(--text-mid)', fontSize: 12, fontWeight: 600, transition: 'all .15s' }
+  const btnHover = (e) => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)' }
+  const btnOut   = (e) => { e.currentTarget.style.background = 'transparent';     e.currentTarget.style.color = 'var(--text-mid)' }
 
   const sidebarContent = (
     <aside style={{ width: 248, background: 'var(--surface)', borderRight: '1px solid var(--border)', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -335,11 +360,15 @@ export default function Sidebar({ module }) {
         </div>
       </div>
 
-      {/* Back to home */}
-      <div style={{ padding: '10px 10px 6px' }}>
-        <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 8, background: 'transparent', border: '1px solid var(--border2)', cursor: 'pointer', color: 'var(--text-mid)', fontSize: 12, fontWeight: 600, transition: 'all .15s' }}
-          onMouseOver={e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text)' }}
-          onMouseOut={e  => { e.currentTarget.style.background = 'transparent';     e.currentTarget.style.color = 'var(--text-mid)' }}>
+      {/* Navigation buttons */}
+      <div style={{ padding: '10px 10px 6px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {module === 'hr' && (
+          <button onClick={() => navigate('/module/hr')} style={btnStyle} onMouseOver={btnHover} onMouseOut={btnOut}>
+            <span className="material-icons" style={{ fontSize: 16 }}>badge</span>
+            HR Home
+          </button>
+        )}
+        <button onClick={() => navigate('/')} style={btnStyle} onMouseOver={btnHover} onMouseOut={btnOut}>
           <span className="material-icons" style={{ fontSize: 16 }}>home</span>
           Back to Home
         </button>
@@ -347,7 +376,7 @@ export default function Sidebar({ module }) {
 
       {/* Pages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>
-        {config.sections.map(section => {
+        {visibleSections.map(section => {
           const isExpanded = expanded[section.label] !== false
           return (
             <div key={section.label} style={{ marginBottom: 4 }}>
@@ -358,7 +387,7 @@ export default function Sidebar({ module }) {
               {isExpanded && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 }}>
                   {section.pages.map(page => {
-                    const isActive = currentPage === page.id || (page.id === config.sections[0]?.pages[0]?.id && location.pathname === `/module/${module}`)
+                    const isActive = currentPage === page.id || (page.id === visibleSections[0]?.pages[0]?.id && location.pathname === `/module/${module}`)
                     return (
                       <button key={page.id} onClick={() => { navigate(`/module/${module}/${page.id}`); setMobileOpen(false) }}
                         style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px 8px 20px', borderRadius: 8, border: 'none', background: isActive ? `${config.color}18` : 'transparent', cursor: 'pointer', color: isActive ? config.color : 'var(--text-mid)', fontSize: 12, fontWeight: isActive ? 700 : 400, textAlign: 'left', transition: 'all .12s', borderLeft: isActive ? `3px solid ${config.color}` : '3px solid transparent' }}
