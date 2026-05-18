@@ -7,6 +7,14 @@ import { usePermission } from '../../contexts/PermissionContext'
 const HR_PAGE_SECTION = {
   employees: 'Organisation', departments: 'Organisation',
   designations: 'Organisation', permissions: 'Organisation',
+  'employee-grades': 'Organisation', 'employment-types': 'Organisation',
+  'org-chart': 'Organisation',
+  promotions: 'Employee Lifecycle', transfers: 'Employee Lifecycle',
+  onboarding: 'Employee Lifecycle', separation: 'Employee Lifecycle',
+  'full-final': 'Employee Lifecycle',
+  overtime: 'Overtime',
+  grievances: 'Grievances',
+  'scheduled-notifications': 'Reports',
   'shift-types': 'Shift Management', 'shift-assignments': 'Shift Management', 'holiday-lists': 'Shift Management',
   attendance: 'Attendance', 'attendance-requests': 'Attendance',
   leave: 'Leave Management', 'leave-policies': 'Leave Management',
@@ -139,17 +147,29 @@ const ALL_MODULES = {
       {
         label: 'Overview',
         pages: [
-          { id: 'dashboard',  label: 'HR Home',    icon: 'home'      },
-          { id: 'analytics',  label: 'Analytics',  icon: 'bar_chart' },
+          { id: 'dashboard', label: 'HR Home', icon: 'home' },
         ],
       },
       {
         label: 'Organisation',
         pages: [
-          { id: 'employees',    label: 'Employees',    icon: 'people'               },
-          { id: 'departments',  label: 'Departments',  icon: 'business'             },
-          { id: 'designations', label: 'Designations', icon: 'work'                 },
-          { id: 'permissions',  label: 'Permissions',  icon: 'admin_panel_settings' },
+          { id: 'employees',         label: 'Employees',         icon: 'people'               },
+          { id: 'departments',       label: 'Departments',       icon: 'business'             },
+          { id: 'designations',      label: 'Designations',      icon: 'work'                 },
+          { id: 'employee-grades',   label: 'Employee Grades',   icon: 'military_tech'        },
+          { id: 'employment-types',  label: 'Employment Types',  icon: 'badge'                },
+          { id: 'org-chart',         label: 'Org Chart',         icon: 'account_tree'         },
+          { id: 'permissions',       label: 'Permissions',       icon: 'admin_panel_settings' },
+        ],
+      },
+      {
+        label: 'Employee Lifecycle',
+        pages: [
+          { id: 'promotions', label: 'Promotions',         icon: 'trending_up'    },
+          { id: 'transfers',  label: 'Transfers',          icon: 'swap_horiz'     },
+          { id: 'onboarding', label: 'Onboarding',         icon: 'how_to_reg'     },
+          { id: 'separation', label: 'Separation',         icon: 'logout'         },
+          { id: 'full-final', label: 'Full & Final',       icon: 'calculate'      },
         ],
       },
       {
@@ -211,9 +231,23 @@ const ALL_MODULES = {
         ],
       },
       {
+        label: 'Overtime',
+        pages: [
+          { id: 'overtime', label: 'Overtime Slips', icon: 'more_time' },
+        ],
+      },
+      {
+        label: 'Grievances',
+        pages: [
+          { id: 'grievances', label: 'Grievances', icon: 'report_problem' },
+        ],
+      },
+      {
         label: 'Reports',
         pages: [
-          { id: 'hr-reports', label: 'HR Reports', icon: 'bar_chart' },
+          { id: 'hr-reports',               label: 'HR Reports',              icon: 'bar_chart'        },
+          { id: 'scheduled-notifications',  label: 'Scheduled Notifications', icon: 'notifications'    },
+          { id: 'analytics',                label: 'Analytics',               icon: 'insights'         },
         ],
       },
     ],
