@@ -402,36 +402,31 @@ CREATE TABLE IF NOT EXISTS expense_claims (
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Guard: add any columns missing due to a prior partial run
+-- Guard: ensure every column exists regardless of prior table state
 DO $$
+DECLARE t TEXT := 'expense_claims';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='approval_status') THEN
-    ALTER TABLE expense_claims ADD COLUMN approval_status TEXT DEFAULT 'Draft';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='is_paid') THEN
-    ALTER TABLE expense_claims ADD COLUMN is_paid BOOLEAN DEFAULT FALSE;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='remark') THEN
-    ALTER TABLE expense_claims ADD COLUMN remark TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='payable_account_code') THEN
-    ALTER TABLE expense_claims ADD COLUMN payable_account_code TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='workflow_instance_id') THEN
-    ALTER TABLE expense_claims ADD COLUMN workflow_instance_id UUID;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='gl_entry_id') THEN
-    ALTER TABLE expense_claims ADD COLUMN gl_entry_id UUID;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='total_advance_amount') THEN
-    ALTER TABLE expense_claims ADD COLUMN total_advance_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='total_amount_reimbursed') THEN
-    ALTER TABLE expense_claims ADD COLUMN total_amount_reimbursed NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='expense_claims' AND column_name='total_sanctioned_amount') THEN
-    ALTER TABLE expense_claims ADD COLUMN total_sanctioned_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='claim_number') THEN ALTER TABLE expense_claims ADD COLUMN claim_number TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='employee_id') THEN ALTER TABLE expense_claims ADD COLUMN employee_id TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='posting_date') THEN ALTER TABLE expense_claims ADD COLUMN posting_date DATE; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='department_id') THEN ALTER TABLE expense_claims ADD COLUMN department_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='expense_approver_id') THEN ALTER TABLE expense_claims ADD COLUMN expense_approver_id TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='expense_approver_name') THEN ALTER TABLE expense_claims ADD COLUMN expense_approver_name TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='total_claimed_amount') THEN ALTER TABLE expense_claims ADD COLUMN total_claimed_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='total_sanctioned_amount') THEN ALTER TABLE expense_claims ADD COLUMN total_sanctioned_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='grand_total') THEN ALTER TABLE expense_claims ADD COLUMN grand_total NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='total_advance_amount') THEN ALTER TABLE expense_claims ADD COLUMN total_advance_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='total_amount_reimbursed') THEN ALTER TABLE expense_claims ADD COLUMN total_amount_reimbursed NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='approval_status') THEN ALTER TABLE expense_claims ADD COLUMN approval_status TEXT DEFAULT 'Draft'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='status') THEN ALTER TABLE expense_claims ADD COLUMN status TEXT DEFAULT 'Draft'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='is_paid') THEN ALTER TABLE expense_claims ADD COLUMN is_paid BOOLEAN DEFAULT FALSE; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='remark') THEN ALTER TABLE expense_claims ADD COLUMN remark TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='payable_account_code') THEN ALTER TABLE expense_claims ADD COLUMN payable_account_code TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE expense_claims ADD COLUMN workflow_instance_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='gl_entry_id') THEN ALTER TABLE expense_claims ADD COLUMN gl_entry_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_by') THEN ALTER TABLE expense_claims ADD COLUMN created_by TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_at') THEN ALTER TABLE expense_claims ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='updated_at') THEN ALTER TABLE expense_claims ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW(); END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_expense_claims_employee        ON expense_claims(employee_id);
@@ -479,25 +474,23 @@ CREATE TABLE IF NOT EXISTS employee_advances (
 );
 
 DO $$
+DECLARE t TEXT := 'employee_advances';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='paid_amount') THEN
-    ALTER TABLE employee_advances ADD COLUMN paid_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='claimed_amount') THEN
-    ALTER TABLE employee_advances ADD COLUMN claimed_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='return_amount') THEN
-    ALTER TABLE employee_advances ADD COLUMN return_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='pending_amount') THEN
-    ALTER TABLE employee_advances ADD COLUMN pending_amount NUMERIC(14,2) DEFAULT 0;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='repay_from_salary') THEN
-    ALTER TABLE employee_advances ADD COLUMN repay_from_salary BOOLEAN DEFAULT FALSE;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='employee_advances' AND column_name='workflow_instance_id') THEN
-    ALTER TABLE employee_advances ADD COLUMN workflow_instance_id UUID;
-  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='advance_number') THEN ALTER TABLE employee_advances ADD COLUMN advance_number TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='employee_id') THEN ALTER TABLE employee_advances ADD COLUMN employee_id TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='posting_date') THEN ALTER TABLE employee_advances ADD COLUMN posting_date DATE; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='purpose') THEN ALTER TABLE employee_advances ADD COLUMN purpose TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='advance_amount') THEN ALTER TABLE employee_advances ADD COLUMN advance_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='paid_amount') THEN ALTER TABLE employee_advances ADD COLUMN paid_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='claimed_amount') THEN ALTER TABLE employee_advances ADD COLUMN claimed_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='return_amount') THEN ALTER TABLE employee_advances ADD COLUMN return_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='pending_amount') THEN ALTER TABLE employee_advances ADD COLUMN pending_amount NUMERIC(14,2) DEFAULT 0; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='repay_from_salary') THEN ALTER TABLE employee_advances ADD COLUMN repay_from_salary BOOLEAN DEFAULT FALSE; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='status') THEN ALTER TABLE employee_advances ADD COLUMN status TEXT DEFAULT 'Draft'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='workflow_instance_id') THEN ALTER TABLE employee_advances ADD COLUMN workflow_instance_id UUID; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_by') THEN ALTER TABLE employee_advances ADD COLUMN created_by TEXT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='created_at') THEN ALTER TABLE employee_advances ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=t AND column_name='updated_at') THEN ALTER TABLE employee_advances ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW(); END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_employee_advances_employee ON employee_advances(employee_id);
