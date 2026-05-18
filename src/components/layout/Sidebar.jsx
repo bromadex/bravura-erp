@@ -7,9 +7,8 @@ import { usePermission } from '../../contexts/PermissionContext'
 const HR_PAGE_SECTION = {
   employees: 'Organisation', departments: 'Organisation',
   designations: 'Organisation', permissions: 'Organisation',
-  attendance: 'Shifts & Attendance', 'attendance-requests': 'Shifts & Attendance',
-  'shift-types': 'Shifts & Attendance', 'shift-assignments': 'Shifts & Attendance',
-  'holiday-lists': 'Shifts & Attendance',
+  'shift-types': 'Shift Management', 'shift-assignments': 'Shift Management', 'holiday-lists': 'Shift Management',
+  attendance: 'Attendance', 'attendance-requests': 'Attendance',
   leave: 'Leave Management', 'leave-policies': 'Leave Management',
   'leave-allocation': 'Leave Management', 'compensatory-leave': 'Leave Management',
   'leave-encashment': 'Leave Management', 'leave-balance': 'Leave Management',
@@ -154,13 +153,18 @@ const ALL_MODULES = {
         ],
       },
       {
-        label: 'Shifts & Attendance',
+        label: 'Shift Management',
         pages: [
-          { id: 'shift-types',          label: 'Shift Types',          icon: 'pending_actions'        },
-          { id: 'shift-assignments',    label: 'Shift Assignments',    icon: 'assignment_ind'         },
-          { id: 'holiday-lists',        label: 'Holiday Lists',        icon: 'beach_access'           },
-          { id: 'attendance',           label: 'Attendance',           icon: 'schedule'               },
-          { id: 'attendance-requests',  label: 'Attendance Requests',  icon: 'edit_calendar'          },
+          { id: 'shift-types',       label: 'Shift Types',       icon: 'pending_actions' },
+          { id: 'shift-assignments', label: 'Shift Assignments', icon: 'assignment_ind'  },
+          { id: 'holiday-lists',     label: 'Holiday Lists',     icon: 'beach_access'    },
+        ],
+      },
+      {
+        label: 'Attendance',
+        pages: [
+          { id: 'attendance',          label: 'Attendance',          icon: 'schedule'      },
+          { id: 'attendance-requests', label: 'Attendance Requests', icon: 'edit_calendar' },
         ],
       },
       {

@@ -56,7 +56,7 @@ export default function LeaveEncashment() {
     try {
       let query = supabase
         .from('leave_encashments')
-        .select('*, employees(name, employee_number, salary), leave_types(name, color), leave_periods(name)')
+        .select('*, employees(name, employee_number, basic_salary), leave_types(name, color), leave_periods(name)')
         .order('created_at', { ascending: false })
 
       if (activeTab === 'pending') {
@@ -99,7 +99,7 @@ export default function LeaveEncashment() {
     try {
       const balance = await getLedgerBalance(employeeId, leaveTypeId)
       const emp = employees.find(e => e.id === employeeId)
-      const dailyRate = (emp?.salary || 0) / 30
+      const dailyRate = (emp?.basic_salary || 0) / 30
       const days = Number(modal.form.encashment_days) || 0
       const amount = dailyRate * days
       setModal(m => ({ ...m, currentBalance: balance, loadingBalance: false, encashmentAmount: amount }))
@@ -112,7 +112,7 @@ export default function LeaveEncashment() {
   const recalcAmount = (days, employeeId) => {
     const emp = employees.find(e => e.id === (employeeId || modal.form.employee_id))
     if (!emp) return 0
-    return ((emp.salary || 0) / 30) * Number(days)
+    return ((emp.basic_salary || 0) / 30) * Number(days)
   }
 
   const updateModalForm = (key, value) => {
@@ -140,7 +140,7 @@ export default function LeaveEncashment() {
     setModal(m => ({ ...m, saving: true }))
     try {
       const emp = employees.find(e => e.id === f.employee_id)
-      const amount = ((emp?.salary || 0) / 30) * Number(f.encashment_days)
+      const amount = ((emp?.basic_salary || 0) / 30) * Number(f.encashment_days)
 
       const { error } = await supabase.from('leave_encashments').insert([{
         id: crypto.randomUUID(),

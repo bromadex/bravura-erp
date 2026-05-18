@@ -465,9 +465,11 @@ function AppRoutes() {
         <Route path="/module/expenses" element={
           <ProtectedRoute>
             <PermissionRoute module="expenses" page="dashboard">
-              <ExpenseProvider>
-                <Layout module="expenses" />
-              </ExpenseProvider>
+              <HRProvider>
+                <ExpenseProvider>
+                  <Layout module="expenses" />
+                </ExpenseProvider>
+              </HRProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>

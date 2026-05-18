@@ -32,7 +32,7 @@ export default function SalarySlips() {
     try {
       let q = supabase
         .from('salary_slips')
-        .select('*, employees(name, designation, department_id, departments:department_id(name))')
+        .select('*, employees(name, designation_id, designations:designation_id(title), department_id, departments:department_id(name))')
         .order('created_at', { ascending: false })
       const { data, error } = await q
       if (error) throw error
@@ -208,7 +208,7 @@ export default function SalarySlips() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20, fontSize: 13 }}>
                 <div><strong>Employee:</strong> {payslip.employees?.name}</div>
                 <div><strong>Department:</strong> {payslip.employees?.departments?.name || '—'}</div>
-                <div><strong>Designation:</strong> {payslip.employees?.designation || '—'}</div>
+                <div><strong>Designation:</strong> {payslip.employees?.designations?.title || '—'}</div>
                 <div><strong>Period:</strong> {payslip.start_date} – {payslip.end_date}</div>
                 <div><strong>Working Days:</strong> {payslip.working_days}</div>
                 <div><strong>Payment Days:</strong> {payslip.payment_days}</div>
