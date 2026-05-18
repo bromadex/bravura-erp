@@ -1,244 +1,147 @@
 // src/pages/HR/HRDashboard.jsx
-// Added: leave pending alerts, accrual trigger button, leave summary KPIs
+// HR module landing page — category picker inspired by Frappe HR.
 
-import { useState, useEffect } from 'react'
-import { useHR } from '../../contexts/HRContext'
 import { useNavigate } from 'react-router-dom'
-import { useCanView, useCanApprove } from '../../hooks/usePermission'
-import { supabase } from '../../lib/supabase'
-import toast from 'react-hot-toast'
-import { PageHeader, KPICard, EmptyState } from '../../components/ui'
+import { useCanView } from '../../hooks/usePermission'
+
+const CATEGORIES = [
+  {
+    id: 'setup',
+    icon: 'manage_accounts',
+    label: 'HR Setup',
+    desc: 'Employees, departments & designations',
+    color: '#f87171',
+    route: '/module/hr/employees',
+    pages: ['employees', 'departments', 'designations', 'permissions'],
+  },
+  {
+    id: 'attendance',
+    icon: 'fingerprint',
+    label: 'Attendance',
+    desc: 'Daily clock-in/out & attendance requests',
+    color: '#34d399',
+    route: '/module/hr/attendance',
+    pages: ['attendance', 'attendance-requests'],
+  },
+  {
+    id: 'shifts',
+    icon: 'schedule',
+    label: 'Shift Management',
+    desc: 'Shift types, assignments & holiday lists',
+    color: '#fbbf24',
+    route: '/module/hr/shift-types',
+    pages: ['shift-types', 'shift-assignments', 'holiday-lists'],
+  },
+  {
+    id: 'leaves',
+    icon: 'beach_access',
+    label: 'Leaves',
+    desc: 'Requests, policies, allocation & balance',
+    color: '#60a5fa',
+    route: '/module/hr/leave',
+    pages: ['leave', 'leave-policies', 'leave-allocation', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
+  },
+  {
+    id: 'payroll',
+    icon: 'payments',
+    label: 'Payroll',
+    desc: 'Payroll processing & timesheets',
+    color: '#a78bfa',
+    route: '/module/hr/payroll',
+    pages: ['payroll', 'timesheet'],
+  },
+  {
+    id: 'travel',
+    icon: 'flight',
+    label: 'Travel',
+    desc: 'Travel requests & allowances',
+    color: '#fb923c',
+    route: '/module/hr/travel',
+    pages: ['travel'],
+  },
+  {
+    id: 'expenses',
+    icon: 'receipt_long',
+    label: 'Expenses',
+    desc: 'Claims & employee advances',
+    color: '#f59e0b',
+    route: '/module/expenses',
+    pages: null,
+  },
+  {
+    id: 'analytics',
+    icon: 'bar_chart',
+    label: 'Analytics',
+    desc: 'KPIs, headcounts & smart alerts',
+    color: '#38bdf8',
+    route: '/module/hr/analytics',
+    pages: ['dashboard'],
+  },
+]
 
 export default function HRDashboard() {
-  const navigate           = useNavigate()
-  const { employees, departments, attendance, certifications, leaveRequests, fetchAll } = useHR()
-  const canViewEmployees   = useCanView('hr', 'employees')
-  const canViewAttendance  = useCanView('hr', 'attendance')
-  const canApproveLeave    = useCanApprove('hr', 'leave')
+  const navigate   = useNavigate()
+  const canView    = useCanView
 
-  const [dashboardData, setDashboardData] = useState({
-    totalEmployees: 0, activeEmployees: 0, inactiveEmployees: 0,
-    attendanceToday: 0, attendanceRate: 0, overtimeAlerts: 0,
-    pendingAttendance: 0, pendingLeave: 0, pendingSupervLeave: 0,
-    lowBalanceCount: 0, departmentHeadcounts: [], alerts: []
+  const visibleCategories = CATEGORIES.filter(cat => {
+    if (!cat.pages) return true
+    return cat.pages.some(p => canView('hr', p))
   })
 
-  const [runningAccrual,  setRunningAccrual]  = useState(false)
-  const [accrualMonth,    setAccrualMonth]    = useState(new Date().getMonth() + 1)
-  const [accrualYear,     setAccrualYear]     = useState(new Date().getFullYear())
-  const [myEmployeeId,    setMyEmployeeId]    = useState(null)
-
-  useEffect(() => { fetchAll() }, [])
-
-  // Resolve current user's employee ID for supervisor check
-  useEffect(() => {
-    const session = JSON.parse(localStorage.getItem('bravura_session') || sessionStorage.getItem('bravura_session') || '{}')
-    if (session?.employee_id) { setMyEmployeeId(session.employee_id); return }
-    if (session?.id) {
-      supabase.from('app_users').select('employee_id').eq('id', session.id).single()
-        .then(({ data }) => { if (data?.employee_id) setMyEmployeeId(data.employee_id) })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!employees.length) return
-    const total    = employees.length
-    const active   = employees.filter(e => e.status === 'Active').length
-    const inactive = total - active
-    const today    = new Date().toISOString().split('T')[0]
-
-    const todayAttendance = attendance.filter(a => a.date === today && a.clock_in)
-    const attendanceToday = todayAttendance.length
-    const attendanceRate  = active > 0 ? ((attendanceToday / active) * 100).toFixed(1) : 0
-    const pendingAttendance = attendance.filter(a => a.status === 'pending').length
-
-    // Leave alerts
-    const pendingLeave      = leaveRequests.filter(r => r.status === 'pending_hr').length
-    const pendingSupervLeave = leaveRequests.filter(r => r.status === 'pending_supervisor').length
-
-    const startOfWeek = new Date()
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-    const weeklyOvertime = {}
-    attendance.forEach(a => {
-      if (new Date(a.date) >= startOfWeek && a.overtime_hours) {
-        weeklyOvertime[a.employee_id] = (weeklyOvertime[a.employee_id] || 0) + a.overtime_hours
-      }
-    })
-    const overtimeAlerts = Object.values(weeklyOvertime).filter(ot => ot > 10).length
-
-    const deptMap = new Map()
-    departments.forEach(d => deptMap.set(d.id, { name: d.name, count: 0 }))
-    employees.forEach(e => { if (e.department_id && deptMap.has(e.department_id)) deptMap.get(e.department_id).count++ })
-    const departmentHeadcounts = Array.from(deptMap.values()).sort((a, b) => b.count - a.count)
-
-    const alerts = []
-
-    if (pendingAttendance > 0) alerts.push({ type: 'warning', icon: 'schedule', message: `${pendingAttendance} attendance record(s) pending approval`, action: () => navigate('/module/hr/attendance'), color: 'var(--yellow)' })
-    if (pendingLeave > 0 && canApproveLeave) alerts.push({ type: 'warning', icon: 'event_busy', message: `${pendingLeave} leave request(s) pending HR approval`, action: () => navigate('/module/hr/leave'), color: 'var(--red)' })
-    if (pendingSupervLeave > 0) alerts.push({ type: 'warning', icon: 'approval', message: `${pendingSupervLeave} leave request(s) awaiting supervisor review`, action: () => navigate('/module/hr/leave'), color: 'var(--yellow)' })
-
-    const activeEmployeesList = employees.filter(e => e.status === 'Active')
-    const attendedIds = new Set(todayAttendance.map(a => a.employee_id))
-    const missingAttendance = activeEmployeesList.filter(e => !attendedIds.has(e.id))
-    if (missingAttendance.length > 0) alerts.push({ type: 'warning', icon: 'warning', message: `${missingAttendance.length} employee(s) have not clocked in today`, action: () => navigate('/module/hr/attendance'), color: 'var(--red)' })
-
-    const noDept = employees.filter(e => !e.department_id)
-    if (noDept.length > 0) alerts.push({ type: 'warning', icon: 'business', message: `${noDept.length} employee(s) have no department assigned`, action: () => navigate('/module/hr/employees'), color: 'var(--yellow)' })
-
-    const thirtyDays = new Date()
-    thirtyDays.setDate(thirtyDays.getDate() + 30)
-    const expiringCerts = certifications.filter(c => { if (!c.expiry_date) return false; const e = new Date(c.expiry_date); return e <= thirtyDays && e >= new Date() })
-    if (expiringCerts.length > 0) alerts.push({ type: 'warning', icon: 'verified', message: `${expiringCerts.length} certification(s) expiring within 30 days`, action: () => navigate('/module/hr/employees'), color: 'var(--yellow)' })
-
-    const missingContact = employees.filter(e => !e.phone || !e.email)
-    if (missingContact.length > 0) alerts.push({ type: 'info', icon: 'contact_phone', message: `${missingContact.length} employee(s) missing phone or email`, action: () => navigate('/module/hr/employees'), color: 'var(--blue)' })
-    if (overtimeAlerts > 0) alerts.push({ type: 'warning', icon: 'warning', message: `${overtimeAlerts} employee(s) exceeded 10 hours overtime this week`, action: () => navigate('/module/hr/attendance'), color: 'var(--red)' })
-
-    setDashboardData({
-      totalEmployees: total, activeEmployees: active, inactiveEmployees: inactive,
-      attendanceToday, attendanceRate, overtimeAlerts, pendingAttendance,
-      pendingLeave, pendingSupervLeave, departmentHeadcounts, alerts,
-    })
-  }, [employees, departments, attendance, certifications, leaveRequests, navigate, canApproveLeave])
-
-  const handleRunAccrual = async () => {
-    if (!window.confirm(`Run monthly accrual for ${accrualMonth}/${accrualYear}? This adds 2.5 days to all active employees. Cannot be undone.`)) return
-    setRunningAccrual(true)
-    try {
-      // Call the accrual function from HRContext if exposed, otherwise call directly
-      const activeEmps = employees.filter(e => e.status === 'Active')
-      const { data: ltData } = await supabase.from('leave_types').select('id').eq('is_active', true)
-      const generateId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
-      let accrued = 0
-
-      for (const emp of activeEmps) {
-        for (const lt of (ltData || [])) {
-          const { error: accrErr } = await supabase.from('leave_accruals').insert([{
-            id: generateId(), employee_id: emp.id, leave_type_id: lt.id,
-            days_accrued: 2.5, month: accrualMonth, year: accrualYear, created_at: new Date().toISOString()
-          }])
-          if (accrErr?.message?.includes('duplicate key') || accrErr?.code === '23505') continue
-          if (accrErr) continue
-
-          // Increment balance
-          const { data: bal } = await supabase.from('leave_balances').select('id, total_days').eq('employee_id', emp.id).eq('leave_type_id', lt.id).eq('year', accrualYear).maybeSingle()
-          if (bal) {
-            await supabase.from('leave_balances').update({ total_days: (bal.total_days || 0) + 2.5 }).eq('id', bal.id)
-          } else {
-            await supabase.from('leave_balances').insert([{ id: generateId(), employee_id: emp.id, leave_type_id: lt.id, total_days: 2.5, used_days: 0, year: accrualYear }])
-          }
-          accrued++
-        }
-      }
-
-      toast.success(`Accrual complete! ${accrued} records processed for ${activeEmps.length} employees.`)
-      await fetchAll()
-    } catch (err) { toast.error(err.message) }
-    finally { setRunningAccrual(false) }
-  }
-
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
   return (
-    <div>
-      <PageHeader title="HR Dashboard">
-        {canViewEmployees && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/employees')}><span className="material-icons">people</span> Employees</button>}
-        {canViewAttendance && <button className="btn btn-secondary btn-sm" onClick={() => navigate('/module/hr/attendance')}><span className="material-icons">schedule</span> Attendance</button>}
-      </PageHeader>
-
-      {/* KPI Cards */}
-      <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <KPICard label="Total Employees" value={dashboardData.totalEmployees} sub={`Active: ${dashboardData.activeEmployees} · Inactive: ${dashboardData.inactiveEmployees}`} icon="people" color="blue" />
-        <KPICard label="Attendance Today" value={dashboardData.attendanceToday} sub={`${dashboardData.attendanceRate}% of active`} icon="today" color="teal" />
-        <KPICard label="Pending Timesheets" value={dashboardData.pendingAttendance} sub="awaiting approval" icon="schedule" color={dashboardData.pendingAttendance > 0 ? 'yellow' : 'green'} />
-        <KPICard label="Leave Requests" value={dashboardData.pendingLeave + dashboardData.pendingSupervLeave} sub={`HR: ${dashboardData.pendingLeave} · Supervisor: ${dashboardData.pendingSupervLeave}`} icon="event_busy" color={(dashboardData.pendingLeave + dashboardData.pendingSupervLeave) > 0 ? 'yellow' : 'green'} />
+    <div style={{ padding: '8px 0' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Human Resources</h2>
+        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Select a category to get started</p>
       </div>
 
-      {/* Quick alerts for pending leave */}
-      {(dashboardData.pendingLeave > 0 || dashboardData.pendingSupervLeave > 0) && (
-        <div className="card" style={{ padding: 16, marginBottom: 20, borderLeft: '4px solid var(--yellow)', background: 'rgba(251,191,36,.04)', cursor: 'pointer' }} onClick={() => navigate('/module/hr/leave')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="material-icons" style={{ fontSize: 32, color: 'var(--yellow)' }}>event_busy</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>
-                {dashboardData.pendingLeave + dashboardData.pendingSupervLeave} leave request(s) need attention
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                {dashboardData.pendingLeave > 0 && `${dashboardData.pendingLeave} pending HR approval`}
-                {dashboardData.pendingLeave > 0 && dashboardData.pendingSupervLeave > 0 && ' · '}
-                {dashboardData.pendingSupervLeave > 0 && `${dashboardData.pendingSupervLeave} pending supervisor review`}
-              </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+        gap: 16,
+      }}>
+        {visibleCategories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => navigate(cat.route)}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              padding: '28px 20px',
+              cursor: 'pointer',
+              transition: 'all .2s',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 14,
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.borderColor = cat.color
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = `0 8px 24px ${cat.color}22`
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.transform = ''
+              e.currentTarget.style.boxShadow = ''
+            }}
+          >
+            <div style={{
+              width: 56, height: 56,
+              borderRadius: 14,
+              background: `${cat.color}18`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span className="material-icons" style={{ fontSize: 30, color: cat.color }}>{cat.icon}</span>
             </div>
-            <span className="material-icons" style={{ color: 'var(--text-dim)' }}>chevron_right</span>
-          </div>
-        </div>
-      )}
-
-      {/* Monthly Accrual Panel */}
-      {canApproveLeave && (
-        <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-            <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6, color: 'var(--teal)' }}>timeline</span>
-            Monthly Leave Accrual
-          </h3>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-            Adds 2.5 leave days per active employee per leave type. Duplicate-safe — running twice for the same month does nothing.
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Month</label>
-              <select className="form-control" style={{ width: 120 }} value={accrualMonth} onChange={e => setAccrualMonth(parseInt(e.target.value))}>
-                {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{cat.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }}>{cat.desc}</div>
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Year</label>
-              <input type="number" className="form-control" style={{ width: 90 }} value={accrualYear} onChange={e => setAccrualYear(parseInt(e.target.value) || new Date().getFullYear())} />
-            </div>
-            <button className="btn btn-primary" onClick={handleRunAccrual} disabled={runningAccrual}>
-              <span className="material-icons">autorenew</span>
-              {runningAccrual ? 'Running…' : 'Run Accrual'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Department headcounts */}
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Department Headcounts</h3>
-        <div className="table-wrap">
-          <table className="stock-table">
-            <thead><tr><th>Department</th><th>Employees</th><th>% of Total</th></tr></thead>
-            <tbody>
-              {dashboardData.departmentHeadcounts.map(dept => (
-                <tr key={dept.name}>
-                  <td style={{ fontWeight: 600 }}>{dept.name}</td>
-                  <td style={{ fontWeight: 700 }}>{dept.count}</td>
-                  <td>{dashboardData.totalEmployees ? ((dept.count / dashboardData.totalEmployees) * 100).toFixed(1) : 0}%</td>
-                </tr>
-              ))}
-              {dashboardData.departmentHeadcounts.length === 0 && <tr><td colSpan="3" className="empty-state">No departments</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Smart Alerts */}
-      <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Smart Alerts</h3>
-        {dashboardData.alerts.length === 0 ? (
-          <EmptyState icon="check_circle" message="All systems normal. No alerts." />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {dashboardData.alerts.map((alert, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--surface2)', borderRadius: 8, cursor: 'pointer', borderLeft: `3px solid ${alert.color}` }} onClick={alert.action}>
-                <span className="material-icons" style={{ color: alert.color }}>{alert.icon}</span>
-                <span style={{ flex: 1, fontSize: 13 }}>{alert.message}</span>
-                <span className="material-icons" style={{ fontSize: 16, color: 'var(--text-dim)' }}>chevron_right</span>
-              </div>
-            ))}
-          </div>
-        )}
+          </button>
+        ))}
       </div>
     </div>
   )
