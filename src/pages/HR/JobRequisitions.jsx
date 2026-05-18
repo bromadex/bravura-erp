@@ -20,7 +20,7 @@ const STATUS_COLOR = {
 const BLANK = {
   designation: '', department_id: '', no_of_positions: 1,
   expected_compensation: '', currency: 'USD',
-  posting_date: today(), expected_by: '', requested_by: '',
+  posting_date: today(), expected_by: '', requested_by: '', requested_by_name: '',
   description: '', reason: '',
 }
 
@@ -31,6 +31,7 @@ export default function JobRequisitions() {
 
   const [reqs,        setReqs]        = useState([])
   const [departments, setDepartments] = useState([])
+  const [employees,   setEmployees]   = useState([])
   const [loading,     setLoading]     = useState(true)
   const [saving,      setSaving]      = useState(false)
 
@@ -61,7 +62,12 @@ export default function JobRequisitions() {
     setDepartments(data || [])
   }, [])
 
-  useEffect(() => { fetchReqs(); fetchDepts() }, [fetchReqs, fetchDepts])
+  const fetchEmployees = useCallback(async () => {
+    const { data } = await supabase.from('employees').select('id, name, employee_number').eq('status', 'Active').order('name')
+    setEmployees(data || [])
+  }, [])
+
+  useEffect(() => { fetchReqs(); fetchDepts(); fetchEmployees() }, [fetchReqs, fetchDepts, fetchEmployees])
 
   const openNew = () => { setEditReq(null); setForm(BLANK); setShowForm(true) }
   const openEdit = (r) => {
@@ -72,6 +78,7 @@ export default function JobRequisitions() {
       expected_compensation: r.expected_compensation || '',
       currency: r.currency || 'USD', posting_date: r.posting_date || today(),
       expected_by: r.expected_by || '', requested_by: r.requested_by || '',
+      requested_by_name: r.requested_by_name || '',
       description: r.description || '', reason: r.reason || '',
     })
     setShowForm(true)
@@ -88,7 +95,8 @@ export default function JobRequisitions() {
         no_of_positions: parseInt(form.no_of_positions) || 1,
         expected_compensation: form.expected_compensation ? parseFloat(form.expected_compensation) : null,
         currency: form.currency, posting_date: form.posting_date || null,
-        expected_by: form.expected_by || null, requested_by: form.requested_by,
+        expected_by: form.expected_by || null,
+        requested_by: form.requested_by, requested_by_name: form.requested_by_name,
         description: form.description, reason: form.reason,
         updated_at: new Date().toISOString(),
       }
@@ -206,7 +214,7 @@ export default function JobRequisitions() {
                   <td>{r.departments?.name || '—'}</td>
                   <td>{r.no_of_positions}</td>
                   <td>{r.expected_by || '—'}</td>
-                  <td>{r.requested_by || '—'}</td>
+                  <td>{r.requested_by_name || r.requested_by || '—'}</td>
                   <td>{r.job_openings?.job_title ? <span style={{ color: 'var(--teal)', fontSize: 12 }}>{r.job_openings.job_title}</span> : '—'}</td>
                   <td>
                     <StatusBadge status={r.status?.toLowerCase().replace(/ /g, '_')} label={r.status} color={STATUS_COLOR[r.status]} />
@@ -275,7 +283,16 @@ export default function JobRequisitions() {
           </div>
           <div className="form-group" style={{ gridColumn: '1/-1' }}>
             <label>Requested By</label>
-            <input className="form-control" value={form.requested_by} onChange={e => set('requested_by', e.target.value)} placeholder="Name of requestor" />
+            <select className="form-control" value={form.requested_by} onChange={e => {
+              const emp = employees.find(x => x.id === e.target.value)
+              set('requested_by', e.target.value)
+              setForm(f => ({ ...f, requested_by: e.target.value, requested_by_name: emp?.name || '' }))
+            }}>
+              <option value="">— Select Employee —</option>
+              {employees.map(e => (
+                <option key={e.id} value={e.id}>{e.name}{e.employee_number ? ` (${e.employee_number})` : ''}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group" style={{ gridColumn: '1/-1' }}>
             <label>Reason for Requisition</label>

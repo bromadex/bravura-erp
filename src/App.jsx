@@ -157,6 +157,21 @@ const KRAs               = lazy(() => import('./pages/HR/KRAs'))
 const AppraisalTemplates = lazy(() => import('./pages/HR/AppraisalTemplates'))
 // HR Reports
 const HRReports          = lazy(() => import('./pages/HR/HRReports'))
+// HR Phase 3 — Employee Management v2
+const EmployeeGrades     = lazy(() => import('./pages/HR/EmployeeGrades'))
+const EmploymentTypes    = lazy(() => import('./pages/HR/EmploymentTypes'))
+const EmployeePromotions = lazy(() => import('./pages/HR/EmployeePromotions'))
+const EmployeeTransfers  = lazy(() => import('./pages/HR/EmployeeTransfers'))
+const OrgChart           = lazy(() => import('./pages/HR/OrgChart'))
+// HR Phase 3 — Lifecycle
+const EmployeeOnboarding = lazy(() => import('./pages/HR/EmployeeOnboarding'))
+const EmployeeSeparation = lazy(() => import('./pages/HR/EmployeeSeparation'))
+const FullFinalStatement = lazy(() => import('./pages/HR/FullFinalStatement'))
+// HR Phase 3 — Overtime & Grievances
+const OvertimeSlips      = lazy(() => import('./pages/HR/OvertimeSlips'))
+const EmployeeGrievances = lazy(() => import('./pages/HR/EmployeeGrievances'))
+// HR Phase 3 — Notifications
+const ScheduledNotifications = lazy(() => import('./pages/HR/ScheduledNotifications'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -458,6 +473,22 @@ function AppRoutes() {
             <Route path="appraisal-templates" element={<AppraisalTemplates />} />
             {/* HR Reports */}
             <Route path="hr-reports"          element={<HRReports />} />
+            {/* Phase 3 — Employee Management v2 */}
+            <Route path="employee-grades"     element={<EmployeeGrades />} />
+            <Route path="employment-types"    element={<EmploymentTypes />} />
+            <Route path="promotions"          element={<EmployeePromotions />} />
+            <Route path="transfers"           element={<EmployeeTransfers />} />
+            <Route path="org-chart"           element={<OrgChart />} />
+            {/* Phase 3 — Lifecycle */}
+            <Route path="onboarding"          element={<EmployeeOnboarding />} />
+            <Route path="separation"          element={<EmployeeSeparation />} />
+            <Route path="full-final"          element={<FullFinalStatement />} />
+            {/* Phase 3 — Overtime */}
+            <Route path="overtime"            element={<OvertimeSlips />} />
+            {/* Phase 3 — Grievances */}
+            <Route path="grievances"          element={<EmployeeGrievances />} />
+            {/* Phase 3 — Notifications */}
+            <Route path="scheduled-notifications" element={<ScheduledNotifications />} />
           </Route>
         </Route>
 
@@ -465,9 +496,11 @@ function AppRoutes() {
         <Route path="/module/expenses" element={
           <ProtectedRoute>
             <PermissionRoute module="expenses" page="dashboard">
-              <ExpenseProvider>
-                <Layout module="expenses" />
-              </ExpenseProvider>
+              <HRProvider>
+                <ExpenseProvider>
+                  <Layout module="expenses" />
+                </ExpenseProvider>
+              </HRProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>

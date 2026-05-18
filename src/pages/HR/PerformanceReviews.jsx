@@ -101,7 +101,7 @@ export default function PerformanceReviews() {
     try {
       const { data, error } = await supabase
         .from('performance_reviews')
-        .select('*, employees(name, department_id, departments:department_id(name)), appraisal_periods(name)')
+        .select('*, employees!employee_id(name, department_id, departments:department_id(name)), appraisal_periods(name)')
         .order('created_at', { ascending: false })
       if (error) throw error
       setReviews(data || [])
