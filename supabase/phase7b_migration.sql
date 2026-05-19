@@ -246,26 +246,3 @@ CREATE TABLE IF NOT EXISTS job_offer_templates (
 ALTER TABLE job_offer_templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "allow_all_job_offer_templates" ON job_offer_templates;
 CREATE POLICY "allow_all_job_offer_templates" ON job_offer_templates FOR ALL USING (true) WITH CHECK (true);
-
--- ============================================================
--- SECTION 9: EXTEND EXISTING TABLES (safe — skips if not present)
--- ============================================================
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'applicants'
-  ) THEN
-    ALTER TABLE applicants ADD COLUMN IF NOT EXISTS source_id TEXT REFERENCES job_applicant_sources(id);
-    CREATE INDEX IF NOT EXISTS idx_applicants_source_id ON applicants (source_id);
-  END IF;
-
-  IF EXISTS (
-    SELECT FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'interviews'
-  ) THEN
-    ALTER TABLE interviews ADD COLUMN IF NOT EXISTS interview_type_id TEXT REFERENCES interview_types(id);
-    CREATE INDEX IF NOT EXISTS idx_interviews_interview_type_id ON interviews (interview_type_id);
-  END IF;
-END $$;
