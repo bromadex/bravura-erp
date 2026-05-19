@@ -1,17 +1,20 @@
 // src/pages/HR/HRDashboard.jsx
-// HR module landing page — category picker inspired by Frappe HR.
+// People & Workforce home — stats strip + consolidated section tiles.
 
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCanView } from '../../hooks/usePermission'
+import { supabase } from '../../lib/supabase'
 
 const CATEGORIES = [
   {
-    id: 'setup',
-    icon: 'manage_accounts',
-    label: 'HR Setup',
-    desc: 'Employees, grades, employment types & org chart',
+    id: 'organisation',
+    icon: 'corporate_fare',
+    label: 'Organisation',
+    desc: 'Employees, departments, designations, grades & org chart',
     color: '#f87171',
     route: '/module/hr/employees',
+    module: 'hr',
     pages: ['employees', 'departments', 'designations', 'employee-grades', 'employment-types', 'permissions', 'org-chart', 'department-approvers'],
   },
   {
@@ -21,43 +24,38 @@ const CATEGORIES = [
     desc: 'Promotions, transfers, onboarding, separation & F&F',
     color: '#c084fc',
     route: '/module/hr/promotions',
+    module: 'hr',
     pages: ['promotions', 'transfers', 'onboarding', 'boarding-activities', 'separation', 'exit-interviews', 'exit-questionnaire', 'full-final'],
   },
   {
-    id: 'attendance',
-    icon: 'fingerprint',
-    label: 'Attendance',
-    desc: 'Clock-in, bulk tool, requests & daily summaries',
+    id: 'shifts-attendance',
+    icon: 'schedule',
+    label: 'Shifts & Attendance',
+    desc: 'Shift types, assignments, attendance, check-ins & biometric devices',
     color: '#34d399',
     route: '/module/hr/attendance',
-    pages: ['attendance', 'attendance-tool', 'attendance-requests', 'daily-work-summary'],
+    module: 'hr',
+    pages: ['shift-types', 'shift-assignments', 'shift-assignment-tool', 'shift-schedules', 'shift-requests', 'holiday-lists', 'holiday-list-assignments', 'attendance', 'attendance-tool', 'attendance-requests', 'employee-checkins', 'attendance-devices', 'daily-work-summary'],
   },
   {
-    id: 'shifts',
-    icon: 'schedule',
-    label: 'Shift Management',
-    desc: 'Shift types, schedules, bulk assignments & holidays',
-    color: '#fbbf24',
-    route: '/module/hr/shift-types',
-    pages: ['shift-types', 'shift-assignments', 'shift-assignment-tool', 'shift-schedules', 'shift-requests', 'holiday-lists', 'holiday-list-assignments'],
-  },
-  {
-    id: 'leaves',
+    id: 'leave',
     icon: 'beach_access',
-    label: 'Leaves',
-    desc: 'Requests, policies, allocation, accrual & balance',
+    label: 'Leave Management',
+    desc: 'Requests, policies, allocation, accrual, balance & calendar',
     color: '#60a5fa',
     route: '/module/hr/leave',
+    module: 'hr',
     pages: ['leave', 'leave-types', 'leave-policies', 'leave-allocation', 'leave-control-panel', 'leave-block-list', 'earned-leave-schedule', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
   },
   {
     id: 'payroll',
     icon: 'payments',
-    label: 'Payroll',
-    desc: 'Salary structures, slips, payroll entry & timesheets',
+    label: 'Payroll & Compensation',
+    desc: 'Salary structures, slips, entry, PAYE, adjustments & overtime',
     color: '#a78bfa',
     route: '/module/hr/payroll',
-    pages: ['payroll', 'timesheet', 'salary-structures', 'salary-slips', 'payroll-entry', 'travel', 'purpose-of-travel'],
+    module: 'hr',
+    pages: ['payroll', 'salary-structures', 'salary-slips', 'payroll-entry', 'tax-years', 'tax-exemptions', 'additional-salary', 'salary-arrears', 'salary-withholdings', 'payroll-corrections', 'employee-incentives', 'retention-bonuses', 'component-accounts', 'timesheet', 'travel', 'purpose-of-travel', 'overtime'],
   },
   {
     id: 'recruitment',
@@ -66,115 +64,38 @@ const CATEGORIES = [
     desc: 'Requisitions, openings, applicants, interviews & offer letters',
     color: '#06b6d4',
     route: '/module/hr/job-requisitions',
+    module: 'hr',
     pages: ['job-requisitions', 'job-postings', 'applicants', 'interviews', 'interview-types', 'applicant-sources', 'appointment-letters', 'job-offer-templates'],
+  },
+  {
+    id: 'talent',
+    icon: 'rate_review',
+    label: 'Talent & Growth',
+    desc: 'Performance appraisals, KRAs, training, skills & referrals',
+    color: '#f59e0b',
+    route: '/module/hr/performance-reviews',
+    module: 'hr',
+    pages: ['appraisal-cycles', 'appraisal-periods', 'appraisal-templates', 'kras', 'performance-reviews', 'kpi-templates', 'peer-feedback', 'training', 'skills-admin', 'employee-skills', 'skill-matrix', 'designation-skills', 'referrals'],
   },
   {
     id: 'benefits',
     icon: 'card_giftcard',
-    label: 'Benefits & Gratuity',
-    desc: 'Gratuity rules & slabs, benefit applications & claims',
+    label: 'Benefits & Wellbeing',
+    desc: 'Gratuity rules, employee benefits & grievance resolution',
     color: '#10b981',
-    route: '/module/hr/gratuity-rules',
-    pages: ['gratuity-rules', 'gratuity', 'employee-benefits'],
-  },
-  {
-    id: 'performance',
-    icon: 'rate_review',
-    label: 'Performance',
-    desc: 'Appraisals, KRAs, templates & reviews',
-    color: '#f59e0b',
-    route: '/module/hr/appraisal-periods',
-    pages: ['appraisal-cycles', 'appraisal-periods', 'appraisal-templates', 'kras', 'performance-reviews', 'kpi-templates', 'peer-feedback'],
-  },
-  {
-    id: 'overtime',
-    icon: 'more_time',
-    label: 'Overtime',
-    desc: 'Overtime types, slips & payroll integration',
-    color: '#f97316',
-    route: '/module/hr/overtime',
-    pages: ['overtime'],
-  },
-  {
-    id: 'grievances',
-    icon: 'report_problem',
-    label: 'Grievances',
-    desc: 'Employee grievance types, filing & resolution',
-    color: '#ef4444',
-    route: '/module/hr/grievances',
-    pages: ['grievances'],
-  },
-  {
-    id: 'training',
-    icon: 'school',
-    label: 'Training',
-    desc: 'Training types, schedules & employee training log',
-    color: '#0ea5e9',
-    route: '/module/hr/training',
-    pages: ['training'],
-  },
-  {
-    id: 'referrals',
-    icon: 'share',
-    label: 'Referrals',
-    desc: 'Employee referral programs & bonus tracking',
-    color: '#8b5cf6',
-    route: '/module/hr/referrals',
-    pages: ['referrals'],
-  },
-  {
-    id: 'skills',
-    icon: 'workspace_premium',
-    label: 'Skills & Competency',
-    desc: 'Skill master, employee skills, matrix & role requirements',
-    color: '#22d3ee',
-    route: '/module/hr/skills-admin',
-    pages: ['skills-admin', 'employee-skills', 'skill-matrix', 'designation-skills'],
-  },
-  {
-    id: 'documents',
-    icon: 'folder_shared',
-    label: 'Documents',
-    desc: 'Employee identification documents & expiry tracking',
-    color: '#94a3b8',
-    route: '/module/hr/employee-documents',
-    pages: ['employee-documents', 'id-document-types'],
+    route: '/module/hr/employee-benefits',
+    module: 'hr',
+    pages: ['gratuity-rules', 'gratuity', 'employee-benefits', 'grievances'],
   },
   {
     id: 'expenses',
     icon: 'receipt_long',
     label: 'Expenses',
-    desc: 'Claims & employee advances',
+    desc: 'Claims, employee advances & expense types',
     color: '#fb923c',
     route: '/module/expenses',
-    pages: null,
-  },
-  {
-    id: 'reports',
-    icon: 'bar_chart',
-    label: 'HR Reports',
-    desc: 'Attendance, leave balance, salary register & analytics',
-    color: '#38bdf8',
-    route: '/module/hr/hr-reports',
-    pages: ['hr-reports', 'scheduled-notifications'],
-  },
-  {
-    id: 'analytics',
-    icon: 'insights',
-    label: 'Analytics',
-    desc: 'KPIs, headcounts & smart alerts',
-    color: '#10b981',
-    route: '/module/hr/analytics',
-    pages: ['dashboard'],
-  },
-  {
-    id: 'pay-adjustments',
-    icon: 'tune',
-    label: 'Pay Adjustments',
-    desc: 'PAYE slabs, exemptions, arrears, withholdings, incentives & bonuses',
-    color: '#e879f9',
-    route: '/module/hr/tax-years',
-    pages: ['tax-years', 'tax-exemptions', 'additional-salary', 'salary-arrears', 'salary-withholdings', 'payroll-corrections', 'employee-incentives', 'retention-bonuses', 'component-accounts'],
+    module: 'expenses',
+    pages: ['claims', 'advances'],
   },
   {
     id: 'hr-settings',
@@ -183,31 +104,76 @@ const CATEGORIES = [
     desc: 'Employee, payroll, leave, recruitment & notification configuration',
     color: '#64748b',
     route: '/module/hr/hr-settings-hub',
-    pages: ['hr-settings-hub', 'hr-settings', 'employee-settings', 'leave-settings', 'expense-settings', 'shift-attendance-settings', 'recruitment-settings', 'tenure-settings', 'performance-settings', 'payroll-settings', 'notification-templates', 'email-configuration'],
+    module: 'hr',
+    pages: ['hr-settings-hub', 'hr-settings', 'employee-settings', 'leave-settings', 'expense-settings', 'shift-attendance-settings', 'recruitment-settings', 'tenure-settings', 'performance-settings', 'payroll-settings', 'notification-templates', 'email-configuration', 'skills-settings', 'benefits-settings', 'documents-settings'],
   },
 ]
 
-export default function HRDashboard() {
-  const navigate   = useNavigate()
-  const canView    = useCanView
+const STAT_DEFS = [
+  { key: 'totalEmployees',      label: 'Total Employees',        icon: 'people',       color: '#f87171' },
+  { key: 'onLeaveToday',        label: 'On Leave Today',         icon: 'event_busy',   color: '#60a5fa' },
+  { key: 'pendingLeave',        label: 'Pending Leave',          icon: 'pending',      color: '#fbbf24' },
+  { key: 'newHiresThisMonth',   label: 'New Hires (Month)',      icon: 'person_add',   color: '#34d399' },
+  { key: 'openGrievances',      label: 'Open Grievances',        icon: 'report_problem', color: '#f97316' },
+]
 
-  const visibleCategories = CATEGORIES.filter(cat => {
-    if (!cat.pages) return true
-    return cat.pages.some(p => canView('hr', p))
-  })
+export default function HRDashboard() {
+  const navigate = useNavigate()
+  const canView  = useCanView
+
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [stats, setStats]               = useState({ totalEmployees: 0, onLeaveToday: 0, pendingLeave: 0, newHiresThisMonth: 0, openGrievances: 0 })
+
+  useEffect(() => {
+    const today     = new Date().toISOString().slice(0, 10)
+    const monthStart = today.slice(0, 7) + '-01'
+
+    Promise.all([
+      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'approved').lte('start_date', today).gte('end_date', today),
+      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('employees').select('id', { count: 'exact', head: true }).gte('hire_date', monthStart),
+      supabase.from('employee_grievances').select('id', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")'),
+    ]).then(([emp, onLeave, pendLeave, newHires, grievances]) => {
+      setStats({
+        totalEmployees:    emp.count       ?? 0,
+        onLeaveToday:      onLeave.count   ?? 0,
+        pendingLeave:      pendLeave.count ?? 0,
+        newHiresThisMonth: newHires.count  ?? 0,
+        openGrievances:    grievances.count ?? 0,
+      })
+      setStatsLoading(false)
+    }).catch(() => setStatsLoading(false))
+  }, [])
+
+  const visibleCategories = CATEGORIES.filter(cat =>
+    cat.pages ? cat.pages.some(p => canView(cat.module || 'hr', p)) : true
+  )
 
   return (
     <div style={{ padding: '8px 0' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Human Resources</h2>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Select a category to get started</p>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>People &amp; Workforce</h2>
+        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Overview of your workforce at a glance</p>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-        gap: 16,
-      }}>
+      {/* Stats strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {STAT_DEFS.map(s => (
+          <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span className="material-icons" style={{ fontSize: 18, color: s.color }}>{s.icon}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 500 }}>{s.label}</span>
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)' }}>
+              {statsLoading ? '—' : stats[s.key]}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section tiles */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
         {visibleCategories.map(cat => (
           <button
             key={cat.id}
