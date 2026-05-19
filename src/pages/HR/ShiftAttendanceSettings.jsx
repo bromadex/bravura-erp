@@ -14,12 +14,17 @@ const DEFAULTS = {
   auto_mark_absent_after_hours: 4,
   late_entry_grace_minutes: 15,
   early_exit_grace_minutes: 15,
+  // Phase 7 biometric additions
+  auto_process_checkins: false,
+  checkin_match_hours: 12,
+  require_biometric_device: false,
   updated_at: null,
 }
 
 const TABS = [
   { id: 'shifts',     label: 'Shifts',              icon: 'schedule' },
   { id: 'checkin',    label: 'Check-in',            icon: 'login' },
+  { id: 'biometric',  label: 'Biometric',           icon: 'fingerprint' },
   { id: 'attendance', label: 'Attendance Marking',  icon: 'fact_check' },
 ]
 
@@ -215,6 +220,46 @@ export default function ShiftAttendanceSettings() {
               </FormField>
             </div>
           )}
+          {settings.updated_at && (
+            <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>
+              Last updated: {fmtDate(settings.updated_at)}
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {activeTab === 'biometric' && (
+        <SectionCard>
+          <ToggleRow
+            label="Auto-Process Check-ins to Attendance"
+            description="Automatically convert matched IN/OUT check-in pairs into attendance records"
+            checked={settings.auto_process_checkins}
+            onChange={v => set('auto_process_checkins', v)}
+            disabled={!canEdit}
+          />
+          <ToggleRow
+            label="Require Biometric Device"
+            description="Only allow check-ins from registered biometric devices (no manual entries)"
+            checked={settings.require_biometric_device}
+            onChange={v => set('require_biometric_device', v)}
+            disabled={!canEdit}
+          />
+          <div style={{ marginTop: 20, maxWidth: 320 }}>
+            <FormField label="Match IN/OUT Within (hours)">
+              <input
+                className="form-control"
+                type="number"
+                min={1}
+                max={24}
+                value={settings.checkin_match_hours}
+                onChange={e => set('checkin_match_hours', Number(e.target.value))}
+                disabled={!canEdit}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                Maximum hours between an IN and its matching OUT check-in
+              </div>
+            </FormField>
+          </div>
           {settings.updated_at && (
             <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>
               Last updated: {fmtDate(settings.updated_at)}

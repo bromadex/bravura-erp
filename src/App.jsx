@@ -188,6 +188,7 @@ const HRPerformanceSettings   = lazy(() => import('./pages/HR/PerformanceSetting
 const PayrollSettings         = lazy(() => import('./pages/HR/PayrollSettings'))
 const NotificationTemplates   = lazy(() => import('./pages/HR/NotificationTemplates'))
 const EmailConfiguration      = lazy(() => import('./pages/HR/EmailConfiguration'))
+const SkillsSettings          = lazy(() => import('./pages/HR/SkillsSettings'))
 // HR Phase 6 — Tax & Pay Adjustments
 const TaxYears               = lazy(() => import('./pages/HR/TaxYears'))
 const TaxExemptions          = lazy(() => import('./pages/HR/TaxExemptions'))
@@ -537,6 +538,7 @@ function AppRoutes() {
             <Route path="payroll-settings"            element={<PayrollSettings />} />
             <Route path="notification-templates"      element={<NotificationTemplates />} />
             <Route path="email-configuration"         element={<EmailConfiguration />} />
+            <Route path="skills-settings"             element={<SkillsSettings />} />
             {/* Phase 6 — Tax & Pay Adjustments */}
             <Route path="tax-years"               element={<TaxYears />} />
             <Route path="tax-exemptions"          element={<TaxExemptions />} />
