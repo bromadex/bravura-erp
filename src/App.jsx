@@ -52,10 +52,17 @@ const CampPPERegister = lazy(() => import('./pages/Campsite/CampPPERegister'))
 const CampHeadcount   = lazy(() => import('./pages/Campsite/CampHeadcount'))
 
 // Settings / Workflow
-const WorkflowAdmin   = lazy(() => import('./components/workflow/WorkflowAdmin'))
-const WorkflowBuilder = lazy(() => import('./components/workflow/WorkflowBuilder'))
-const WorkflowInbox   = lazy(() => import('./pages/Workflow/WorkflowInbox'))
-const MasterData      = lazy(() => import('./pages/Settings/MasterData'))
+const WorkflowAdmin       = lazy(() => import('./components/workflow/WorkflowAdmin'))
+const WorkflowBuilder     = lazy(() => import('./components/workflow/WorkflowBuilder'))
+const WorkflowInbox       = lazy(() => import('./pages/Workflow/WorkflowInbox'))
+const WorkflowAssignments = lazy(() => import('./pages/Workflow/WorkflowAssignments'))
+const MasterData          = lazy(() => import('./pages/Settings/MasterData'))
+// Phase 10 — Cross-cutting engines
+const PushNotificationSettings = lazy(() => import('./pages/Settings/PushNotificationSettings'))
+const EmailLogs                = lazy(() => import('./pages/Settings/EmailLogs'))
+const ExitQuestionnaireAdmin   = lazy(() => import('./pages/HR/ExitQuestionnaireAdmin'))
+const FormsLayout              = lazy(() => import('./pages/Forms/FormsLayout'))
+const ExitQuestionnaire        = lazy(() => import('./pages/Forms/ExitQuestionnaire'))
 
 // Connect
 const ConnectPage = lazy(() => import('./pages/Connect/ConnectPage'))
@@ -361,6 +368,10 @@ function AppRoutes() {
         <Route path="/login"           element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/access-denied"   element={<AccessDenied />} />
         <Route path="/change-password" element={<ChangePassword />} />
+        {/* ── Public web forms (no auth) ─────────────────────── */}
+        <Route path="/forms" element={<FormsLayout />}>
+          <Route path="exit-questionnaire/:token" element={<ExitQuestionnaire />} />
+        </Route>
         <Route path="/"                element={<ProtectedRoute><HomeGrid /></ProtectedRoute>} />
         <Route path="/module/workflow/inbox" element={<ProtectedRoute><WorkflowInbox /></ProtectedRoute>} />
 
@@ -617,6 +628,8 @@ function AppRoutes() {
             <Route path="department-approvers"       element={<DepartmentApprovers />} />
             <Route path="purpose-of-travel"          element={<PurposeOfTravel />} />
             <Route path="boarding-activities"        element={<EmployeeBoardingActivity />} />
+            {/* Phase 10 — Exit Questionnaire (admin) */}
+            <Route path="exit-questionnaire"         element={<ExitQuestionnaireAdmin />} />
           </Route>
         </Route>
 
@@ -770,10 +783,13 @@ function AppRoutes() {
             <Layout module="settings" />
           </ProtectedRoute>
         }>
-          <Route index                    element={<MasterData />}      />
-          <Route path="master-data"       element={<MasterData />}      />
-          <Route path="workflows"         element={<WorkflowBuilder />} />
-          <Route path="workflows/admin"   element={<WorkflowAdmin />}   />
+          <Route index                       element={<MasterData />}            />
+          <Route path="master-data"          element={<MasterData />}            />
+          <Route path="workflows"            element={<WorkflowBuilder />}       />
+          <Route path="workflows/admin"      element={<WorkflowAdmin />}         />
+          <Route path="workflow-assignments" element={<WorkflowAssignments />}   />
+          <Route path="push-notifications"   element={<PushNotificationSettings />} />
+          <Route path="email-logs"           element={<EmailLogs />}             />
         </Route>
 
         {/* ── REPORTS ──────────────────────────────────────── */}

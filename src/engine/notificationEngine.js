@@ -11,9 +11,25 @@
 // All functions are fire-and-forget: failures are logged, never thrown.
 
 import { supabase } from '../lib/supabase'
+import { sendPushNotification, sendEmail } from './emailEngine'
+
+// ── Resolve email for a userId (best-effort) ────────────────────
+async function resolveEmailForUser(userId) {
+  try {
+    const { data: u } = await supabase.from('app_users').select('email, employee_id').eq('id', userId).maybeSingle()
+    if (u?.email) return u.email
+    if (u?.employee_id) {
+      const { data: e } = await supabase.from('employees').select('email').eq('id', u.employee_id).maybeSingle()
+      if (e?.email) return e.email
+    }
+  } catch (e) { /* swallow */ }
+  return null
+}
 
 /**
- * Push a single notification to one user.
+ * Push a single notification to one user. Writes to in-app `notifications`
+ * table (real-time). Pass `channels` to also fan out to email and/or
+ * web-push subscriptions.
  *
  * @param {string} userId  - app_users.id
  * @param {object} notif
@@ -21,9 +37,12 @@ import { supabase } from '../lib/supabase'
  * @param {string} notif.title
  * @param {string} notif.message
  * @param {string} [notif.link]   - route to navigate on click, e.g. '/module/hr/leave'
- * @param {object} [notif.metadata] - arbitrary extra data stored as JSON
+ * @param {object} [notif.metadata]
+ * @param {string} [notif.category]
+ * @param {object} [notif.channels] - { email?: boolean, push?: boolean }
+ * @param {string} [notif.eventType] - for logging in email_logs/push_logs
  */
-export async function pushNotification(userId, { type, title, message, link = null, metadata = {}, category = 'general' }) {
+export async function pushNotification(userId, { type, title, message, link = null, metadata = {}, category = 'general', channels = {}, eventType = null }) {
   if (!userId) return
   try {
     await supabase.from('notifications').insert([{
@@ -40,6 +59,29 @@ export async function pushNotification(userId, { type, title, message, link = nu
     }])
   } catch (err) {
     console.error('[notificationEngine] push failed:', err?.message || err)
+  }
+
+  // Fan-out (fire and forget)
+  if (channels.push) {
+    sendPushNotification(userId, { title, body: message, link, eventType }).catch(e =>
+      console.error('[notificationEngine] push fanout failed:', e?.message || e))
+  }
+  if (channels.email) {
+    resolveEmailForUser(userId).then(email => {
+      if (email) {
+        sendEmail({
+          to: email,
+          subject: title,
+          html: `<div style="font-family:Arial,sans-serif">
+                   <h3 style="color:#facc15">${title}</h3>
+                   <p>${message}</p>
+                   ${link ? `<p><a href="${link}">View in Bravura ERP</a></p>` : ''}
+                 </div>`,
+          text: `${title}\n\n${message}${link ? `\n\n${link}` : ''}`,
+          eventType,
+        }).catch(e => console.error('[notificationEngine] email fanout failed:', e?.message || e))
+      }
+    })
   }
 }
 
@@ -137,7 +179,7 @@ export async function pushNotificationFromTemplate(eventType, variables = {}, re
     // 1. Fetch template
     const { data: tmpl, error } = await supabase
       .from('notification_templates')
-      .select('type, title, message, link, enabled, category')
+      .select('type, title, message, link, enabled, category, send_email, send_push, email_subject, email_body')
       .eq('event_type', eventType)
       .maybeSingle()
 
@@ -160,6 +202,11 @@ export async function pushNotificationFromTemplate(eventType, variables = {}, re
         link:     tmpl.link || null,
         category: tmpl.category || 'general',
         metadata: variables,
+        eventType,
+        channels: { email: !!tmpl.send_email, push: !!tmpl.send_push },
+        // Stash interpolated email-specific bits in metadata for downstream
+        _emailSubject: tmpl.send_email ? interpolate(tmpl.email_subject || tmpl.title) : null,
+        _emailBody:    tmpl.send_email ? interpolate(tmpl.email_body    || tmpl.message) : null,
       }
     }
 

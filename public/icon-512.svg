@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0b0f1a"/>
+  <text x="256" y="300" font-family="Inter, sans-serif" font-size="180" font-weight="800" fill="#facc15" text-anchor="middle">B</text>
+  <text x="256" y="420" font-family="Inter, sans-serif" font-size="56" font-weight="600" fill="#e2e8f0" text-anchor="middle">BRAVURA</text>
+</svg>

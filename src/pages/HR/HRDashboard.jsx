@@ -21,7 +21,7 @@ const CATEGORIES = [
     desc: 'Promotions, transfers, onboarding, separation & F&F',
     color: '#c084fc',
     route: '/module/hr/promotions',
-    pages: ['promotions', 'transfers', 'onboarding', 'boarding-activities', 'separation', 'exit-interviews', 'full-final'],
+    pages: ['promotions', 'transfers', 'onboarding', 'boarding-activities', 'separation', 'exit-interviews', 'exit-questionnaire', 'full-final'],
   },
   {
     id: 'attendance',

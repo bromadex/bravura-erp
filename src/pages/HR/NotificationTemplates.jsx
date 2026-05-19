@@ -36,6 +36,10 @@ const BLANK_FORM = {
   message: '',
   link: '',
   enabled: true,
+  send_email: false,
+  send_push:  false,
+  email_subject: '',
+  email_body: '',
 }
 
 function TypeBadge({ type }) {
@@ -103,13 +107,17 @@ export default function NotificationTemplates() {
   const openEdit = (r) => {
     setEditRow(r)
     setForm({
-      event_type: r.event_type || '',
-      category:   r.category   || 'general',
-      type:       r.type       || 'info',
-      title:      r.title      || '',
-      message:    r.message    || '',
-      link:       r.link       || '',
-      enabled:    !!r.enabled,
+      event_type:    r.event_type    || '',
+      category:      r.category      || 'general',
+      type:          r.type          || 'info',
+      title:         r.title         || '',
+      message:       r.message       || '',
+      link:          r.link          || '',
+      enabled:       !!r.enabled,
+      send_email:    !!r.send_email,
+      send_push:     !!r.send_push,
+      email_subject: r.email_subject || '',
+      email_body:    r.email_body    || '',
     })
     setShowModal(true)
   }
@@ -130,13 +138,17 @@ export default function NotificationTemplates() {
     setSaving(true)
     try {
       const payload = {
-        event_type: eventTypeKey,
-        category:   form.category.trim() || 'general',
-        type:       form.type,
-        title:      form.title.trim(),
-        message:    form.message,
-        link:       form.link.trim() || null,
-        enabled:    form.enabled,
+        event_type:    eventTypeKey,
+        category:      form.category.trim() || 'general',
+        type:          form.type,
+        title:         form.title.trim(),
+        message:       form.message,
+        link:          form.link.trim() || null,
+        enabled:       form.enabled,
+        send_email:    !!form.send_email,
+        send_push:     !!form.send_push,
+        email_subject: form.email_subject?.trim() || null,
+        email_body:    form.email_body || null,
       }
       if (editRow) {
         const { error } = await supabase
@@ -409,6 +421,47 @@ export default function NotificationTemplates() {
               onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
             />
             <label htmlFor="nt_enabled" style={{ margin: 0, cursor: 'pointer' }}>Enabled</label>
+          </div>
+
+          {/* Delivery channels — Phase 10 */}
+          <div style={{
+            marginTop: 8, padding: 14,
+            background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+              Delivery Channels
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                <input type="checkbox" checked={!!form.send_push}
+                  onChange={e => setForm(f => ({ ...f, send_push: e.target.checked }))} />
+                <span className="material-icons" style={{ fontSize: 14, color: 'var(--blue)' }}>notifications_active</span>
+                Send browser push notification (PWA)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                <input type="checkbox" checked={!!form.send_email}
+                  onChange={e => setForm(f => ({ ...f, send_email: e.target.checked }))} />
+                <span className="material-icons" style={{ fontSize: 14, color: 'var(--gold)' }}>mail</span>
+                Send email notification
+              </label>
+            </div>
+
+            {form.send_email && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                <div className="form-group">
+                  <label>Email Subject <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(falls back to Title if empty)</span></label>
+                  <input className="form-control" value={form.email_subject || ''}
+                    onChange={e => setForm(f => ({ ...f, email_subject: e.target.value }))}
+                    placeholder="e.g. Your leave has been approved" />
+                </div>
+                <div className="form-group">
+                  <label>Email Body (HTML allowed) <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(falls back to Message)</span></label>
+                  <textarea className="form-control" rows={4} value={form.email_body || ''}
+                    onChange={e => setForm(f => ({ ...f, email_body: e.target.value }))}
+                    placeholder="<p>Hello {{employee_name}}, your leave request has been approved...</p>" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{
