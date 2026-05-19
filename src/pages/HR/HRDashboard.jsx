@@ -114,6 +114,15 @@ const CATEGORIES = [
     pages: ['referrals'],
   },
   {
+    id: 'skills',
+    icon: 'workspace_premium',
+    label: 'Skills & Competency',
+    desc: 'Skill types, employee skills & competency matrix',
+    color: '#22d3ee',
+    route: '/module/hr/skills-admin',
+    pages: ['skills-admin', 'employee-skills', 'skill-matrix'],
+  },
+  {
     id: 'expenses',
     icon: 'receipt_long',
     label: 'Expenses',

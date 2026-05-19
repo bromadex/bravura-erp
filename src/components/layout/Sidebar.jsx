@@ -40,6 +40,10 @@ const HR_PAGE_SECTION = {
   'salary-withholdings': 'Pay Adjustments', 'payroll-corrections': 'Pay Adjustments',
   'employee-incentives': 'Pay Adjustments', 'retention-bonuses': 'Pay Adjustments',
   'component-accounts': 'Pay Adjustments',
+  // Phase 7 — Attendance v2 & Skills
+  'employee-checkins': 'Attendance', 'attendance-devices': 'Attendance',
+  'skills-admin': 'Skills & Competency', 'employee-skills': 'Skills & Competency',
+  'skill-matrix': 'Skills & Competency',
 }
 
 const ALL_MODULES = {
@@ -195,8 +199,10 @@ const ALL_MODULES = {
       {
         label: 'Attendance',
         pages: [
-          { id: 'attendance',          label: 'Attendance',          icon: 'schedule'      },
-          { id: 'attendance-requests', label: 'Attendance Requests', icon: 'edit_calendar' },
+          { id: 'attendance',          label: 'Attendance',          icon: 'schedule'           },
+          { id: 'attendance-requests', label: 'Attendance Requests', icon: 'edit_calendar'      },
+          { id: 'employee-checkins',   label: 'Check-in Log',        icon: 'fingerprint'        },
+          { id: 'attendance-devices',  label: 'Biometric Devices',   icon: 'sensors'            },
         ],
       },
       {
@@ -278,6 +284,14 @@ const ALL_MODULES = {
         label: 'Referrals',
         pages: [
           { id: 'referrals', label: 'Employee Referrals', icon: 'share' },
+        ],
+      },
+      {
+        label: 'Skills & Competency',
+        pages: [
+          { id: 'skills-admin',    label: 'Skills Master',   icon: 'star'         },
+          { id: 'employee-skills', label: 'Employee Skills', icon: 'manage_accounts' },
+          { id: 'skill-matrix',    label: 'Skill Matrix',    icon: 'grid_on'      },
         ],
       },
       {
