@@ -50,6 +50,14 @@ const HR_PAGE_SECTION = {
   'appointment-letters': 'Recruitment', 'interview-types': 'Recruitment',
   'applicant-sources': 'Recruitment', 'job-offer-templates': 'Recruitment',
   'benefits-settings': 'HR Settings',
+  // Phase 8 — Attendance v2, Shifts v2, Skills v2 & Documents
+  'attendance-tool': 'Attendance', 'daily-work-summary': 'Attendance',
+  'earned-leave-schedule': 'Leave Management',
+  'shift-requests': 'Shift Management', 'shift-schedules': 'Shift Management',
+  'shift-assignment-tool': 'Shift Management', 'holiday-list-assignments': 'Shift Management',
+  'designation-skills': 'Skills & Competency',
+  'id-document-types': 'Documents', 'employee-documents': 'Documents',
+  'documents-settings': 'HR Settings',
 }
 
 const ALL_MODULES = {
@@ -197,31 +205,38 @@ const ALL_MODULES = {
       {
         label: 'Shift Management',
         pages: [
-          { id: 'shift-types',       label: 'Shift Types',       icon: 'pending_actions' },
-          { id: 'shift-assignments', label: 'Shift Assignments', icon: 'assignment_ind'  },
-          { id: 'holiday-lists',     label: 'Holiday Lists',     icon: 'beach_access'    },
+          { id: 'shift-types',              label: 'Shift Types',         icon: 'pending_actions' },
+          { id: 'shift-assignments',        label: 'Shift Assignments',   icon: 'assignment_ind'  },
+          { id: 'shift-assignment-tool',    label: 'Bulk Assign Tool',    icon: 'done_all'        },
+          { id: 'shift-schedules',          label: 'Shift Schedules',     icon: 'rotate_right'    },
+          { id: 'shift-requests',           label: 'Shift Requests',      icon: 'swap_horiz'      },
+          { id: 'holiday-lists',            label: 'Holiday Lists',       icon: 'beach_access'    },
+          { id: 'holiday-list-assignments', label: 'Holiday Assignments', icon: 'event_available' },
         ],
       },
       {
         label: 'Attendance',
         pages: [
           { id: 'attendance',          label: 'Attendance',          icon: 'schedule'           },
+          { id: 'attendance-tool',     label: 'Attendance Tool',     icon: 'grid_on'            },
           { id: 'attendance-requests', label: 'Attendance Requests', icon: 'edit_calendar'      },
           { id: 'employee-checkins',   label: 'Check-in Log',        icon: 'fingerprint'        },
           { id: 'attendance-devices',  label: 'Biometric Devices',   icon: 'sensors'            },
+          { id: 'daily-work-summary',  label: 'Daily Work Summary',  icon: 'description'        },
         ],
       },
       {
         label: 'Leave Management',
         pages: [
-          { id: 'leave',              label: 'Leave',               icon: 'event_busy'             },
-          { id: 'leave-policies',     label: 'Leave Policies',      icon: 'policy'                 },
-          { id: 'leave-allocation',   label: 'Leave Allocation',    icon: 'calendar_month'         },
-          { id: 'compensatory-leave', label: 'Compensatory Leave',  icon: 'swap_horiz'             },
-          { id: 'leave-encashment',   label: 'Leave Encashment',    icon: 'payments'               },
-          { id: 'leave-balance',      label: 'Leave Balance',       icon: 'account_balance_wallet' },
-          { id: 'leave-calendar',     label: 'Leave Calendar',      icon: 'calendar_today'         },
-          { id: 'leave-reports',      label: 'Leave Reports',       icon: 'bar_chart'              },
+          { id: 'leave',                  label: 'Leave',               icon: 'event_busy'             },
+          { id: 'leave-policies',         label: 'Leave Policies',      icon: 'policy'                 },
+          { id: 'leave-allocation',       label: 'Leave Allocation',    icon: 'calendar_month'         },
+          { id: 'earned-leave-schedule',  label: 'Earned Leave Schedule', icon: 'event_repeat'         },
+          { id: 'compensatory-leave',     label: 'Compensatory Leave',  icon: 'swap_horiz'             },
+          { id: 'leave-encashment',       label: 'Leave Encashment',    icon: 'payments'               },
+          { id: 'leave-balance',          label: 'Leave Balance',       icon: 'account_balance_wallet' },
+          { id: 'leave-calendar',         label: 'Leave Calendar',      icon: 'calendar_today'         },
+          { id: 'leave-reports',          label: 'Leave Reports',       icon: 'bar_chart'              },
         ],
       },
       {
@@ -307,9 +322,17 @@ const ALL_MODULES = {
       {
         label: 'Skills & Competency',
         pages: [
-          { id: 'skills-admin',    label: 'Skills Master',   icon: 'star'         },
-          { id: 'employee-skills', label: 'Employee Skills', icon: 'manage_accounts' },
-          { id: 'skill-matrix',    label: 'Skill Matrix',    icon: 'grid_on'      },
+          { id: 'skills-admin',        label: 'Skills Master',       icon: 'star'            },
+          { id: 'employee-skills',     label: 'Employee Skills',     icon: 'manage_accounts' },
+          { id: 'skill-matrix',        label: 'Skill Matrix',        icon: 'grid_on'         },
+          { id: 'designation-skills',  label: 'Designation Skills',  icon: 'fact_check'      },
+        ],
+      },
+      {
+        label: 'Documents',
+        pages: [
+          { id: 'employee-documents',  label: 'Employee Documents',  icon: 'folder'          },
+          { id: 'id-document-types',   label: 'ID Document Types',   icon: 'badge'           },
         ],
       },
       {
@@ -336,6 +359,7 @@ const ALL_MODULES = {
           { id: 'email-configuration',         label: 'Email Configuration',       icon: 'email'                  },
           { id: 'skills-settings',             label: 'Skills Settings',           icon: 'workspace_premium'      },
           { id: 'benefits-settings',           label: 'Benefits & Gratuity',       icon: 'card_giftcard'          },
+          { id: 'documents-settings',          label: 'Documents Settings',        icon: 'folder_shared'          },
         ],
       },
     ],

@@ -214,6 +214,18 @@ const InterviewTypes     = lazy(() => import('./pages/HR/InterviewTypes'))
 const ApplicantSources   = lazy(() => import('./pages/HR/ApplicantSources'))
 const JobOfferTemplates  = lazy(() => import('./pages/HR/JobOfferTemplates'))
 const BenefitsSettings   = lazy(() => import('./pages/HR/BenefitsSettings'))
+// HR Phase 8 — Attendance v2, Shifts v2, Skills v2 & Documents
+const AttendanceTool             = lazy(() => import('./pages/HR/AttendanceTool'))
+const DailyWorkSummary           = lazy(() => import('./pages/HR/DailyWorkSummary'))
+const EarnedLeaveSchedule        = lazy(() => import('./pages/HR/EarnedLeaveSchedule'))
+const ShiftRequests              = lazy(() => import('./pages/HR/ShiftRequests'))
+const ShiftSchedules             = lazy(() => import('./pages/HR/ShiftSchedules'))
+const ShiftAssignmentTool        = lazy(() => import('./pages/HR/ShiftAssignmentTool'))
+const HolidayListAssignment      = lazy(() => import('./pages/HR/HolidayListAssignment'))
+const DesignationSkills          = lazy(() => import('./pages/HR/DesignationSkills'))
+const IdentificationDocumentTypes = lazy(() => import('./pages/HR/IdentificationDocumentTypes'))
+const EmployeeDocuments          = lazy(() => import('./pages/HR/EmployeeDocuments'))
+const DocumentsSettings          = lazy(() => import('./pages/HR/DocumentsSettings'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -573,6 +585,18 @@ function AppRoutes() {
             <Route path="applicant-sources"     element={<ApplicantSources />} />
             <Route path="job-offer-templates"   element={<JobOfferTemplates />} />
             <Route path="benefits-settings"     element={<BenefitsSettings />} />
+            {/* Phase 8 — Attendance v2, Shifts v2, Skills v2 & Documents */}
+            <Route path="attendance-tool"            element={<AttendanceTool />} />
+            <Route path="daily-work-summary"         element={<DailyWorkSummary />} />
+            <Route path="earned-leave-schedule"      element={<EarnedLeaveSchedule />} />
+            <Route path="shift-requests"             element={<ShiftRequests />} />
+            <Route path="shift-schedules"            element={<ShiftSchedules />} />
+            <Route path="shift-assignment-tool"      element={<ShiftAssignmentTool />} />
+            <Route path="holiday-list-assignments"   element={<HolidayListAssignment />} />
+            <Route path="designation-skills"         element={<DesignationSkills />} />
+            <Route path="id-document-types"          element={<IdentificationDocumentTypes />} />
+            <Route path="employee-documents"         element={<EmployeeDocuments />} />
+            <Route path="documents-settings"         element={<DocumentsSettings />} />
           </Route>
         </Route>
 
