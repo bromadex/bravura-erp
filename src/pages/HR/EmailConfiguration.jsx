@@ -124,7 +124,15 @@ export default function EmailConfiguration() {
       .eq('id', 'singleton')
       .maybeSingle()
     if (error) toast.error(error.message)
-    setSettings(data ? { ...DEFAULTS, ...data } : DEFAULTS)
+    if (data) {
+      const merged = { ...DEFAULTS }
+      Object.entries(data).forEach(([k, v]) => {
+        merged[k] = (v === null && typeof DEFAULTS[k] === 'string') ? '' : v
+      })
+      setSettings(merged)
+    } else {
+      setSettings(DEFAULTS)
+    }
     setLoading(false)
   }, [])
 
