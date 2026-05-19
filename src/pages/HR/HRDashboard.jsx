@@ -141,13 +141,22 @@ const CATEGORIES = [
     pages: ['dashboard'],
   },
   {
+    id: 'pay-adjustments',
+    icon: 'tune',
+    label: 'Pay Adjustments',
+    desc: 'PAYE slabs, exemptions, arrears, withholdings, incentives & bonuses',
+    color: '#e879f9',
+    route: '/module/hr/tax-years',
+    pages: ['tax-years', 'tax-exemptions', 'additional-salary', 'salary-arrears', 'salary-withholdings', 'payroll-corrections', 'employee-incentives', 'retention-bonuses', 'component-accounts'],
+  },
+  {
     id: 'hr-settings',
     icon: 'settings',
     label: 'HR Settings',
-    desc: 'Company, payroll, leave & notification configuration',
+    desc: 'Employee, payroll, leave, recruitment & notification configuration',
     color: '#64748b',
-    route: '/module/hr/hr-settings',
-    pages: ['hr-settings'],
+    route: '/module/hr/hr-settings-hub',
+    pages: ['hr-settings-hub', 'hr-settings', 'employee-settings', 'leave-settings', 'expense-settings', 'shift-attendance-settings', 'recruitment-settings', 'tenure-settings', 'performance-settings', 'payroll-settings', 'notification-templates', 'email-configuration'],
   },
 ]
 

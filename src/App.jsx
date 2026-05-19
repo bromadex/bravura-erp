@@ -176,6 +176,28 @@ const ScheduledNotifications = lazy(() => import('./pages/HR/ScheduledNotificati
 const TrainingManagement  = lazy(() => import('./pages/HR/TrainingManagement'))
 const EmployeeReferrals   = lazy(() => import('./pages/HR/EmployeeReferrals'))
 const HRSettings          = lazy(() => import('./pages/HR/HRSettings'))
+// HR Phase 5 — Settings Hub & per-module settings
+const HRSettingsHub           = lazy(() => import('./pages/HR/HRSettingsHub'))
+const EmployeeSettings        = lazy(() => import('./pages/HR/EmployeeSettings'))
+const LeaveSettings           = lazy(() => import('./pages/HR/LeaveSettings'))
+const HRExpenseSettings       = lazy(() => import('./pages/HR/ExpenseSettings'))
+const ShiftAttendanceSettings = lazy(() => import('./pages/HR/ShiftAttendanceSettings'))
+const RecruitmentSettings     = lazy(() => import('./pages/HR/RecruitmentSettings'))
+const TenureSettings          = lazy(() => import('./pages/HR/TenureSettings'))
+const HRPerformanceSettings   = lazy(() => import('./pages/HR/PerformanceSettings'))
+const PayrollSettings         = lazy(() => import('./pages/HR/PayrollSettings'))
+const NotificationTemplates   = lazy(() => import('./pages/HR/NotificationTemplates'))
+const EmailConfiguration      = lazy(() => import('./pages/HR/EmailConfiguration'))
+// HR Phase 6 — Tax & Pay Adjustments
+const TaxYears               = lazy(() => import('./pages/HR/TaxYears'))
+const TaxExemptions          = lazy(() => import('./pages/HR/TaxExemptions'))
+const AdditionalSalary       = lazy(() => import('./pages/HR/AdditionalSalary'))
+const SalaryArrears          = lazy(() => import('./pages/HR/SalaryArrears'))
+const SalaryWithholdings     = lazy(() => import('./pages/HR/SalaryWithholdings'))
+const PayrollCorrections     = lazy(() => import('./pages/HR/PayrollCorrections'))
+const EmployeeIncentives     = lazy(() => import('./pages/HR/EmployeeIncentives'))
+const RetentionBonuses       = lazy(() => import('./pages/HR/RetentionBonuses'))
+const SalaryComponentAccounts = lazy(() => import('./pages/HR/SalaryComponentAccounts'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -497,6 +519,28 @@ function AppRoutes() {
             <Route path="training"                element={<TrainingManagement />} />
             <Route path="referrals"               element={<EmployeeReferrals />} />
             <Route path="hr-settings"             element={<HRSettings />} />
+            {/* Phase 5 — Settings Hub & per-module settings */}
+            <Route path="hr-settings-hub"             element={<HRSettingsHub />} />
+            <Route path="employee-settings"           element={<EmployeeSettings />} />
+            <Route path="leave-settings"              element={<LeaveSettings />} />
+            <Route path="expense-settings"            element={<HRExpenseSettings />} />
+            <Route path="shift-attendance-settings"   element={<ShiftAttendanceSettings />} />
+            <Route path="recruitment-settings"        element={<RecruitmentSettings />} />
+            <Route path="tenure-settings"             element={<TenureSettings />} />
+            <Route path="performance-settings"        element={<HRPerformanceSettings />} />
+            <Route path="payroll-settings"            element={<PayrollSettings />} />
+            <Route path="notification-templates"      element={<NotificationTemplates />} />
+            <Route path="email-configuration"         element={<EmailConfiguration />} />
+            {/* Phase 6 — Tax & Pay Adjustments */}
+            <Route path="tax-years"               element={<TaxYears />} />
+            <Route path="tax-exemptions"          element={<TaxExemptions />} />
+            <Route path="additional-salary"       element={<AdditionalSalary />} />
+            <Route path="salary-arrears"          element={<SalaryArrears />} />
+            <Route path="salary-withholdings"     element={<SalaryWithholdings />} />
+            <Route path="payroll-corrections"     element={<PayrollCorrections />} />
+            <Route path="employee-incentives"     element={<EmployeeIncentives />} />
+            <Route path="retention-bonuses"       element={<RetentionBonuses />} />
+            <Route path="component-accounts"      element={<SalaryComponentAccounts />} />
           </Route>
         </Route>
 

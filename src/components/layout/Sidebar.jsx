@@ -14,7 +14,6 @@ const HR_PAGE_SECTION = {
   'full-final': 'Employee Lifecycle',
   overtime: 'Overtime',
   grievances: 'Grievances',
-  'scheduled-notifications': 'Reports',
   'shift-types': 'Shift Management', 'shift-assignments': 'Shift Management', 'holiday-lists': 'Shift Management',
   attendance: 'Attendance', 'attendance-requests': 'Attendance',
   leave: 'Leave Management', 'leave-policies': 'Leave Management',
@@ -28,6 +27,19 @@ const HR_PAGE_SECTION = {
   kras: 'Performance', 'appraisal-templates': 'Performance',
   'hr-reports': 'Reports', 'scheduled-notifications': 'Reports', analytics: 'Reports',
   training: 'Training', referrals: 'Referrals', 'hr-settings': 'HR Settings',
+  // Phase 5 — Settings
+  'hr-settings-hub': 'HR Settings', 'employee-settings': 'HR Settings',
+  'leave-settings': 'HR Settings', 'expense-settings': 'HR Settings',
+  'shift-attendance-settings': 'HR Settings', 'recruitment-settings': 'HR Settings',
+  'tenure-settings': 'HR Settings', 'performance-settings': 'HR Settings',
+  'payroll-settings': 'HR Settings', 'notification-templates': 'HR Settings',
+  'email-configuration': 'HR Settings',
+  // Phase 6 — Pay Adjustments
+  'tax-years': 'Pay Adjustments', 'tax-exemptions': 'Pay Adjustments',
+  'additional-salary': 'Pay Adjustments', 'salary-arrears': 'Pay Adjustments',
+  'salary-withholdings': 'Pay Adjustments', 'payroll-corrections': 'Pay Adjustments',
+  'employee-incentives': 'Pay Adjustments', 'retention-bonuses': 'Pay Adjustments',
+  'component-accounts': 'Pay Adjustments',
 }
 
 const ALL_MODULES = {
@@ -212,6 +224,20 @@ const ALL_MODULES = {
         ],
       },
       {
+        label: 'Pay Adjustments',
+        pages: [
+          { id: 'tax-years',             label: 'Tax Years & PAYE',       icon: 'calendar_month'         },
+          { id: 'tax-exemptions',        label: 'Tax Exemptions',         icon: 'receipt_long'           },
+          { id: 'additional-salary',     label: 'Additional Salary',      icon: 'add_circle'             },
+          { id: 'salary-arrears',        label: 'Salary Arrears',         icon: 'history'                },
+          { id: 'salary-withholdings',   label: 'Salary Withholdings',    icon: 'block'                  },
+          { id: 'payroll-corrections',   label: 'Payroll Corrections',    icon: 'build_circle'           },
+          { id: 'employee-incentives',   label: 'Employee Incentives',    icon: 'emoji_events'           },
+          { id: 'retention-bonuses',     label: 'Retention Bonuses',      icon: 'card_giftcard'          },
+          { id: 'component-accounts',    label: 'Component GL Accounts',  icon: 'account_tree'           },
+        ],
+      },
+      {
         label: 'Recruitment',
         pages: [
           { id: 'job-requisitions', label: 'Job Requisitions', icon: 'description'    },
@@ -265,7 +291,17 @@ const ALL_MODULES = {
       {
         label: 'HR Settings',
         pages: [
-          { id: 'hr-settings', label: 'HR Settings', icon: 'settings' },
+          { id: 'hr-settings-hub',            label: 'Settings Hub',              icon: 'settings'               },
+          { id: 'employee-settings',           label: 'Employee Settings',         icon: 'manage_accounts'        },
+          { id: 'leave-settings',              label: 'Leave Settings',            icon: 'event_busy'             },
+          { id: 'expense-settings',            label: 'Expense Settings',          icon: 'receipt_long'           },
+          { id: 'shift-attendance-settings',   label: 'Shift & Attendance',        icon: 'schedule'               },
+          { id: 'recruitment-settings',        label: 'Recruitment Settings',      icon: 'work_outline'           },
+          { id: 'tenure-settings',             label: 'Tenure & Exit Settings',    icon: 'logout'                 },
+          { id: 'performance-settings',        label: 'Performance Settings',      icon: 'rate_review'            },
+          { id: 'payroll-settings',            label: 'Payroll Settings',          icon: 'payments'               },
+          { id: 'notification-templates',      label: 'Notification Templates',    icon: 'notifications'          },
+          { id: 'email-configuration',         label: 'Email Configuration',       icon: 'email'                  },
         ],
       },
     ],
