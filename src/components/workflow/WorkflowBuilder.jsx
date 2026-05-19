@@ -226,7 +226,7 @@ function StepCard({ step, index, total, onChange, onRemove, onMoveUp, onMoveDown
       <div className="form-group" style={{ margin: '10px 0 0' }}>
         <label className="form-label" style={{ fontSize: 11 }}>Instructions for approver (optional)</label>
         <input className="form-control" placeholder="e.g. Check leave balance before approving"
-          value={step.description} onChange={e => onChange({ ...step, description: e.target.value })} />
+          value={step.description || ''} onChange={e => onChange({ ...step, description: e.target.value })} />
       </div>
 
       {/* Final step indicator */}
@@ -315,7 +315,7 @@ export default function WorkflowBuilder() {
   const openEdit = (wf) => {
     const wfSteps = (wf.workflow_steps || [])
       .sort((a, b) => a.step_order - b.step_order)
-      .map(s => ({ ...s, _id: s.id }))
+      .map(s => ({ ...s, _id: s.id, step_name: s.step_name || '', description: s.description || '', specific_user_id: s.specific_user_id || '' }))
     setWfId(wf.id); setWfName(wf.name); setWfModule(wf.module)
     setWfEntity(wf.entity_type); setWfDescription(wf.description || '')
     setWfDept(wf.department_filter || ''); setWfDeptName(wf.department_name || '')
@@ -353,7 +353,7 @@ export default function WorkflowBuilder() {
     e.preventDefault()
     if (!wfName.trim())  return toast.error('Workflow name is required')
     if (!wfEntity)       return toast.error('Select a module process')
-    if (steps.some(s => !s.step_name.trim())) return toast.error('All steps must have a name')
+    if (steps.some(s => !s.step_name?.trim())) return toast.error('All steps must have a name')
     if (steps.some(s => !s.required_role))    return toast.error('All steps must have a required role')
 
     setSaving(true)
