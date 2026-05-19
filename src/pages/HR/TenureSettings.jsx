@@ -166,15 +166,19 @@ export default function TenureSettings() {
 
       <SectionCard>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
-          <FormField label="Exit Questionnaire URL">
+          <FormField label="Exit Questionnaire URL (external override)">
             <input
               className="form-control"
               type="url"
               value={settings.exit_questionnaire_url}
               onChange={e => set('exit_questionnaire_url', e.target.value)}
               disabled={!canEdit}
-              placeholder="https://forms.company.com/exit"
+              placeholder="Leave empty to use built-in form"
             />
+            <small style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginTop: 4 }}>
+              Or use the built-in exit questionnaire at{' '}
+              <a href="/module/hr/exit-questionnaire" style={{ color: 'var(--gold)' }}>HR → Exit Questionnaire</a>
+            </small>
           </FormField>
           <FormField label="Exit Notification Template">
             <select

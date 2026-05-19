@@ -63,6 +63,8 @@ const HR_PAGE_SECTION = {
   'appraisal-cycles': 'Performance', 'peer-feedback': 'Performance',
   'leave-block-list': 'Leave Management', 'leave-control-panel': 'Leave Management',
   'department-approvers': 'Organisation', 'purpose-of-travel': 'Payroll & Travel',
+  // Phase 10 — Cross-cutting engines
+  'exit-questionnaire': 'Employee Lifecycle',
 }
 
 const ALL_MODULES = {
@@ -207,6 +209,7 @@ const ALL_MODULES = {
           { id: 'boarding-activities',  label: 'Boarding Activities',  icon: 'assignment_turned_in' },
           { id: 'separation',           label: 'Separation',           icon: 'logout'         },
           { id: 'exit-interviews',      label: 'Exit Interviews',      icon: 'feedback'       },
+          { id: 'exit-questionnaire',   label: 'Exit Questionnaire',   icon: 'quiz'           },
           { id: 'full-final',           label: 'Full & Final',         icon: 'calculate'      },
         ],
       },
@@ -489,11 +492,17 @@ const ALL_MODULES = {
     label: 'Settings & Admin', icon: 'admin_panel_settings', color: '#a78bfa',
     sections: [{
       label: 'Master Data', pages: [
-        { id: 'master-data', label: 'Master Data',      icon: 'database' },
+        { id: 'master-data', label: 'Master Data', icon: 'database' },
       ],
     }, {
-      label: 'System Configuration', pages: [
-        { id: 'workflows', label: 'Workflow Builder', icon: 'account_tree' },
+      label: 'Workflow', pages: [
+        { id: 'workflows',            label: 'Workflow Builder',     icon: 'account_tree' },
+        { id: 'workflow-assignments', label: 'Workflow Assignments', icon: 'route'        },
+      ],
+    }, {
+      label: 'Communications', pages: [
+        { id: 'push-notifications', label: 'Push Notifications', icon: 'notifications_active' },
+        { id: 'email-logs',         label: 'Email Logs',         icon: 'mail'                 },
       ],
     }],
   },
