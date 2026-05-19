@@ -58,6 +58,11 @@ const HR_PAGE_SECTION = {
   'designation-skills': 'Skills & Competency',
   'id-document-types': 'Documents', 'employee-documents': 'Documents',
   'documents-settings': 'HR Settings',
+  // Phase 9 — Lifecycle & Performance Refinements
+  'exit-interviews': 'Employee Lifecycle', 'boarding-activities': 'Employee Lifecycle',
+  'appraisal-cycles': 'Performance', 'peer-feedback': 'Performance',
+  'leave-block-list': 'Leave Management', 'leave-control-panel': 'Leave Management',
+  'department-approvers': 'Organisation', 'purpose-of-travel': 'Payroll & Travel',
 }
 
 const ALL_MODULES = {
@@ -188,18 +193,21 @@ const ALL_MODULES = {
           { id: 'designations',      label: 'Designations',      icon: 'work'                 },
           { id: 'employee-grades',   label: 'Employee Grades',   icon: 'military_tech'        },
           { id: 'employment-types',  label: 'Employment Types',  icon: 'badge'                },
-          { id: 'org-chart',         label: 'Org Chart',         icon: 'account_tree'         },
-          { id: 'permissions',       label: 'Permissions',       icon: 'admin_panel_settings' },
+          { id: 'org-chart',            label: 'Org Chart',            icon: 'account_tree'         },
+          { id: 'department-approvers', label: 'Dept Approvers',      icon: 'approval'             },
+          { id: 'permissions',          label: 'Permissions',          icon: 'admin_panel_settings' },
         ],
       },
       {
         label: 'Employee Lifecycle',
         pages: [
-          { id: 'promotions', label: 'Promotions',         icon: 'trending_up'    },
-          { id: 'transfers',  label: 'Transfers',          icon: 'swap_horiz'     },
-          { id: 'onboarding', label: 'Onboarding',         icon: 'how_to_reg'     },
-          { id: 'separation', label: 'Separation',         icon: 'logout'         },
-          { id: 'full-final', label: 'Full & Final',       icon: 'calculate'      },
+          { id: 'promotions',           label: 'Promotions',           icon: 'trending_up'    },
+          { id: 'transfers',            label: 'Transfers',            icon: 'swap_horiz'     },
+          { id: 'onboarding',           label: 'Onboarding',           icon: 'how_to_reg'     },
+          { id: 'boarding-activities',  label: 'Boarding Activities',  icon: 'assignment_turned_in' },
+          { id: 'separation',           label: 'Separation',           icon: 'logout'         },
+          { id: 'exit-interviews',      label: 'Exit Interviews',      icon: 'feedback'       },
+          { id: 'full-final',           label: 'Full & Final',         icon: 'calculate'      },
         ],
       },
       {
@@ -232,6 +240,8 @@ const ALL_MODULES = {
           { id: 'leave-types',            label: 'Leave Types',         icon: 'category'               },
           { id: 'leave-policies',         label: 'Leave Policies',      icon: 'policy'                 },
           { id: 'leave-allocation',       label: 'Leave Allocation',    icon: 'calendar_month'         },
+          { id: 'leave-control-panel',    label: 'Leave Control Panel', icon: 'tune'                   },
+          { id: 'leave-block-list',       label: 'Leave Block Lists',   icon: 'block'                  },
           { id: 'earned-leave-schedule',  label: 'Earned Leave Schedule', icon: 'event_repeat'         },
           { id: 'compensatory-leave',     label: 'Compensatory Leave',  icon: 'swap_horiz'             },
           { id: 'leave-encashment',       label: 'Leave Encashment',    icon: 'payments'               },
@@ -247,8 +257,9 @@ const ALL_MODULES = {
           { id: 'payroll',           label: 'Payroll',            icon: 'payments'               },
           { id: 'salary-slips',      label: 'Salary Slips',       icon: 'receipt_long'           },
           { id: 'payroll-entry',     label: 'Payroll Entry',      icon: 'batch_prediction'       },
-          { id: 'travel',            label: 'Travel',             icon: 'flight'                 },
-          { id: 'timesheet',         label: 'Timesheet Summary',  icon: 'fact_check'             },
+          { id: 'travel',              label: 'Travel',               icon: 'flight'       },
+          { id: 'purpose-of-travel', label: 'Purpose of Travel',    icon: 'explore'      },
+          { id: 'timesheet',         label: 'Timesheet Summary',    icon: 'fact_check'   },
         ],
       },
       {
@@ -289,11 +300,13 @@ const ALL_MODULES = {
       {
         label: 'Performance',
         pages: [
-          { id: 'appraisal-periods',   label: 'Appraisal Periods',   icon: 'calendar_month'    },
+          { id: 'appraisal-cycles',    label: 'Appraisal Cycles',    icon: 'loop'               },
+          { id: 'appraisal-periods',   label: 'Appraisal Periods',   icon: 'calendar_month'     },
           { id: 'appraisal-templates', label: 'Appraisal Templates', icon: 'assignment'         },
           { id: 'kras',                label: 'Key Result Areas',    icon: 'flag'               },
           { id: 'performance-reviews', label: 'Performance Reviews', icon: 'rate_review'        },
           { id: 'kpi-templates',       label: 'KPI Templates',       icon: 'checklist'          },
+          { id: 'peer-feedback',       label: 'Peer Feedback',       icon: 'people'             },
         ],
       },
       {

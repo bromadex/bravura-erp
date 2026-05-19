@@ -227,6 +227,15 @@ const DesignationSkills          = lazy(() => import('./pages/HR/DesignationSkil
 const IdentificationDocumentTypes = lazy(() => import('./pages/HR/IdentificationDocumentTypes'))
 const EmployeeDocuments          = lazy(() => import('./pages/HR/EmployeeDocuments'))
 const DocumentsSettings          = lazy(() => import('./pages/HR/DocumentsSettings'))
+// HR Phase 9 — Lifecycle & Performance Refinements
+const ExitInterviews           = lazy(() => import('./pages/HR/ExitInterviews'))
+const AppraisalCycles          = lazy(() => import('./pages/HR/AppraisalCycles'))
+const PeerFeedback             = lazy(() => import('./pages/HR/PeerFeedback'))
+const LeaveBlockList           = lazy(() => import('./pages/HR/LeaveBlockList'))
+const LeaveControlPanel        = lazy(() => import('./pages/HR/LeaveControlPanel'))
+const DepartmentApprovers      = lazy(() => import('./pages/HR/DepartmentApprovers'))
+const PurposeOfTravel          = lazy(() => import('./pages/HR/PurposeOfTravel'))
+const EmployeeBoardingActivity = lazy(() => import('./pages/HR/EmployeeBoardingActivity'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -599,6 +608,15 @@ function AppRoutes() {
             <Route path="id-document-types"          element={<IdentificationDocumentTypes />} />
             <Route path="employee-documents"         element={<EmployeeDocuments />} />
             <Route path="documents-settings"         element={<DocumentsSettings />} />
+            {/* Phase 9 — Lifecycle & Performance Refinements */}
+            <Route path="exit-interviews"            element={<ExitInterviews />} />
+            <Route path="appraisal-cycles"           element={<AppraisalCycles />} />
+            <Route path="peer-feedback"              element={<PeerFeedback />} />
+            <Route path="leave-block-list"           element={<LeaveBlockList />} />
+            <Route path="leave-control-panel"        element={<LeaveControlPanel />} />
+            <Route path="department-approvers"       element={<DepartmentApprovers />} />
+            <Route path="purpose-of-travel"          element={<PurposeOfTravel />} />
+            <Route path="boarding-activities"        element={<EmployeeBoardingActivity />} />
           </Route>
         </Route>
 
