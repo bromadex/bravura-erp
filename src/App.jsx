@@ -198,6 +198,12 @@ const PayrollCorrections     = lazy(() => import('./pages/HR/PayrollCorrections'
 const EmployeeIncentives     = lazy(() => import('./pages/HR/EmployeeIncentives'))
 const RetentionBonuses       = lazy(() => import('./pages/HR/RetentionBonuses'))
 const SalaryComponentAccounts = lazy(() => import('./pages/HR/SalaryComponentAccounts'))
+// HR Phase 7 — Attendance v2, Biometric Check-ins & Skills
+const EmployeeCheckins  = lazy(() => import('./pages/HR/EmployeeCheckins'))
+const AttendanceDevices = lazy(() => import('./pages/HR/AttendanceDevices'))
+const SkillsAdmin       = lazy(() => import('./pages/HR/SkillsAdmin'))
+const EmployeeSkillMap  = lazy(() => import('./pages/HR/EmployeeSkillMap'))
+const SkillMatrix       = lazy(() => import('./pages/HR/SkillMatrix'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -541,6 +547,12 @@ function AppRoutes() {
             <Route path="employee-incentives"     element={<EmployeeIncentives />} />
             <Route path="retention-bonuses"       element={<RetentionBonuses />} />
             <Route path="component-accounts"      element={<SalaryComponentAccounts />} />
+            {/* Phase 7 — Attendance v2 & Skills */}
+            <Route path="employee-checkins"   element={<EmployeeCheckins />} />
+            <Route path="attendance-devices"  element={<AttendanceDevices />} />
+            <Route path="skills-admin"        element={<SkillsAdmin />} />
+            <Route path="employee-skills"     element={<EmployeeSkillMap />} />
+            <Route path="skill-matrix"        element={<SkillMatrix />} />
           </Route>
         </Route>
 
