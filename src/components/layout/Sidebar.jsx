@@ -16,7 +16,7 @@ const HR_PAGE_SECTION = {
   grievances: 'Grievances',
   'shift-types': 'Shift Management', 'shift-assignments': 'Shift Management', 'holiday-lists': 'Shift Management',
   attendance: 'Attendance', 'attendance-requests': 'Attendance',
-  leave: 'Leave Management', 'leave-policies': 'Leave Management',
+  leave: 'Leave Management', 'leave-types': 'Leave Management', 'leave-policies': 'Leave Management',
   'leave-allocation': 'Leave Management', 'compensatory-leave': 'Leave Management',
   'leave-encashment': 'Leave Management', 'leave-balance': 'Leave Management',
   'leave-calendar': 'Leave Management', 'leave-reports': 'Leave Management',
@@ -228,7 +228,8 @@ const ALL_MODULES = {
       {
         label: 'Leave Management',
         pages: [
-          { id: 'leave',                  label: 'Leave',               icon: 'event_busy'             },
+          { id: 'leave',                  label: 'Leave Requests',      icon: 'event_busy'             },
+          { id: 'leave-types',            label: 'Leave Types',         icon: 'category'               },
           { id: 'leave-policies',         label: 'Leave Policies',      icon: 'policy'                 },
           { id: 'leave-allocation',       label: 'Leave Allocation',    icon: 'calendar_month'         },
           { id: 'earned-leave-schedule',  label: 'Earned Leave Schedule', icon: 'event_repeat'         },
