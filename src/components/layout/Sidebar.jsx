@@ -44,6 +44,12 @@ const HR_PAGE_SECTION = {
   'employee-checkins': 'Attendance', 'attendance-devices': 'Attendance',
   'skills-admin': 'Skills & Competency', 'employee-skills': 'Skills & Competency',
   'skill-matrix': 'Skills & Competency',
+  // Phase 7B — Benefits, Gratuity & Recruitment v2
+  'gratuity-rules': 'Benefits & Gratuity', 'gratuity': 'Benefits & Gratuity',
+  'employee-benefits': 'Benefits & Gratuity',
+  'appointment-letters': 'Recruitment', 'interview-types': 'Recruitment',
+  'applicant-sources': 'Recruitment', 'job-offer-templates': 'Recruitment',
+  'benefits-settings': 'HR Settings',
 }
 
 const ALL_MODULES = {
@@ -246,10 +252,22 @@ const ALL_MODULES = {
       {
         label: 'Recruitment',
         pages: [
-          { id: 'job-requisitions', label: 'Job Requisitions', icon: 'description'    },
-          { id: 'job-postings',     label: 'Job Openings',     icon: 'work_outline'   },
-          { id: 'applicants',       label: 'Applicants',       icon: 'people_outline' },
-          { id: 'interviews',       label: 'Interviews',       icon: 'event_note'     },
+          { id: 'job-requisitions',   label: 'Job Requisitions',   icon: 'description'    },
+          { id: 'job-postings',       label: 'Job Openings',       icon: 'work_outline'   },
+          { id: 'applicants',         label: 'Applicants',         icon: 'people_outline' },
+          { id: 'interviews',         label: 'Interviews',         icon: 'event_note'     },
+          { id: 'interview-types',    label: 'Interview Types',    icon: 'category'       },
+          { id: 'applicant-sources',  label: 'Applicant Sources',  icon: 'hub'            },
+          { id: 'appointment-letters',label: 'Appointment Letters',icon: 'mail'           },
+          { id: 'job-offer-templates',label: 'Offer Templates',    icon: 'description'    },
+        ],
+      },
+      {
+        label: 'Benefits & Gratuity',
+        pages: [
+          { id: 'gratuity-rules',    label: 'Gratuity Rules',    icon: 'rule'          },
+          { id: 'gratuity',          label: 'Gratuity',          icon: 'calculate'     },
+          { id: 'employee-benefits', label: 'Employee Benefits', icon: 'card_giftcard' },
         ],
       },
       {
@@ -317,6 +335,7 @@ const ALL_MODULES = {
           { id: 'notification-templates',      label: 'Notification Templates',    icon: 'notifications'          },
           { id: 'email-configuration',         label: 'Email Configuration',       icon: 'email'                  },
           { id: 'skills-settings',             label: 'Skills Settings',           icon: 'workspace_premium'      },
+          { id: 'benefits-settings',           label: 'Benefits & Gratuity',       icon: 'card_giftcard'          },
         ],
       },
     ],

@@ -205,6 +205,15 @@ const AttendanceDevices = lazy(() => import('./pages/HR/AttendanceDevices'))
 const SkillsAdmin       = lazy(() => import('./pages/HR/SkillsAdmin'))
 const EmployeeSkillMap  = lazy(() => import('./pages/HR/EmployeeSkillMap'))
 const SkillMatrix       = lazy(() => import('./pages/HR/SkillMatrix'))
+// HR Phase 7B — Benefits, Gratuity & Recruitment v2
+const GratuityRules      = lazy(() => import('./pages/HR/GratuityRules'))
+const GratuityCalculator = lazy(() => import('./pages/HR/GratuityCalculator'))
+const EmployeeBenefits   = lazy(() => import('./pages/HR/EmployeeBenefits'))
+const AppointmentLetters = lazy(() => import('./pages/HR/AppointmentLetters'))
+const InterviewTypes     = lazy(() => import('./pages/HR/InterviewTypes'))
+const ApplicantSources   = lazy(() => import('./pages/HR/ApplicantSources'))
+const JobOfferTemplates  = lazy(() => import('./pages/HR/JobOfferTemplates'))
+const BenefitsSettings   = lazy(() => import('./pages/HR/BenefitsSettings'))
 
 // Expenses
 const ExpenseDashboard   = lazy(() => import('./pages/Expenses/ExpenseDashboard'))
@@ -555,6 +564,15 @@ function AppRoutes() {
             <Route path="skills-admin"        element={<SkillsAdmin />} />
             <Route path="employee-skills"     element={<EmployeeSkillMap />} />
             <Route path="skill-matrix"        element={<SkillMatrix />} />
+            {/* Phase 7B — Benefits, Gratuity & Recruitment v2 */}
+            <Route path="gratuity-rules"        element={<GratuityRules />} />
+            <Route path="gratuity"              element={<GratuityCalculator />} />
+            <Route path="employee-benefits"     element={<EmployeeBenefits />} />
+            <Route path="appointment-letters"   element={<AppointmentLetters />} />
+            <Route path="interview-types"       element={<InterviewTypes />} />
+            <Route path="applicant-sources"     element={<ApplicantSources />} />
+            <Route path="job-offer-templates"   element={<JobOfferTemplates />} />
+            <Route path="benefits-settings"     element={<BenefitsSettings />} />
           </Route>
         </Route>
 
