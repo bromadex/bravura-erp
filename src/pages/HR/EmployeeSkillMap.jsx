@@ -33,7 +33,7 @@ export default function EmployeeSkillMap() {
   const fetchMeta = useCallback(async () => {
     const [{ data: emps }, { data: sk }] = await Promise.all([
       supabase.from('employees').select('id,name').eq('status','Active').order('name'),
-      supabase.from('skills').select('id,name,skill_type_id').eq('is_active', true).order('name'),
+      supabase.from('skills').select('id,name,skill_type_id').eq('is_active', true).order('name').then(r => r).catch(() => ({ data: [] })),
     ])
     setEmployees(emps || []); setSkills(sk || [])
   }, [])
@@ -41,7 +41,7 @@ export default function EmployeeSkillMap() {
   const fetchEmpSkills = useCallback(async () => {
     if (!selEmp) { setEmpSkills([]); return }
     setLoading(true)
-    const { data, error } = await supabase.from('employee_skills').select('*').eq('employee_id', selEmp).order('created_at')
+    const { data, error } = await supabase.from('employee_skills').select('*').eq('employee_id', selEmp).order('id')
     if (error) { toast.error(error.message); setLoading(false); return }
     setEmpSkills(data || []); setLoading(false)
   }, [selEmp])

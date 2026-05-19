@@ -33,7 +33,7 @@ const HR_PAGE_SECTION = {
   'shift-attendance-settings': 'HR Settings', 'recruitment-settings': 'HR Settings',
   'tenure-settings': 'HR Settings', 'performance-settings': 'HR Settings',
   'payroll-settings': 'HR Settings', 'notification-templates': 'HR Settings',
-  'email-configuration': 'HR Settings',
+  'email-configuration': 'HR Settings', 'skills-settings': 'HR Settings',
   // Phase 6 — Pay Adjustments
   'tax-years': 'Pay Adjustments', 'tax-exemptions': 'Pay Adjustments',
   'additional-salary': 'Pay Adjustments', 'salary-arrears': 'Pay Adjustments',
@@ -316,6 +316,7 @@ const ALL_MODULES = {
           { id: 'payroll-settings',            label: 'Payroll Settings',          icon: 'payments'               },
           { id: 'notification-templates',      label: 'Notification Templates',    icon: 'notifications'          },
           { id: 'email-configuration',         label: 'Email Configuration',       icon: 'email'                  },
+          { id: 'skills-settings',             label: 'Skills Settings',           icon: 'workspace_premium'      },
         ],
       },
     ],

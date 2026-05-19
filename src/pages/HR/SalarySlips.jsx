@@ -14,9 +14,11 @@ const STATUS_COLOR = { Draft: 'yellow', Submitted: 'green', Cancelled: 'red' }
 export default function SalarySlips() {
   const { user } = useAuth()
 
-  const [slips,       setSlips]       = useState([])
-  const [employees,   setEmployees]   = useState([])
-  const [loading,     setLoading]     = useState(true)
+  const [slips,        setSlips]        = useState([])
+  const [employees,    setEmployees]    = useState([])
+  const [designations, setDesignations] = useState([])
+  const [departments,  setDepartments]  = useState([])
+  const [loading,      setLoading]      = useState(true)
 
   const [filterEmp,    setFilterEmp]    = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -30,11 +32,10 @@ export default function SalarySlips() {
   const fetchSlips = useCallback(async () => {
     setLoading(true)
     try {
-      let q = supabase
+      const { data, error } = await supabase
         .from('salary_slips')
-        .select('*, employees(name, designation_id, designations:designation_id(title), department_id, departments:department_id(name))')
+        .select('*, employees(id, name, designation_id, department_id, departments:department_id(name))')
         .order('created_at', { ascending: false })
-      const { data, error } = await q
       if (error) throw error
       setSlips(data || [])
     } catch (err) {
@@ -44,12 +45,18 @@ export default function SalarySlips() {
     }
   }, [])
 
-  const fetchEmployees = useCallback(async () => {
-    const { data } = await supabase.from('employees').select('id, name, employee_number').eq('status', 'Active').order('name')
-    setEmployees(data || [])
+  const fetchMeta = useCallback(async () => {
+    const [{ data: emps }, { data: desigs }, { data: depts }] = await Promise.all([
+      supabase.from('employees').select('id,name,employee_number').eq('status','Active').order('name'),
+      supabase.from('designations').select('id,title'),
+      supabase.from('departments').select('id,name'),
+    ])
+    setEmployees(emps || [])
+    setDesignations(desigs || [])
+    setDepartments(depts || [])
   }, [])
 
-  useEffect(() => { fetchSlips(); fetchEmployees() }, [fetchSlips, fetchEmployees])
+  useEffect(() => { fetchSlips(); fetchMeta() }, [fetchSlips, fetchMeta])
 
   const openPayslip = async (slip) => {
     setPayslip(slip)
@@ -87,7 +94,8 @@ export default function SalarySlips() {
     .filter(s => s.status === 'Submitted' && s.start_date >= thisMonthStart && s.start_date <= thisMonthEnd)
     .reduce((a, s) => a + Number(s.net_pay || 0), 0)
 
-  const earnings = slipComps.filter(c => c.component_type === 'earning')
+  const desgMap = Object.fromEntries(designations.map(d => [d.id, d.title]))
+  const earnings  = slipComps.filter(c => c.component_type === 'earning')
   const deductions = slipComps.filter(c => c.component_type === 'deduction')
 
   return (
@@ -208,7 +216,7 @@ export default function SalarySlips() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20, fontSize: 13 }}>
                 <div><strong>Employee:</strong> {payslip.employees?.name}</div>
                 <div><strong>Department:</strong> {payslip.employees?.departments?.name || '—'}</div>
-                <div><strong>Designation:</strong> {payslip.employees?.designations?.title || '—'}</div>
+                <div><strong>Designation:</strong> {desgMap[payslip.employees?.designation_id] || '—'}</div>
                 <div><strong>Period:</strong> {payslip.start_date} – {payslip.end_date}</div>
                 <div><strong>Working Days:</strong> {payslip.working_days}</div>
                 <div><strong>Payment Days:</strong> {payslip.payment_days}</div>

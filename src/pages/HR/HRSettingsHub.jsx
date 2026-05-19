@@ -12,6 +12,7 @@ const CARDS = [
   { title: 'Payroll Settings',           desc: 'Frequency, tax year, slip defaults',               icon: 'payments',      color: 'var(--purple)', path: '/module/hr/payroll-settings' },
   { title: 'Notification Templates',     desc: 'Manage email and event templates',                 icon: 'notifications', color: 'var(--green)',  path: '/module/hr/notification-templates' },
   { title: 'Email Configuration',        desc: 'SMTP, sender, signing config',                     icon: 'mail',          color: 'var(--blue)',   path: '/module/hr/email-configuration' },
+  { title: 'Skills & Competency Settings', desc: 'Review cycles, self-assessment, certification tracking', icon: 'workspace_premium', color: '#22d3ee', path: '/module/hr/skills-settings' },
   { title: 'General Company Settings',   desc: 'Company info and HR-wide preferences',             icon: 'business',      color: 'var(--text-dim)', path: '/module/hr/hr-settings' },
 ]
 
