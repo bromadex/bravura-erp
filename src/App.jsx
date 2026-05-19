@@ -135,6 +135,7 @@ const AttendanceRequests = lazy(() => import('./pages/HR/AttendanceRequests'))
 const HRAnalytics        = lazy(() => import('./pages/HR/HRAnalytics'))
 // HR Phase 1 — Leave v2
 const LeavePolicies      = lazy(() => import('./pages/HR/LeavePolicies'))
+const LeaveTypes         = lazy(() => import('./pages/HR/LeaveTypes'))
 const LeaveAllocation    = lazy(() => import('./pages/HR/LeaveAllocation'))
 const CompensatoryLeave  = lazy(() => import('./pages/HR/CompensatoryLeave'))
 const LeaveEncashment    = lazy(() => import('./pages/HR/LeaveEncashment'))
@@ -499,6 +500,7 @@ function AppRoutes() {
             <Route path="attendance"          element={<Attendance />} />
             <Route path="attendance-requests" element={<AttendanceRequests />} />
             <Route path="leave"               element={<Leave />} />
+            <Route path="leave-types"         element={<LeaveTypes />} />
             <Route path="leave-policies"      element={<LeavePolicies />} />
             <Route path="leave-allocation"    element={<LeaveAllocation />} />
             <Route path="compensatory-leave"  element={<CompensatoryLeave />} />

@@ -21,6 +21,21 @@ import { useLeave } from '../../contexts/LeaveContext'
 import TxnCodeBadge from '../../components/TxnCodeBadge'
 import { PageHeader, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
+function tenure(hireDate) {
+  if (!hireDate) return null
+  const start = new Date(hireDate)
+  const now   = new Date()
+  const years  = now.getFullYear() - start.getFullYear()
+  const months = now.getMonth() - start.getMonth()
+  const adj    = months < 0 ? years - 1 : years
+  const mAdj   = months < 0 ? 12 + months : months
+  if (adj === 0 && mAdj === 0) return 'Less than 1 month'
+  const parts = []
+  if (adj  > 0) parts.push(`${adj}y`)
+  if (mAdj > 0) parts.push(`${mAdj}m`)
+  return parts.join(' ')
+}
+
 export default function Employees() {
   const {
     employees, departments, designations, attendance, skills, certifications, auditLogs,
@@ -93,9 +108,10 @@ export default function Employees() {
 
   const docCategories = [
     { id: 'passport',       label: 'Passport Photo', icon: 'photo_camera', accept: 'image/*' },
-    { id: 'identification', label: 'Identification', icon: 'badge',        accept: 'image/*,application/pdf' },
-    { id: 'certifications', label: 'Certifications', icon: 'verified',     accept: 'image/*,application/pdf' },
-    { id: 'general',        label: 'General',        icon: 'description',  accept: '*' }
+    { id: 'identification', label: 'Identification', icon: 'badge',        accept: 'image/*,application/pdf,.doc,.docx' },
+    { id: 'certifications', label: 'Certifications', icon: 'verified',     accept: 'image/*,application/pdf,.doc,.docx' },
+    { id: 'contracts',      label: 'Contracts',      icon: 'description',  accept: 'application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    { id: 'general',        label: 'General',        icon: 'folder',       accept: '*' },
   ]
 
   const fetchDocuments = async (employeeId) => {
@@ -297,23 +313,75 @@ export default function Employees() {
     const filteredDocs = documents.filter(d => d.category === activeDocCategory)
     const { cls, label } = getStatusBadge(employee)
     const showPassword = systemAccountData?.must_change_password === true && systemAccountData?.password_plain
+    const empTenure    = tenure(employee.hire_date)
+
+    const docIcon = (name) => {
+      if (/\.(docx?|odt|rtf)$/i.test(name)) return { icon: 'article',      color: 'var(--blue)'   }
+      if (/\.(pdf)$/i.test(name))            return { icon: 'picture_as_pdf', color: 'var(--red)'  }
+      if (/\.(jpe?g|png|gif|webp)$/i.test(name)) return { icon: 'image',   color: 'var(--teal)'   }
+      return { icon: 'description', color: 'var(--text-dim)' }
+    }
+
     return (
       <div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-          <div><span className="text-dim">Employee ID:</span> {employee.employee_number || '—'}</div>
-          <div><span className="text-dim">Status:</span> <span className={`badge ${cls}`}>{label}</span></div>
-          <div><span className="text-dim">Employment Type:</span> {employee.employment_type || '—'}</div>
-          <div><span className="text-dim">Designation:</span> {getDesignationTitle(employee.designation_id)}</div>
-          <div><span className="text-dim">Department:</span> {getDepartmentName(employee.department_id)}</div>
-          <div><span className="text-dim">Phone:</span> {employee.phone || '—'}</div>
-          <div><span className="text-dim">Email:</span> {employee.email || '—'}</div>
-          <div><span className="text-dim">Hire Date:</span> {employee.hire_date || '—'}</div>
-          <div><span className="text-dim">Date of Birth:</span> {employee.date_of_birth || '—'}</div>
-          <div style={{ gridColumn: 'span 2' }}><span className="text-dim">Address:</span> {employee.residential_address || '—'}</div>
-          <div><span className="text-dim">Emergency Name:</span> {employee.emergency_name || '—'}</div>
-          <div><span className="text-dim">Emergency Phone:</span> {employee.emergency_phone || '—'}</div>
+        {/* Profile header card */}
+        <div style={{
+          background: 'linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%)',
+          border: '1px solid var(--border)', borderRadius: 12, padding: '20px 24px',
+          marginBottom: 20, display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap',
+        }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 800, color: '#0b0f1a', flexShrink: 0 }}>
+            {employee.name?.charAt(0).toUpperCase() || '?'}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>{employee.name}</div>
+              <span className={`badge ${cls}`}>{label}</span>
+              {employee.employment_type && <span style={{ fontSize: 11, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '2px 8px', borderRadius: 10, border: '1px solid var(--border)' }}>{employee.employment_type}</span>}
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--gold)', fontWeight: 600, marginBottom: 6 }}>{getDesignationTitle(employee.designation_id)}</div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, color: 'var(--text-dim)' }}>
+              {employee.employee_number && <span><span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 3 }}>badge</span>{employee.employee_number}</span>}
+              <span><span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 3 }}>business</span>{getDepartmentName(employee.department_id)}</span>
+              {employee.phone && <span><span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 3 }}>phone</span>{employee.phone}</span>}
+              {employee.email && <span><span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 3 }}>email</span>{employee.email}</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {employee.hire_date && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>Hire Date</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{employee.hire_date}</div>
+              </div>
+            )}
+            {empTenure && (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 }}>Tenure</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)' }}>{empTenure}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Personal details grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20, fontSize: 13 }}>
+          {[
+            { label: 'Date of Birth',    value: employee.date_of_birth },
+            { label: 'Emergency Contact', value: employee.emergency_name ? `${employee.emergency_name} (${employee.emergency_phone || '—'})` : null },
+          ].filter(r => r.value).map(r => (
+            <div key={r.label} style={{ background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{r.label}</div>
+              <div style={{ fontWeight: 500 }}>{r.value}</div>
+            </div>
+          ))}
+          {employee.residential_address && (
+            <div style={{ gridColumn: 'span 2', background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Address</div>
+              <div style={{ fontWeight: 500 }}>{employee.residential_address}</div>
+            </div>
+          )}
           {employee.system_username && (
-            <div style={{ gridColumn: 'span 2', background: 'var(--surface2)', borderRadius: 8, padding: 12, border: '1px solid var(--border)' }}>
+            <div style={{ gridColumn: 'span 2', background: 'var(--surface2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>System Account</div>
               <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div><span className="text-dim">Username: </span><strong style={{ fontFamily: 'var(--mono)' }}>{employee.system_username}</strong></div>
@@ -343,11 +411,14 @@ export default function Employees() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {filteredDocs.length === 0 && <div className="empty-state" style={{ padding: 20 }}>No documents in this category</div>}
             {filteredDocs.map(doc => {
-              const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name)
+              const di = docIcon(doc.name)
               return (
-                <div key={doc.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  <span className="material-icons" style={{ fontSize: 22, color: isImage ? 'var(--teal)' : 'var(--blue)' }}>{isImage ? 'image' : 'description'}</span>
-                  <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name}</div><div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}</div></div>
+                <div key={doc.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <span className="material-icons" style={{ fontSize: 24, color: di.color }}>{di.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{doc.size ? `${(doc.size / 1024).toFixed(1)} KB` : ''}</div>
+                  </div>
                   <div className="btn-group-sm">
                     <a href={doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm"><span className="material-icons" style={{ fontSize: 14 }}>open_in_new</span></a>
                     <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDocument(doc.path)}><span className="material-icons" style={{ fontSize: 14 }}>delete</span></button>
@@ -803,8 +874,90 @@ export default function Employees() {
     )
   }
 
+  const LeaveBalanceTab = ({ employee }) => {
+    const currentYear = new Date().getFullYear()
+    const getBalance  = (ltId) => {
+      const b = leaveTypesList.length > 0
+        ? null
+        : null
+      // We use HRContext leaveBalances via closure won't work — fetch inline
+      return null
+    }
+
+    const [balances, setBalances] = useState([])
+    const [ltypes,   setLtypes]   = useState([])
+    const [lbLoading, setLbLoading] = useState(true)
+
+    useEffect(() => {
+      const fetch = async () => {
+        setLbLoading(true)
+        const [ltRes, lbRes] = await Promise.all([
+          supabase.from('leave_types').select('id, name, color, max_leaves_allowed, is_active').order('name'),
+          supabase.from('leave_balances').select('*').eq('employee_id', employee.id).eq('year', currentYear),
+        ])
+        setLtypes(ltRes.data || [])
+        setBalances(lbRes.data || [])
+        setLbLoading(false)
+      }
+      fetch()
+    }, [employee.id])
+
+    if (lbLoading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>Loading…</div>
+
+    const activeTypes = ltypes.filter(lt => lt.is_active !== false)
+
+    return (
+      <div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
+          Leave balances for <strong>{currentYear}</strong>. Allocations are set per employee in Leave Allocation.
+        </div>
+        {activeTypes.length === 0
+          ? <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: '20px 0' }}>No active leave types configured.</div>
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {activeTypes.map(lt => {
+                const b         = balances.find(b => b.leave_type_id === lt.id)
+                const total     = b?.total_days     ?? 0
+                const used      = b?.used_days      ?? 0
+                const remaining = b?.remaining_days ?? Math.max(0, total - used)
+                const pct       = total > 0 ? Math.min(100, (used / total) * 100) : 0
+                const color     = lt.color || '#60a5fa'
+                return (
+                  <div key={lt.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                    <div style={{ height: 3, background: color }} />
+                    <div style={{ padding: '14px 14px 12px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{lt.name}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 20, fontWeight: 800, color, fontFamily: 'var(--mono)' }}>{remaining.toFixed(1)}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>remaining</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>{used.toFixed(1)}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>used</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--mono)' }}>{total.toFixed(1)}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>total</div>
+                        </div>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : color, borderRadius: 3, transition: 'width .4s' }} />
+                      </div>
+                      {total === 0 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>Not allocated this year</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+      </div>
+    )
+  }
+
   const TABS = [
     { id: 'profile',      icon: 'person',          label: 'Profile'      },
+    { id: 'leave',        icon: 'event_busy',       label: 'Leave'        },
     { id: 'compensation', icon: 'payments',         label: 'Compensation' },
     { id: 'attendance',   icon: 'schedule',         label: 'Attendance'   },
     { id: 'performance',  icon: 'trending_up',      label: 'Performance'  },
@@ -859,31 +1012,48 @@ export default function Employees() {
       </div>
 
       {/* View modal */}
-      {viewModalOpen && selectedEmployee && (
-        <div className="overlay" onClick={() => setViewModalOpen(false)}>
-          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Employee: <span style={{ color: 'var(--gold)' }}>{selectedEmployee.name}</span></span>
-              <div className="btn-group-sm">
-                {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView}><span className="material-icons">edit</span> Edit</button>}
-                {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
+      {viewModalOpen && selectedEmployee && (() => {
+        const { cls, label } = getStatusBadge(selectedEmployee)
+        return (
+          <div className="overlay" onClick={() => setViewModalOpen(false)}>
+            <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
+              {/* Modal top bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gold),var(--teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#0b0f1a', flexShrink: 0 }}>
+                    {selectedEmployee.name?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18, fontWeight: 800 }}>{selectedEmployee.name}</span>
+                      <span className={`badge ${cls}`}>{label}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 600 }}>{getDesignationTitle(selectedEmployee.designation_id)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{getDepartmentName(selectedEmployee.department_id)}{selectedEmployee.employee_number ? ` · ${selectedEmployee.employee_number}` : ''}</div>
+                  </div>
+                </div>
+                <div className="btn-group-sm">
+                  {canEdit && <button className="btn btn-secondary btn-sm" onClick={editFromView}><span className="material-icons">edit</span> Edit</button>}
+                  {canDelete && <button className="btn btn-danger btn-sm" onClick={deleteFromView}><span className="material-icons">delete</span> Delete</button>}
+                </div>
+              </div>
+              <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
+              <div style={{ maxHeight: '58vh', overflowY: 'auto', paddingRight: 8, marginTop: 12 }}>
+                {activeTab === 'profile'      && <ProfileTab      employee={selectedEmployee} />}
+                {activeTab === 'leave'        && <LeaveBalanceTab employee={selectedEmployee} />}
+                {activeTab === 'compensation' && <CompensationTab employee={selectedEmployee} />}
+                {activeTab === 'attendance'   && <AttendanceTab   employee={selectedEmployee} />}
+                {activeTab === 'performance'  && <PerformanceTab  employee={selectedEmployee} />}
+                {activeTab === 'possession'   && <InPossessionTab employee={selectedEmployee} />}
+                {activeTab === 'history'      && <HistoryTab      employee={selectedEmployee} />}
+              </div>
+              <div className="modal-actions" style={{ marginTop: 16 }}>
+                <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
               </div>
             </div>
-            <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
-            <div style={{ maxHeight: '62vh', overflowY: 'auto', paddingRight: 8 }}>
-              {activeTab === 'profile'      && <ProfileTab      employee={selectedEmployee} />}
-              {activeTab === 'compensation' && <CompensationTab employee={selectedEmployee} />}
-              {activeTab === 'attendance'   && <AttendanceTab   employee={selectedEmployee} />}
-              {activeTab === 'performance'  && <PerformanceTab  employee={selectedEmployee} />}
-              {activeTab === 'possession'   && <InPossessionTab employee={selectedEmployee} />}
-              {activeTab === 'history'      && <HistoryTab      employee={selectedEmployee} />}
-            </div>
-            <div className="modal-actions" style={{ marginTop: 16 }}>
-              <button className="btn btn-secondary" onClick={() => setViewModalOpen(false)}>Close</button>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Cert modal */}
       {showCertModal && (

@@ -48,7 +48,7 @@ const CATEGORIES = [
     desc: 'Requests, policies, allocation, accrual & balance',
     color: '#60a5fa',
     route: '/module/hr/leave',
-    pages: ['leave', 'leave-policies', 'leave-allocation', 'earned-leave-schedule', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
+    pages: ['leave', 'leave-types', 'leave-policies', 'leave-allocation', 'earned-leave-schedule', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
   },
   {
     id: 'payroll',
