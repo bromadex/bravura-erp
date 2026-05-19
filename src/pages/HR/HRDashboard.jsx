@@ -12,7 +12,7 @@ const CATEGORIES = [
     desc: 'Employees, grades, employment types & org chart',
     color: '#f87171',
     route: '/module/hr/employees',
-    pages: ['employees', 'departments', 'designations', 'employee-grades', 'employment-types', 'permissions', 'org-chart'],
+    pages: ['employees', 'departments', 'designations', 'employee-grades', 'employment-types', 'permissions', 'org-chart', 'department-approvers'],
   },
   {
     id: 'lifecycle',
@@ -21,7 +21,7 @@ const CATEGORIES = [
     desc: 'Promotions, transfers, onboarding, separation & F&F',
     color: '#c084fc',
     route: '/module/hr/promotions',
-    pages: ['promotions', 'transfers', 'onboarding', 'separation', 'full-final'],
+    pages: ['promotions', 'transfers', 'onboarding', 'boarding-activities', 'separation', 'exit-interviews', 'full-final'],
   },
   {
     id: 'attendance',
@@ -48,7 +48,7 @@ const CATEGORIES = [
     desc: 'Requests, policies, allocation, accrual & balance',
     color: '#60a5fa',
     route: '/module/hr/leave',
-    pages: ['leave', 'leave-types', 'leave-policies', 'leave-allocation', 'earned-leave-schedule', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
+    pages: ['leave', 'leave-types', 'leave-policies', 'leave-allocation', 'leave-control-panel', 'leave-block-list', 'earned-leave-schedule', 'compensatory-leave', 'leave-encashment', 'leave-balance', 'leave-calendar', 'leave-reports'],
   },
   {
     id: 'payroll',
@@ -57,7 +57,7 @@ const CATEGORIES = [
     desc: 'Salary structures, slips, payroll entry & timesheets',
     color: '#a78bfa',
     route: '/module/hr/payroll',
-    pages: ['payroll', 'timesheet', 'salary-structures', 'salary-slips', 'payroll-entry', 'travel'],
+    pages: ['payroll', 'timesheet', 'salary-structures', 'salary-slips', 'payroll-entry', 'travel', 'purpose-of-travel'],
   },
   {
     id: 'recruitment',
@@ -84,7 +84,7 @@ const CATEGORIES = [
     desc: 'Appraisals, KRAs, templates & reviews',
     color: '#f59e0b',
     route: '/module/hr/appraisal-periods',
-    pages: ['appraisal-periods', 'appraisal-templates', 'kras', 'performance-reviews', 'kpi-templates'],
+    pages: ['appraisal-cycles', 'appraisal-periods', 'appraisal-templates', 'kras', 'performance-reviews', 'kpi-templates', 'peer-feedback'],
   },
   {
     id: 'overtime',
