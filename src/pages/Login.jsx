@@ -127,7 +127,7 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <span className="material-icons" style={{ fontSize: 56, color: 'var(--gold)' }}>settings</span>
           <h1 style={{ fontSize: 28, fontWeight: 800, marginTop: 8, color: 'var(--gold)' }}>BRAVURA</h1>
-          <p style={{ color: 'var(--text-dim)', fontSize: 13, fontFamily: 'var(--mono)', letterSpacing: 2 }}>KAMATIVI ERP</p>
+          <p style={{ color: 'var(--text-dim)', fontSize: 13, fontFamily: 'var(--mono)', letterSpacing: 2 }}>ENTERPRISE ERP</p>
         </div>
 
         <div className="card" style={{ padding: 28 }}>

@@ -701,9 +701,8 @@ tbody tr:hover { background: rgba(255,255,255,.02); }
   /* Keep sidebar dark even in light mode — standard UX pattern */
 }
 
-/* TopBar */
-[data-theme="light"] .topbar,
-[data-theme="light"] [class*="topbar"] {
+/* TopBar — new two-strip design uses inline styles; keep only legacy .topbar class */
+[data-theme="light"] .topbar {
   background: var(--surface);
   border-bottom: 1px solid rgba(0,0,0,.10);
 }

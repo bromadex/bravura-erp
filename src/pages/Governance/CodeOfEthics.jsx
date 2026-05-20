@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
-const FALLBACK_TEXT = `BRAVURA / KAMATIVI — CODE OF ETHICS
+const FALLBACK_TEXT = `BRAVURA — CODE OF ETHICS
 
 1. INTEGRITY
    We conduct all business honestly and transparently. We do not misrepresent facts, falsify records, or engage in deceptive practices.

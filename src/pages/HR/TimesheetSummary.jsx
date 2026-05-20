@@ -247,7 +247,7 @@ export default function TimesheetSummary() {
                 w.document.write(`
                   <html><head><title>Timesheet — ${selectedEmp.emp.name}</title>
                   <style>body{font-family:Arial,sans-serif;padding:24px;font-size:13px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:6px 10px;text-align:left} th{background:#f5f5f5} .total{font-weight:bold;background:#f0f7ff}</style></head><body>
-                  <h2>BRAVURA KAMATIVI — TIMESHEET SUMMARY</h2>
+                  <h2>BRAVURA — TIMESHEET SUMMARY</h2>
                   <p><strong>Employee:</strong> ${selectedEmp.emp.name} (${selectedEmp.emp.employee_number})</p>
                   <p><strong>Department:</strong> ${getDeptName(selectedEmp.emp.department_id)} &nbsp;|&nbsp; <strong>Designation:</strong> ${getDesignation(selectedEmp.emp.designation_id)}</p>
                   <p><strong>Period:</strong> ${selectedPeriod?.start_date} → ${selectedPeriod?.end_date} &nbsp;|&nbsp; <strong>${selectedPeriod?.period_label}</strong></p>
