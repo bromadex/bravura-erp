@@ -133,7 +133,7 @@ export default function HolidayListAssignment() {
             </div>
             <div className="form-group">
               <label>Branch (optional)</label>
-              <input className="form-control" value={modal?.branch_name || ''} onChange={e => setF('branch_name', e.target.value)} disabled={!canEdit} placeholder="e.g. Kamativi Mine" />
+              <input className="form-control" value={modal?.branch_name || ''} onChange={e => setF('branch_name', e.target.value)} disabled={!canEdit} placeholder="e.g. Head Office" />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

@@ -134,7 +134,7 @@ export default function AttendanceDevices() {
             </div>
             <div>
               <label className="field-label">Branch / Site</label>
-              <input className="input" value={form.branch} onChange={e => fld('branch', e.target.value)} placeholder="e.g. Kamativi Mine" />
+              <input className="input" value={form.branch} onChange={e => fld('branch', e.target.value)} placeholder="e.g. Head Office" />
             </div>
           </div>
           <div>

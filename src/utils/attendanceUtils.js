@@ -1,6 +1,6 @@
 // src/utils/attendanceUtils.js
 //
-// Bravura Kamativi work schedule:
+// Bravura ERP work schedule:
 //   Mon–Fri  07:00 → 16:00  (lunch 12:00–13:00 = 8 productive hours)
 //   Saturday 07:00 → 12:00  (5 hours, treated as OT at 1.5×)
 //   Sunday   — not a work day

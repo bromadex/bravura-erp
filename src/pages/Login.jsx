@@ -203,7 +203,7 @@ export default function Login() {
         </div>
 
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-          Bravura Kamativi ERP v2.0
+          Bravura ERP v2.0
         </p>
       </div>
     </div>
