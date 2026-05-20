@@ -283,7 +283,7 @@ export default function Payroll() {
         .total { font-size: 15px; font-weight: bold; }
         @media print { body { padding: 0; } }
       </style></head><body>
-      <h1>BRAVURA KAMATIVI OPERATIONS</h1>
+      <h1>BRAVURA OPERATIONS</h1>
       <h2>PAYSLIP — ${period.period_label || ''}</h2>
       <div class="row"><span>Employee Name</span><span class="bold">${record.employee_name}</span></div>
       <div class="row"><span>Employee Number</span><span>${record.employee_number || '—'}</span></div>
