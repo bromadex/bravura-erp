@@ -787,7 +787,7 @@ function AppRoutes() {
           <Route path="master-data"          element={<MasterData />}            />
           <Route path="workflows"            element={<WorkflowBuilder />}       />
           <Route path="workflows/admin"      element={<WorkflowAdmin />}         />
-          <Route path="workflow-assignments" element={<WorkflowAssignments />}   />
+          <Route path="workflow-assignments" element={<HRProvider><WorkflowAssignments /></HRProvider>} />
           <Route path="push-notifications"   element={<PushNotificationSettings />} />
           <Route path="email-logs"           element={<EmailLogs />}             />
         </Route>
