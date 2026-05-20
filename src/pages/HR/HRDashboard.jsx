@@ -1,10 +1,7 @@
 // src/pages/HR/HRDashboard.jsx
-// People & Workforce home — stats strip + consolidated section tiles.
 
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCanView } from '../../hooks/usePermission'
-import { supabase } from '../../lib/supabase'
 
 const CATEGORIES = [
   {
@@ -109,42 +106,9 @@ const CATEGORIES = [
   },
 ]
 
-const STAT_DEFS = [
-  { key: 'totalEmployees',      label: 'Total Employees',        icon: 'people',       color: '#f87171' },
-  { key: 'onLeaveToday',        label: 'On Leave Today',         icon: 'event_busy',   color: '#60a5fa' },
-  { key: 'pendingLeave',        label: 'Pending Leave',          icon: 'pending',      color: '#fbbf24' },
-  { key: 'newHiresThisMonth',   label: 'New Hires (Month)',      icon: 'person_add',   color: '#34d399' },
-  { key: 'openGrievances',      label: 'Open Grievances',        icon: 'report_problem', color: '#f97316' },
-]
-
 export default function HRDashboard() {
   const navigate = useNavigate()
   const canView  = useCanView
-
-  const [statsLoading, setStatsLoading] = useState(true)
-  const [stats, setStats]               = useState({ totalEmployees: 0, onLeaveToday: 0, pendingLeave: 0, newHiresThisMonth: 0, openGrievances: 0 })
-
-  useEffect(() => {
-    const today     = new Date().toISOString().slice(0, 10)
-    const monthStart = today.slice(0, 7) + '-01'
-
-    Promise.all([
-      supabase.from('employees').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'approved').lte('start_date', today).gte('end_date', today),
-      supabase.from('leave_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('employees').select('id', { count: 'exact', head: true }).gte('hire_date', monthStart),
-      supabase.from('employee_grievances').select('id', { count: 'exact', head: true }).not('status', 'in', '("resolved","closed")'),
-    ]).then(([emp, onLeave, pendLeave, newHires, grievances]) => {
-      setStats({
-        totalEmployees:    emp.count       ?? 0,
-        onLeaveToday:      onLeave.count   ?? 0,
-        pendingLeave:      pendLeave.count ?? 0,
-        newHiresThisMonth: newHires.count  ?? 0,
-        openGrievances:    grievances.count ?? 0,
-      })
-      setStatsLoading(false)
-    }).catch(() => setStatsLoading(false))
-  }, [])
 
   const visibleCategories = CATEGORIES.filter(cat =>
     cat.pages ? cat.pages.some(p => canView(cat.module || 'hr', p)) : true
@@ -152,27 +116,10 @@ export default function HRDashboard() {
 
   return (
     <div style={{ padding: '8px 0' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>People &amp; Workforce</h2>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Overview of your workforce at a glance</p>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>Human Resources</h2>
+        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Select a category to get started</p>
       </div>
-
-      {/* Stats strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 28 }}>
-        {STAT_DEFS.map(s => (
-          <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span className="material-icons" style={{ fontSize: 18, color: s.color }}>{s.icon}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 500 }}>{s.label}</span>
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)' }}>
-              {statsLoading ? '—' : stats[s.key]}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Section tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
         {visibleCategories.map(cat => (
           <button
