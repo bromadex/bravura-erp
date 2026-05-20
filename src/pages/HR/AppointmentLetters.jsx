@@ -60,7 +60,7 @@ export default function AppointmentLetters() {
       .replace(/\{\{joining_date\}\}/g,   vars.joining_date   || '')
       .replace(/\{\{salary\}\}/g,         vars.salary_text    || '')
       .replace(/\{\{letter_date\}\}/g,    vars.letter_date    || '')
-      .replace(/\{\{company_name\}\}/g,   'Kamativi Mining')
+      .replace(/\{\{company_name\}\}/g,   'Bravura Mining')
   }
 
   const generateContent = (letterData) => {

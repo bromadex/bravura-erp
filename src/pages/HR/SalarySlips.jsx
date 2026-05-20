@@ -203,7 +203,7 @@ export default function SalarySlips() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 16, borderBottom: '2px solid var(--border)' }}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--gold)' }}>BRAVURA MINING</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Kamativi, Zimbabwe</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Zimbabwe</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>PAYSLIP</div>

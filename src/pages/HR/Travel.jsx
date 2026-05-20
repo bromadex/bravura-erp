@@ -36,7 +36,7 @@ const STATUS_BADGE = {
 const genId = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
 const BLANK_FORM = {
-  departure_from:    'Kamativi Mine',   // ← default origin
+  departure_from:    '',
   destination:       '',
   purpose:           '',
   departure_date:    today,
@@ -185,7 +185,7 @@ export default function Travel() {
   const editRequest = (req) => {
     setEditingId(req.id)
     setForm({
-      departure_from:    req.departure_from    || 'Kamativi Mine',
+      departure_from:    req.departure_from    || '',
       destination:       req.destination       || '',
       purpose:           req.purpose           || '',
       departure_date:    req.departure_date    || today,
@@ -280,7 +280,7 @@ export default function Travel() {
           {/* ✅ Route: departure_from → destination */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 14 }}>
             <span className="material-icons" style={{ fontSize: 14, color: 'var(--text-dim)' }}>place</span>
-            {req.departure_from || 'Kamativi Mine'}
+            {req.departure_from || '—'}
             <span className="material-icons" style={{ fontSize: 16, color: 'var(--gold)' }}>arrow_forward</span>
             {req.destination}
           </div>
@@ -380,7 +380,7 @@ export default function Travel() {
               <label>Departure From *</label>
               <input className="form-control" value={form.departure_from}
                 onChange={e => setForm({ ...form, departure_from: e.target.value })}
-                placeholder="e.g. Kamativi Mine" />
+                placeholder="e.g. Head Office" />
             </div>
             <div className="form-group">
               <label>Destination *</label>

@@ -238,7 +238,7 @@ export default function DashboardOverview() {
             <div style={{ fontSize: 20, fontWeight: 800 }}>{greeting}, {name} 👋</div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
               {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              {' · '}Kamativi Operations
+              {' · '}Bravura Operations
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
