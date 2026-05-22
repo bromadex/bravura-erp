@@ -338,7 +338,7 @@ SELECT
     WHEN 'ADJUSTMENT' THEN 'StockReconciliation'
     ELSE t.type
   END,
-  COALESCE(t.reference, t.id),
+  t.id,
   CASE WHEN t.type IN ('IN','GRN') THEN ABS(t.qty) ELSE -ABS(t.qty) END,
   CASE WHEN t.type IN ('IN','GRN') THEN COALESCE(i.cost, 0) ELSE 0 END,
   false,
