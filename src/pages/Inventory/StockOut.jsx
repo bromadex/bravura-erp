@@ -31,14 +31,18 @@ export default function StockOut() {
 
   const exportExcel = () => {
     exportXLSX(filtered.map(t => ({
-      Date:       t.date,
-      Item:       t.item_name,
-      Quantity:   t.quantity,
-      Unit:       t.unit,
-      'Unit Cost': t.unit_cost,
-      'Total':    (t.quantity || 0) * (t.unit_cost || 0),
-      Reference:  t.reference || '',
-      Notes:      t.notes || '',
+      Date:         t.date,
+      Item:         t.item_name,
+      Quantity:     t.quantity,
+      Unit:         t.unit,
+      'Unit Cost':  t.unit_cost,
+      Total:        (t.quantity || 0) * (t.unit_cost || 0),
+      Reference:    t.reference || '',
+      'Issued To':  t.issued_to || '',
+      Department:   t.department || '',
+      'Cost Center': t.cost_center || '',
+      Project:      t.project || '',
+      Notes:        t.notes || '',
     })), `stock-out-${new Date().toISOString().split('T')[0]}`, 'Stock Out')
   }
 
@@ -91,21 +95,29 @@ export default function StockOut() {
               <th>Item</th>
               <th>Qty</th>
               <th>Unit</th>
+              <th>Issued To</th>
+              <th>Department</th>
+              <th>Cost Center</th>
+              <th>Project</th>
               <th>Reference</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>Loading…</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6}><EmptyState icon="assignment_return" message="No stock-out transactions found" /></td></tr>
+              <tr><td colSpan={10}><EmptyState icon="assignment_return" message="No stock-out transactions found" /></td></tr>
             ) : filtered.map(t => (
               <tr key={t.id}>
                 <td style={{ fontSize: 12 }}>{t.date}</td>
                 <td style={{ fontWeight: 600 }}>{t.item_name}</td>
                 <td style={{ color: 'var(--red)', fontWeight: 700 }}>−{t.quantity}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.unit}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.issued_to || '—'}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.department || '—'}</td>
+                <td className="td-mono" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.cost_center || '—'}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.project || '—'}</td>
                 <td className="td-mono" style={{ color: 'var(--text-dim)', fontSize: 12 }}>{t.reference || '—'}</td>
                 <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.notes || '—'}</td>
               </tr>

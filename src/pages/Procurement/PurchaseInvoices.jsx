@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { exportXLSX, fmtNum, fmtDate, dateTag } from '../../engine/reportingEngine'
 import { PageHeader, ModalDialog, ModalActions, StatusBadge } from '../../components/ui'
@@ -33,10 +34,31 @@ function daysOverdue(dueDate) {
 
 const PAYMENT_METHODS = ['Bank Transfer', 'Cash', 'Cheque', 'Mobile Money']
 
+const MATCH_BADGE_STYLE = {
+  Matched:   { background: 'var(--green)',  color: '#fff' },
+  Exception: { background: 'var(--red)',    color: '#fff' },
+  Partial:   { background: 'var(--yellow)', color: '#000' },
+  Pending:   { background: 'var(--surface2)', color: 'var(--text-dim)' },
+  Overbilled:    { background: 'var(--red)',    color: '#fff' },
+  'Rate Mismatch': { background: 'var(--red)',  color: '#fff' },
+  'Qty Mismatch':  { background: 'var(--yellow)', color: '#000' },
+}
+
+function MatchBadge({ status }) {
+  const s = MATCH_BADGE_STYLE[status] || MATCH_BADGE_STYLE.Pending
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11,
+      fontWeight: 600, fontFamily: 'var(--mono)', ...s,
+    }}>{status || 'Pending'}</span>
+  )
+}
+
 export default function PurchaseInvoices() {
   const {
     purchaseInvoices, purchaseOrders, suppliers,
     createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
+    getInvoiceLines, getMatchStatus,
     loading,
   } = useProcurement()
   const { user } = useAuth()
@@ -85,6 +107,7 @@ export default function PurchaseInvoices() {
   // ── Edit Invoice form ─────────────────────────────────────
   const [editForm, setEditForm] = useState(null)
   const [editSaving, setEditSaving] = useState(false)
+  const [matchRunning, setMatchRunning] = useState(false)
 
   // ── Reset forms when modals open ──────────────────────────
   useEffect(() => {
@@ -332,6 +355,49 @@ export default function PurchaseInvoices() {
     } catch (err) { toast.error(err.message) }
   }
 
+  // ── Run 3-Way Match Check ─────────────────────────────────
+  const handleRunMatch = async (inv) => {
+    const lines = getInvoiceLines(inv.id)
+    if (!lines.length) { toast.error('No invoice lines found to match'); return }
+    setMatchRunning(true)
+    try {
+      let exceptionCount = 0
+      await Promise.all(lines.map(async (line) => {
+        const invQty  = parseFloat(line.qty)       || 0
+        const invRate = parseFloat(line.unit_rate)  || 0
+        const grnQty  = line.grn_qty !== null && line.grn_qty !== undefined ? parseFloat(line.grn_qty) : null
+        const poRate  = line.po_rate !== null && line.po_rate !== undefined ? parseFloat(line.po_rate)  : null
+
+        let matchStatus = 'Pending'
+        let matchNotes  = ''
+        if (grnQty !== null && poRate !== null) {
+          if (invQty > (grnQty || 0) * 1.001) {
+            matchStatus = 'Overbilled'
+            matchNotes  = `Invoice qty ${invQty} > GRN accepted ${grnQty}`
+          } else if (poRate && Math.abs(invRate - poRate) / poRate > 0.01) {
+            matchStatus = 'Rate Mismatch'
+            matchNotes  = `Invoice rate ${invRate} vs PO rate ${poRate}`
+          } else {
+            matchStatus = 'Matched'
+          }
+        }
+        if (matchStatus !== 'Matched') exceptionCount++
+
+        await supabase.from('purchase_invoice_lines')
+          .update({ match_status: matchStatus, match_notes: matchNotes })
+          .eq('id', line.id)
+      }))
+
+      const allMatched = exceptionCount === 0
+      await updatePurchaseInvoice(inv.id, { three_way_matched: allMatched })
+
+      if (allMatched) toast.success('All lines matched ✓')
+      else toast.error(`${exceptionCount} exception(s) found`)
+    } catch (err) {
+      toast.error(err.message || 'Match check failed')
+    } finally { setMatchRunning(false) }
+  }
+
   // ── Export ────────────────────────────────────────────────
   const handleExport = () => {
     exportXLSX(filteredInvoices.map(inv => ({
@@ -344,7 +410,7 @@ export default function PurchaseInvoices() {
       Amount:         parseFloat(inv.total_amount || 0).toFixed(2),
       Paid:           parseFloat(inv.paid_amount || 0).toFixed(2),
       Outstanding:    ((inv.total_amount || 0) - (inv.paid_amount || 0)).toFixed(2),
-      '3-Way Match':  inv.three_way_matched ? 'Yes' : 'No',
+      '3-Way Match':  getMatchStatus(inv.id),
       Status:         inv.status,
     })), `PurchaseInvoices_${dateTag()}`, 'Purchase Invoices')
     toast.success('Exported')
@@ -566,9 +632,7 @@ export default function PurchaseInvoices() {
                                 ${fmtNum(outstanding)}
                               </td>
                               <td style={{ textAlign: 'center' }}>
-                                {inv.three_way_matched
-                                  ? <span className="material-icons" style={{ color: 'var(--green)', fontSize: 18 }}>check_circle</span>
-                                  : <span className="material-icons" style={{ color: 'var(--yellow)', fontSize: 18 }}>warning</span>}
+                                <MatchBadge status={getMatchStatus(inv.id)} />
                               </td>
                               <td><StatusBadge status={inv.status} /></td>
                               <td className="td-actions" style={{ whiteSpace: 'nowrap' }}>
@@ -725,11 +789,11 @@ export default function PurchaseInvoices() {
           {renderItems(form.items, setForm)}
 
           <div className="form-group" style={{ marginTop: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.three_way_matched}
-                onChange={e => setForm(f => ({ ...f, three_way_matched: e.target.checked }))} />
-              <span>Verified against PO and GRN (3-Way Match)</span>
-            </label>
+            <label>Match Status</label>
+            <div className="form-control" style={{ background: 'var(--surface)', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MatchBadge status="Pending" />
+              <span style={{ fontSize: 12 }}>Computed automatically after saving</span>
+            </div>
           </div>
           <div className="form-group">
             <label>Notes</label>
@@ -795,6 +859,9 @@ export default function PurchaseInvoices() {
           const po          = viewInv.po_id ? purchaseOrders.find(p => p.id === viewInv.po_id) : null
           const outstanding = (viewInv.total_amount || 0) - (viewInv.paid_amount || 0)
           const items       = parseItems(viewInv.items)
+          const matchLines  = getInvoiceLines(viewInv.id)
+          const matchStatus = getMatchStatus(viewInv.id)
+          const hasExceptions = matchLines.some(l => ['Overbilled', 'Rate Mismatch'].includes(l.match_status))
           return (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 13 }}>
@@ -805,9 +872,7 @@ export default function PurchaseInvoices() {
                 <div><span style={{ color: 'var(--text-dim)' }}>Payment Terms:</span> {viewInv.payment_terms || '—'}</div>
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>3-Way Match:</span>{' '}
-                  {viewInv.three_way_matched
-                    ? <span style={{ color: 'var(--green)' }}>✓ Verified</span>
-                    : <span style={{ color: 'var(--yellow)' }}>⚠ Not verified</span>}
+                  <MatchBadge status={matchStatus} />
                 </div>
                 {po && (
                   <div style={{ gridColumn: 'span 2' }}>
@@ -818,6 +883,76 @@ export default function PurchaseInvoices() {
                 )}
                 {viewInv.grn_id && (
                   <div><span style={{ color: 'var(--text-dim)' }}>GRN Ref:</span> {viewInv.grn_id}</div>
+                )}
+              </div>
+
+              {/* Exception warning banner */}
+              {hasExceptions && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 8, marginBottom: 14,
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid var(--red)',
+                  color: 'var(--red)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <span className="material-icons" style={{ fontSize: 18 }}>warning</span>
+                  This invoice has match exceptions. Review before approving.
+                </div>
+              )}
+
+              {/* 3-Way Match panel */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, textTransform: 'uppercase' }}>
+                    3-Way Match
+                  </span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleRunMatch(viewInv)} disabled={matchRunning}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>sync</span>
+                    {matchRunning ? ' Running…' : ' Run Match Check'}
+                  </button>
+                </div>
+                {matchLines.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="stock-table" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th style={{ textAlign: 'right' }}>PO Qty</th>
+                          <th style={{ textAlign: 'right' }}>PO Rate</th>
+                          <th style={{ textAlign: 'right' }}>GRN Qty</th>
+                          <th style={{ textAlign: 'right' }}>GRN Rate</th>
+                          <th style={{ textAlign: 'right' }}>Inv Qty</th>
+                          <th style={{ textAlign: 'right' }}>Inv Rate</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {matchLines.map((line, i) => (
+                          <>
+                            <tr key={line.id || i}>
+                              <td style={{ fontWeight: 600 }}>{line.item_name}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>{line.po_qty ?? '—'}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>{line.po_rate != null ? `$${fmtNum(line.po_rate)}` : '—'}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>{line.grn_qty ?? '—'}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>{line.grn_rate != null ? `$${fmtNum(line.grn_rate)}` : '—'}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>{line.qty}</td>
+                              <td className="td-mono" style={{ textAlign: 'right' }}>${fmtNum(line.unit_rate)}</td>
+                              <td><MatchBadge status={line.match_status || 'Pending'} /></td>
+                            </tr>
+                            {['Overbilled', 'Rate Mismatch'].includes(line.match_status) && line.match_notes && (
+                              <tr key={`${line.id || i}-note`}>
+                                <td colSpan={8} style={{ fontSize: 11, color: 'var(--text-dim)', padding: '2px 8px 6px', fontStyle: 'italic' }}>
+                                  {line.match_notes}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+                    No match lines found. Click "Run Match Check" to evaluate this invoice.
+                  </div>
                 )}
               </div>
 
@@ -949,11 +1084,11 @@ export default function PurchaseInvoices() {
             {renderItems(editForm.items, setEditForm)}
 
             <div className="form-group" style={{ marginTop: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={editForm.three_way_matched}
-                  onChange={e => setEditForm(f => ({ ...f, three_way_matched: e.target.checked }))} />
-                <span>Verified against PO and GRN (3-Way Match)</span>
-              </label>
+              <label>Match Status</label>
+              <div className="form-control" style={{ background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MatchBadge status={getMatchStatus(editInv?.id)} />
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Computed automatically — use "Run Match Check" in the view panel to refresh</span>
+              </div>
             </div>
             <div className="form-group">
               <label>Notes</label>

@@ -22,6 +22,7 @@ const PAGE_LABELS = {
   'suppliers': 'Suppliers', 'store-requisitions': 'Store Requisitions',
   'purchase-requisitions': 'Purchase Requisitions', 'purchase-orders': 'Purchase Orders',
   'goods-received': 'Goods Received',
+  'landed-costs': 'Landed Cost Vouchers',
   'tanks': 'Fuel Tanks', 'dipstick': 'Dipstick Log', 'issuance': 'Fuel Issuance',
   'deliveries': 'Deliveries', 'reports': 'Reports',
   'vehicles': 'Vehicles', 'generators': 'Generators', 'heavy-equipment': 'Heavy Equipment',

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
+import { postToGL } from '../engine/accountingEngine'
 
 const InventoryContext = createContext(null)
 
@@ -189,7 +190,7 @@ export function InventoryProvider({ children }) {
   }
 
   // ── Stock Out ─────────────────────────────────────────────────
-  const stockOut = async (itemId, quantity, date, issuedTo, authorizedBy, purpose, warehouseId) => {
+  const stockOut = async (itemId, quantity, date, issuedTo, authorizedBy, purpose, warehouseId, costCenter, department, project) => {
     const item = items.find(i => i.id === itemId)
     if (!item) throw new Error('Item not found')
     const wh  = warehouseId || item.default_warehouse_id || DEFAULT_WAREHOUSE
@@ -223,8 +224,41 @@ export function InventoryProvider({ children }) {
         qty: quantity, date: date || new Date().toISOString().split('T')[0],
         issued_to: issuedTo, authorized_by: authorizedBy, notes: purpose,
         user_name: authorizedBy, created_at: new Date().toISOString(),
+        cost_center: costCenter || null,
+        department: department || null,
+        project: project || null,
       }]),
     ])
+
+    // Auto GL: DR Department Expense / CR Inventory
+    try {
+      const { data: glConfig } = await supabase
+        .from('inventory_gl_config')
+        .select('*')
+        .eq('event_type', 'stock_issue')
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (glConfig?.debit_account_code && glConfig?.credit_account_code) {
+        const valuationRate = bin?.valuation_rate ?? item.cost ?? 0
+        const totalValue = quantity * valuationRate
+        if (totalValue > 0) {
+          await postToGL({
+            sourceModule: 'inventory',
+            sourceType: 'stock_issue',
+            sourceId: `${txId}-gl`,
+            entryDate: date || new Date().toISOString().split('T')[0],
+            description: `Stock Issue: ${item.name} × ${quantity} to ${issuedTo || 'Department'}`,
+            reference: `ISSUE-${txId}`,
+            postedBy: authorizedBy || 'System',
+            lines: [
+              { account_code: glConfig.debit_account_code,  debit: totalValue, credit: 0,          description: `${item.name} issued to ${issuedTo || purpose || 'Department'}` },
+              { account_code: glConfig.credit_account_code, debit: 0,          credit: totalValue, description: `Inventory: ${item.name}` },
+            ],
+          }).catch(() => null)
+        }
+      }
+    } catch (_) { /* GL not configured */ }
 
     auditLog({ module: 'inventory', action: 'STOCK_OUT', entityType: 'sle', entityId: sleId, entityName: item.name, userName: authorizedBy || '' })
     await fetchAll()
@@ -272,6 +306,38 @@ export function InventoryProvider({ children }) {
           user_name: countedBy, created_at: new Date().toISOString(),
         }]),
       ])
+
+      if (variance < 0) {
+        // Shrinkage: DR Inventory Shrinkage Expense / CR Inventory
+        try {
+          const { data: glConfig } = await supabase
+            .from('inventory_gl_config')
+            .select('*')
+            .eq('event_type', 'stock_adjustment_loss')
+            .eq('is_active', true)
+            .maybeSingle()
+
+          if (glConfig?.debit_account_code && glConfig?.credit_account_code) {
+            const valuationRate = bin?.valuation_rate ?? item.cost ?? 0
+            const shrinkageValue = Math.abs(variance) * valuationRate
+            if (shrinkageValue > 0) {
+              await postToGL({
+                sourceModule: 'inventory',
+                sourceType: 'stock_adjustment',
+                sourceId: `${stId}-gl`,
+                entryDate: date || new Date().toISOString().split('T')[0],
+                description: `Stock Adjustment Loss: ${item.name} variance ${variance}`,
+                reference: `STKTAKE-${stId}`,
+                postedBy: countedBy || 'System',
+                lines: [
+                  { account_code: glConfig.debit_account_code,  debit: shrinkageValue, credit: 0,              description: `Shrinkage: ${item.name}` },
+                  { account_code: glConfig.credit_account_code, debit: 0,              credit: shrinkageValue, description: `Inventory: ${item.name}` },
+                ],
+              }).catch(() => null)
+            }
+          }
+        } catch (_) { /* GL not configured */ }
+      }
     }
 
     auditLog({ module: 'inventory', action: 'STOCK_TAKE', entityType: 'stock_take', entityId: stId, entityName: item.name, userName: countedBy || '' })

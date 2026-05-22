@@ -98,6 +98,7 @@ const PurchaseInvoices     = lazy(() => import('./pages/Procurement/PurchaseInvo
 const SupplierPerformance  = lazy(() => import('./pages/Procurement/SupplierPerformance'))
 const ProcurementDashboard = lazy(() => import('./pages/Procurement/ProcurementDashboard'))
 const BudgetControl        = lazy(() => import('./pages/Procurement/BudgetControl'))
+const LandedCostVouchers   = lazy(() => import('./pages/Procurement/LandedCostVouchers'))
 
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
@@ -436,6 +437,7 @@ function AppRoutes() {
           <Route path="quotation-comparison"    element={<QuotationComparison />}   />
           <Route path="purchase-orders"         element={<PurchaseOrders />}        />
           <Route path="goods-received"          element={<GoodsReceived />}         />
+          <Route path="landed-costs"            element={<LandedCostVouchers />}    />
           <Route path="invoices"                element={<PurchaseInvoices />}      />
           <Route path="budget-control"          element={<BudgetControl />}         />
           <Route path="supplier-performance"    element={<SupplierPerformance />}   />
