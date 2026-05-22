@@ -77,8 +77,8 @@ const ALL_MODULES = {
         { id: 'dashboard',            label: 'Dashboard',            icon: 'dashboard'      },
       ],
     }, {
-      label: 'Purchasing Lifecycle', pages: [
-        { id: 'store-requisitions',    label: 'Store Requisitions',   icon: 'assignment'     },
+      label: 'Procurement Cycle', pages: [
+        { id: 'material-requests',     label: 'Material Requests',    icon: 'assignment'     },
         { id: 'purchase-requisitions', label: 'Purchase Requisitions',icon: 'request_quote'  },
         { id: 'rfq',                   label: 'Request for Quotation',icon: 'send'           },
         { id: 'quotations',            label: 'Supplier Quotations',  icon: 'format_quote'   },
@@ -99,20 +99,20 @@ const ALL_MODULES = {
     label: 'Inventory', icon: 'inventory', color: '#2dd4bf',
     sections: [
       {
-        label: 'Stock Management', pages: [
-          { id: 'stock-balance',    label: 'Stock Balance',    icon: 'list_alt'      },
-          { id: 'stock-in',         label: 'Stock In',         icon: 'add_circle'    },
-          { id: 'stock-out',        label: 'Stock Out',        icon: 'remove_circle' },
-          { id: 'transactions',     label: 'Transactions',     icon: 'swap_horiz'    },
-          { id: 'stock-taking',     label: 'Stock Taking',     icon: 'fact_check'    },
-          { id: 'material-requests',label: 'Material Requests',icon: 'assignment'    },
-          { id: 'categories',       label: 'Categories',       icon: 'category'      },
+        label: 'Stock Operations', pages: [
+          { id: 'stock-balance',     label: 'Stock Balance',     icon: 'list_alt'      },
+          { id: 'stock-in',          label: 'Stock In',          icon: 'add_circle'    },
+          { id: 'store-requisitions',label: 'Store Requisitions',icon: 'assignment_returned' },
+          { id: 'stock-out',         label: 'Stock Out',         icon: 'remove_circle' },
+          { id: 'stock-taking',      label: 'Stock Taking',      icon: 'fact_check'    },
+          { id: 'transactions',      label: 'Transactions',      icon: 'swap_horiz'    },
         ],
       },
       {
         label: 'Configuration', pages: [
-          { id: 'warehouses', label: 'Warehouses',       icon: 'warehouse'     },
-          { id: 'locations',  label: 'Storage Locations',icon: 'location_on'   },
+          { id: 'categories', label: 'Categories',       icon: 'category'   },
+          { id: 'warehouses', label: 'Warehouses',       icon: 'warehouse'  },
+          { id: 'locations',  label: 'Storage Locations',icon: 'location_on'},
         ],
       },
     ],

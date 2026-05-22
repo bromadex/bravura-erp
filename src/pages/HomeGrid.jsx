@@ -22,8 +22,8 @@ import TopBar from '../components/layout/TopBar'
 // null means the module has no sub-pages; navigate directly to its root route
 const MODULE_PAGES = {
   dashboard:   null,
-  procurement: ['suppliers','store-requisitions','purchase-requisitions','purchase-orders','goods-received'],
-  inventory:   ['stock-balance','stock-in','stock-out','transactions','stock-taking','categories','locations'],
+  procurement: ['material-requests','purchase-requisitions','purchase-orders','goods-received','suppliers'],
+  inventory:   ['stock-balance','stock-in','store-requisitions','stock-out','stock-taking','warehouses'],
   logistics:   ['dashboard','camp','batch-plant','deliveries'],
   fuel:        ['tanks','dipstick','issuance','deliveries','reports'],
   fleet:       ['dashboard','vehicles','generators','heavy-equipment','maintenance-alerts','asset-issues','asset-registry','registry','reclass-log','asset-import','category-config'],
