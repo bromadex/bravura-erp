@@ -19,6 +19,7 @@ export function InventoryProvider({ children }) {
   const [reorderLevels,   setReorderLevels]   = useState([])
   // Legacy: keep transactions in state so existing Transactions.jsx still works
   const [transactions,    setTransactions]    = useState([])
+  const [stockTransfers,  setStockTransfers]  = useState([])
   const [loading,         setLoading]         = useState(true)
 
   const generateId = () =>
@@ -27,7 +28,7 @@ export function InventoryProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [itemsRes, binsRes, whRes, sleRes, stRes, catRes, mrRes, mrItemRes, rlRes, txRes] =
+      const [itemsRes, binsRes, whRes, sleRes, stRes, catRes, mrRes, mrItemRes, rlRes, txRes, stxRes] =
         await Promise.all([
           supabase.from('items').select('*').order('name'),
           supabase.from('bins').select('*, warehouses(code, name, type)').order('item_id'),
@@ -40,6 +41,7 @@ export function InventoryProvider({ children }) {
           supabase.from('material_request_items').select('*'),
           supabase.from('item_reorder_levels').select('*'),
           supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(500),
+          supabase.from('stock_transfers').select('*, stock_transfer_lines(*)').order('created_at', { ascending: false }),
         ])
       if (itemsRes.data)   setItems(itemsRes.data)
       if (binsRes.data)    setBins(binsRes.data)
@@ -51,6 +53,7 @@ export function InventoryProvider({ children }) {
       if (mrItemRes.data)  setMrItems(mrItemRes.data)
       if (rlRes.data)      setReorderLevels(rlRes.data)
       if (txRes.data)      setTransactions(txRes.data)
+      if (stxRes.data)     setStockTransfers(stxRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load inventory data')
@@ -454,6 +457,96 @@ export function InventoryProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Stock Transfers ────────────────────────────────────────────────────
+
+  const createStockTransfer = async (transfer, lines) => {
+    const id = generateId()
+    const transferNo = `ST-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const { error } = await supabase.from('stock_transfers').insert([{
+      id, transfer_no: transferNo, ...transfer,
+      status: 'Draft',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    for (const line of lines) {
+      await supabase.from('stock_transfer_lines').insert([{
+        id: generateId(), transfer_id: id,
+        item_id: line.itemId, item_name: line.itemName,
+        unit: line.unit || 'pcs', qty: parseFloat(line.qty),
+        qty_transferred: 0,
+        from_warehouse_id: transfer.from_warehouse_id,
+        to_warehouse_id: transfer.to_warehouse_id,
+        valuation_rate: line.valuationRate || 0,
+        notes: line.notes || '',
+        created_at: new Date().toISOString(),
+      }])
+    }
+    await fetchAll()
+    return { id, transfer_no: transferNo }
+  }
+
+  const submitStockTransfer = async (id) => {
+    const { error } = await supabase.from('stock_transfers').update({
+      status: 'Pending Approval', updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const approveStockTransfer = async (id, approverName, approverId) => {
+    const { error } = await supabase.from('stock_transfers').update({
+      status: 'Approved', approved_by: approverName, approved_by_id: approverId,
+      approved_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const completeStockTransfer = async (id) => {
+    const transfer = stockTransfers.find(t => t.id === id)
+    if (!transfer) throw new Error('Transfer not found')
+    if (!['Approved', 'In Transit'].includes(transfer.status)) throw new Error('Transfer must be Approved before completing')
+    const lines = transfer.stock_transfer_lines || []
+    const now = new Date().toISOString()
+    const today = now.split('T')[0]
+    for (const line of lines) {
+      const qty = parseFloat(line.qty) || 0
+      if (qty <= 0) continue
+      await supabase.from('stock_ledger_entries').insert([{
+        id: generateId(), item_id: line.item_id,
+        warehouse_id: transfer.from_warehouse_id,
+        voucher_type: 'Stock Transfer', voucher_no: transfer.transfer_no,
+        actual_qty: -qty, outgoing_rate: line.valuation_rate || 0, incoming_rate: 0,
+        posting_date: today, created_at: now, updated_at: now,
+      }]).catch(() => null)
+      await supabase.from('stock_ledger_entries').insert([{
+        id: generateId(), item_id: line.item_id,
+        warehouse_id: transfer.to_warehouse_id,
+        voucher_type: 'Stock Transfer', voucher_no: transfer.transfer_no,
+        actual_qty: qty, incoming_rate: line.valuation_rate || 0, outgoing_rate: 0,
+        posting_date: today, created_at: now, updated_at: now,
+      }]).catch(() => null)
+      await supabase.from('stock_transfer_lines').update({ qty_transferred: qty }).eq('id', line.id)
+      if (line.item_id) {
+        const { data: item } = await supabase.from('items').select('balance').eq('id', line.item_id).maybeSingle()
+        if (item) await supabase.from('items').update({ balance: (item.balance || 0) - qty }).eq('id', line.item_id)
+      }
+    }
+    await supabase.from('stock_transfers').update({
+      status: 'Completed', completed_at: now, updated_at: now,
+    }).eq('id', id)
+    await fetchAll()
+  }
+
+  const cancelStockTransfer = async (id, reason) => {
+    const { error } = await supabase.from('stock_transfers').update({
+      status: 'Cancelled', cancellation_reason: reason, updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
   // Auto-create MRs for all items below reorder level
   const autoCreateReorderMRs = async (createdBy) => {
     const belowReorder = getItemsBelowReorder()
@@ -476,6 +569,7 @@ export function InventoryProvider({ children }) {
       items, bins, warehouses, stockLedger, stockTakes, categories,
       materialRequests, mrItems, reorderLevels,
       transactions,  // legacy
+      stockTransfers,
       loading,
       // Bin helpers
       getBin, getActualQty, getProjectedQty, getValuationRate,
@@ -493,6 +587,9 @@ export function InventoryProvider({ children }) {
       // Material requests
       createMaterialRequest, updateMaterialRequestStatus, deleteMaterialRequest,
       autoCreateReorderMRs,
+      // Stock transfers
+      createStockTransfer, submitStockTransfer, approveStockTransfer,
+      completeStockTransfer, cancelStockTransfer,
       fetchAll,
     }}>
       {children}

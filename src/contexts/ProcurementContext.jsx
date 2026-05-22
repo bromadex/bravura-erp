@@ -26,6 +26,12 @@ export function ProcurementProvider({ children }) {
   const [purchaseInvoices,     setPurchaseInvoices]     = useState([])
   const [budgets,              setBudgets]              = useState([])
   const [loading,              setLoading]              = useState(true)
+  const [poLines,              setPoLines]              = useState([])
+  const [grnLines,             setGrnLines]             = useState([])
+  const [invoiceLines,         setInvoiceLines]         = useState([])
+  const [rfqLines,             setRfqLines]             = useState([])
+  const [quotLines,            setQuotLines]            = useState([])
+  const [stockTransfers,       setStockTransfers]       = useState([])
 
   const generateId = () => crypto.randomUUID()
 
@@ -34,7 +40,8 @@ export function ProcurementProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes] = await Promise.all([
+      const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes,
+             polRes, grlRes, pilRes, rflRes, qllRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
@@ -44,6 +51,11 @@ export function ProcurementProvider({ children }) {
         safe(supabase.from('rfq_quotations').select('*').order('created_at', { ascending: false })),
         safe(supabase.from('purchase_invoices').select('*').order('invoice_date', { ascending: false })),
         safe(supabase.from('procurement_budgets').select('*').order('department')),
+        safe(supabase.from('purchase_order_lines').select('*').order('created_at')),
+        safe(supabase.from('grn_lines').select('*').order('created_at')),
+        safe(supabase.from('purchase_invoice_lines').select('*').order('created_at')),
+        safe(supabase.from('rfq_lines').select('*').order('created_at')),
+        safe(supabase.from('quotation_lines').select('*').order('created_at')),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
@@ -54,6 +66,11 @@ export function ProcurementProvider({ children }) {
       if (quotRes.data) setRfqQuotations(quotRes.data)
       if (piRes.data)   setPurchaseInvoices(piRes.data)
       if (budRes.data)  setBudgets(budRes.data)
+      if (polRes.data) setPoLines(polRes.data)
+      if (grlRes.data) setGrnLines(grlRes.data)
+      if (pilRes.data) setInvoiceLines(pilRes.data)
+      if (rflRes.data) setRfqLines(rflRes.data)
+      if (qllRes.data) setQuotLines(qllRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -307,6 +324,27 @@ export function ProcurementProvider({ children }) {
       id, po_number: poNumber, ...po, created_at: new Date().toISOString(),
     }])
     if (error) throw error
+
+    // Write normalized purchase_order_lines
+    const poItemsList = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : (po.items || [])
+    if (poItemsList.length > 0) {
+      const lineInserts = poItemsList.map(it => ({
+        id: generateId(), po_id: id,
+        item_name: it.name || it.item_name || '',
+        category:  it.category || '',
+        unit:      it.unit || 'pcs',
+        qty_ordered: parseFloat(it.ordered_qty || it.qty || 0),
+        qty_received: 0, qty_invoiced: 0, qty_returned: 0,
+        unit_rate: parseFloat(it.unit_cost || it.unit_price || it.rate || 0),
+        warehouse_id: it.warehouse_id || null,
+        mr_item_id: it.mr_item_id || null,
+        status: 'Open',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
+      await supabase.from('purchase_order_lines').insert(lineInserts).catch(() => null)
+    }
+
     await fetchAll()
     return id
   }
