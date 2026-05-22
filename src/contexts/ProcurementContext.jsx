@@ -447,6 +447,78 @@ export function ProcurementProvider({ children }) {
     if (grn.po_id) {
       await supabase.from('purchase_orders').update({ status: 'partially_received' }).eq('id', grn.po_id)
     }
+
+    // Write normalized grn_lines
+    const grnItemsList = typeof grn.items === 'string' ? JSON.parse(grn.items || '[]') : (grn.items || [])
+    const grnLineInserts = []
+    for (const it of grnItemsList) {
+      // Try to find matching PO line for FK linking
+      let poLineId = null
+      if (grn.po_id) {
+        const matchingPoLine = poLines.find(pl =>
+          pl.po_id === grn.po_id &&
+          pl.item_name.toLowerCase() === (it.name || '').toLowerCase()
+        )
+        poLineId = matchingPoLine?.id || null
+      }
+      // Find item_id
+      const { data: itemRow } = await supabase.from('items').select('id').ilike('name', it.name).maybeSingle()
+      grnLineInserts.push({
+        id: generateId(), grn_id: id,
+        po_line_id: poLineId,
+        item_id: itemRow?.id || null,
+        item_name: it.name || '',
+        category: it.category || '',
+        unit: it.unit || 'pcs',
+        qty_ordered: parseFloat(it.ordered || it.ordered_qty || 0),
+        qty_received: parseFloat(it.received || it.qty || 0),
+        qty_rejected: parseFloat(it.rejected || 0),
+        unit_rate: parseFloat(it.unit_cost || it.unit_price || 0),
+        warehouse_id: it.warehouse_id || 'wh_main_store',
+        batch_no: it.batch_no || it.lot_batch || null,
+        lot_batch: it.lot_batch || null,
+        notes: it.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    }
+    if (grnLineInserts.length > 0) {
+      await supabase.from('grn_lines').insert(grnLineInserts).catch(() => null)
+    }
+
+    // Auto GL posting for GRN
+    try {
+      const { postToGL } = await import('../engine/accountingEngine')
+      // Fetch GL config
+      const { data: glConfig } = await supabase
+        .from('inventory_gl_accounts')
+        .select('*')
+        .eq('event_type', 'grn_receipt')
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (glConfig?.debit_account_code && glConfig?.credit_account_code) {
+        const totalVal = grnItemsList.reduce((s, it) =>
+          s + (parseFloat(it.received || 0) * parseFloat(it.unit_cost || 0)), 0)
+        if (totalVal > 0) {
+          // Resolve account codes to IDs (engine uses resolveAccounts internally via account_code)
+          await postToGL({
+            sourceModule: 'procurement',
+            sourceType:   'goods_received',
+            sourceId:     `${grnNumber}-auto`,
+            entryDate:    grn.date,
+            description:  `GRN ${grnNumber} — ${grn.supplier_name || 'Supplier'}`,
+            reference:    `GRN-${grnNumber}`,
+            postedBy:     grn.received_by || 'System',
+            lines: [
+              { account_code: glConfig.debit_account_code,  debit: totalVal,  credit: 0,        description: `Stock received: ${grnNumber}` },
+              { account_code: glConfig.credit_account_code, debit: 0,         credit: totalVal, description: `GRNI: ${grnNumber}` },
+            ],
+          }).catch(() => null) // non-blocking — don't fail GRN if GL config missing
+        }
+      }
+    } catch (_) { /* GL not configured — skip silently */ }
+
     await fetchAll()
     return id
   }
@@ -502,6 +574,62 @@ export function ProcurementProvider({ children }) {
     }])
     if (error) throw error
     auditLog({ module: 'procurement', action: 'CREATE', entityType: 'purchase_invoice', entityId: id, entityName: piNumber })
+
+    // Write normalized purchase_invoice_lines with 3-way match data
+    const piItemsList = typeof pi.items === 'string' ? JSON.parse(pi.items || '[]') : (pi.items || [])
+    for (const it of piItemsList) {
+      // Try to find matching GRN line and PO line for 3-way match
+      let grnLineId = null, poLineId = null, grnQty = null, grnRate = null, poQty = null, poRate = null
+
+      if (pi.grn_id) {
+        const matchGrn = grnLines.find(gl =>
+          gl.grn_id === pi.grn_id && gl.item_name.toLowerCase() === (it.name || '').toLowerCase()
+        )
+        if (matchGrn) {
+          grnLineId = matchGrn.id
+          grnQty    = matchGrn.qty_received
+          grnRate   = matchGrn.unit_rate
+          poLineId  = matchGrn.po_line_id
+        }
+      }
+      if (!poLineId && pi.po_id) {
+        const matchPo = poLines.find(pl =>
+          pl.po_id === pi.po_id && pl.item_name.toLowerCase() === (it.name || '').toLowerCase()
+        )
+        if (matchPo) {
+          poLineId = matchPo.id
+          poQty    = matchPo.qty_ordered
+          poRate   = matchPo.unit_rate
+        }
+      }
+
+      const invQty  = parseFloat(it.qty || it.quantity || 0)
+      const invRate = parseFloat(it.unit_price || it.unit_cost || it.rate || 0)
+
+      // Determine 3-way match status
+      let matchStatus = 'Pending'
+      let matchNotes = ''
+      if (grnQty !== null && poRate !== null) {
+        if (invQty > (grnQty || 0) * 1.001) { matchStatus = 'Overbilled'; matchNotes = `Invoice qty ${invQty} > GRN accepted ${grnQty}` }
+        else if (poRate && Math.abs(invRate - poRate) / poRate > 0.01) { matchStatus = 'Rate Mismatch'; matchNotes = `Invoice rate ${invRate} vs PO rate ${poRate}` }
+        else { matchStatus = 'Matched' }
+      }
+
+      await supabase.from('purchase_invoice_lines').insert([{
+        id: generateId(), invoice_id: id,
+        grn_line_id: grnLineId, po_line_id: poLineId,
+        item_name: it.name || '', category: it.category || '',
+        unit: it.unit || 'pcs',
+        qty: invQty, unit_rate: invRate,
+        tax_rate: parseFloat(it.tax_rate || 0),
+        po_qty: poQty, po_rate: poRate,
+        grn_qty: grnQty, grn_rate: grnRate,
+        match_status: matchStatus, match_notes: matchNotes,
+        notes: it.notes || null,
+        created_at: new Date().toISOString(),
+      }]).catch(() => null)
+    }
+
     await fetchAll(); return id
   }
 
@@ -561,10 +689,28 @@ export function ProcurementProvider({ children }) {
     return { ok: true, warning: false, message: `$${remaining.toFixed(2)} remaining (${(100 - pctUsed).toFixed(0)}%)`, pctUsed }
   }
 
+  // ── Line-level helpers ────────────────────────────────────
+  // Get normalized lines for a specific PO
+  const getPoLines = (poId) => poLines.filter(l => l.po_id === poId)
+  // Get normalized lines for a specific GRN
+  const getGrnLines = (grnId) => grnLines.filter(l => l.grn_id === grnId)
+  // Get normalized lines for a specific invoice
+  const getInvoiceLines = (invoiceId) => invoiceLines.filter(l => l.invoice_id === invoiceId)
+  // Get aggregate 3-way match status for an invoice
+  const getMatchStatus = (invoiceId) => {
+    const lines = invoiceLines.filter(l => l.invoice_id === invoiceId)
+    if (!lines.length) return 'Pending'
+    if (lines.every(l => l.match_status === 'Matched')) return 'Matched'
+    if (lines.some(l => ['Overbilled', 'Rate Mismatch', 'Qty Mismatch'].includes(l.match_status))) return 'Exception'
+    return 'Partial'
+  }
+
   return (
     <ProcurementContext.Provider value={{
       suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived,
       rfqs, rfqQuotations, purchaseInvoices, budgets, loading,
+      poLines, grnLines, invoiceLines, rfqLines, quotLines,
+      getPoLines, getGrnLines, getInvoiceLines, getMatchStatus,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
       approveStoreRequisition, rejectStoreRequisition, fulfillStoreRequisition,
