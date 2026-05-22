@@ -92,7 +92,7 @@ export default function Employees() {
   const [form, setForm] = useState({
     name: '', employee_number: '', designation_id: '', department_id: '',
     phone: '', email: '', hire_date: '', date_of_birth: '',
-    residential_address: '', emergency_name: '', emergency_phone: '',
+    residential_address: '', emergency_contact_name: '', emergency_contact_phone: '',
     employment_type: 'Full-time', status: 'Active'
   })
   const [createAccount, setCreateAccount] = useState(false)
@@ -130,7 +130,7 @@ export default function Employees() {
 
   const fetchSystemAccount = async (employee) => {
     if (!employee.system_user_id) { setSystemAccountData(null); return }
-    const { data } = await supabase.from('app_users').select('username, must_change_password, password_plain').eq('id', employee.system_user_id).single()
+    const { data } = await supabase.from('app_users').select('username, must_change_password').eq('id', employee.system_user_id).single()
     setSystemAccountData(data || null)
   }
 
@@ -230,8 +230,8 @@ export default function Employees() {
 
   const openModal = (employee = null) => {
     setManualEmployeeId(false); setInitialBalances([])
-    if (employee) { setEditing(employee); setForm({ name: employee.name || '', employee_number: employee.employee_number || '', designation_id: employee.designation_id || '', department_id: employee.department_id || '', phone: employee.phone || '', email: employee.email || '', hire_date: employee.hire_date || '', date_of_birth: employee.date_of_birth || '', residential_address: employee.residential_address || '', emergency_name: employee.emergency_name || '', emergency_phone: employee.emergency_phone || '', employment_type: employee.employment_type || 'Full-time', status: employee.status || 'Active' }); setCreateAccount(false) }
-    else { setEditing(null); setForm({ name: '', employee_number: '', designation_id: '', department_id: '', phone: '', email: '', hire_date: '', date_of_birth: '', residential_address: '', emergency_name: '', emergency_phone: '', employment_type: 'Full-time', status: 'Active' }); setCreateAccount(false) }
+    if (employee) { setEditing(employee); setForm({ name: employee.name || '', employee_number: employee.employee_number || '', designation_id: employee.designation_id || '', department_id: employee.department_id || '', phone: employee.phone || '', email: employee.email || '', hire_date: employee.hire_date || '', date_of_birth: employee.date_of_birth || '', residential_address: employee.residential_address || '', emergency_contact_name: employee.emergency_contact_name || employee.emergency_name || '', emergency_contact_phone: employee.emergency_contact_phone || employee.emergency_phone || '', employment_type: employee.employment_type || 'Full-time', status: employee.status || 'Active' }); setCreateAccount(false) }
+    else { setEditing(null); setForm({ name: '', employee_number: '', designation_id: '', department_id: '', phone: '', email: '', hire_date: '', date_of_birth: '', residential_address: '', emergency_contact_name: '', emergency_contact_phone: '', employment_type: 'Full-time', status: 'Active' }); setCreateAccount(false) }
     setModalOpen(true)
   }
 
@@ -312,7 +312,7 @@ export default function Employees() {
   const ProfileTab = ({ employee }) => {
     const filteredDocs = documents.filter(d => d.category === activeDocCategory)
     const { cls, label } = getStatusBadge(employee)
-    const showPassword = systemAccountData?.must_change_password === true && systemAccountData?.password_plain
+    const showPassword = systemAccountData?.must_change_password === true
     const empTenure    = tenure(employee.hire_date)
 
     const docIcon = (name) => {
@@ -367,7 +367,7 @@ export default function Employees() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20, fontSize: 13 }}>
           {[
             { label: 'Date of Birth',    value: employee.date_of_birth },
-            { label: 'Emergency Contact', value: employee.emergency_name ? `${employee.emergency_name} (${employee.emergency_phone || '—'})` : null },
+            { label: 'Emergency Contact', value: (employee.emergency_contact_name || employee.emergency_name) ? `${employee.emergency_contact_name || employee.emergency_name} (${employee.emergency_contact_phone || employee.emergency_phone || '—'})` : null },
           ].filter(r => r.value).map(r => (
             <div key={r.label} style={{ background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{r.label}</div>
@@ -386,7 +386,7 @@ export default function Employees() {
               <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 <div><span className="text-dim">Username: </span><strong style={{ fontFamily: 'var(--mono)' }}>{employee.system_username}</strong></div>
                 {showPassword ? (
-                  <div><span className="text-dim">Temp Password: </span><strong style={{ fontFamily: 'var(--mono)', color: 'var(--yellow)' }}>{systemAccountData.password_plain}</strong><span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>(not yet changed)</span></div>
+                  <div><span className="text-dim">Password: </span><span style={{ color: 'var(--yellow)', fontSize: 12 }}><span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>warning</span>Awaiting first login (use Reset Password to issue new credentials)</span></div>
                 ) : employee.system_user_id ? (
                   <div><span className="text-dim">Password: </span><span style={{ color: 'var(--green)', fontSize: 12 }}><span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>check_circle</span>Changed by employee</span></div>
                 ) : null}
@@ -1109,7 +1109,7 @@ export default function Employees() {
               <div className="form-row"><div className="form-group"><label>Phone</label><input className="form-control" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div><div className="form-group"><label>Email</label><input type="email" className="form-control" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div></div>
               <div className="form-row"><div className="form-group"><label>Hire Date *</label><input type="date" className="form-control" required value={form.hire_date} onChange={e => setForm({ ...form, hire_date: e.target.value })} /></div><div className="form-group"><label>Date of Birth</label><input type="date" className="form-control" value={form.date_of_birth} onChange={e => setForm({ ...form, date_of_birth: e.target.value })} /></div></div>
               <div className="form-group"><label>Residential Address</label><textarea className="form-control" rows="2" value={form.residential_address} onChange={e => setForm({ ...form, residential_address: e.target.value })} /></div>
-              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_name} onChange={e => setForm({ ...form, emergency_name: e.target.value })} /></div><div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_phone} onChange={e => setForm({ ...form, emergency_phone: e.target.value })} /></div></div>
+              <div className="form-row"><div className="form-group"><label>Emergency Contact Name</label><input className="form-control" value={form.emergency_contact_name} onChange={e => setForm({ ...form, emergency_contact_name: e.target.value })} /></div><div className="form-group"><label>Emergency Contact Phone</label><input className="form-control" value={form.emergency_contact_phone} onChange={e => setForm({ ...form, emergency_contact_phone: e.target.value })} /></div></div>
               {!editing && leaveTypesList.length > 0 && (<div className="card" style={{ marginTop: 16, padding: 16, background: 'var(--surface2)' }}><h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Leave Balances (Initial)</h4><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>{leaveTypesList.map(lt => { const cur = initialBalances.find(b => b.leave_type_id === lt.id); return (<div key={lt.id} className="form-group"><label>{lt.name}</label><input type="number" step="0.5" min="0" className="form-control" value={cur?.total_days ?? 0} onChange={e => { const val = parseFloat(e.target.value) || 0; setInitialBalances(prev => { const ex = prev.find(b => b.leave_type_id === lt.id); if (ex) return prev.map(b => b.leave_type_id === lt.id ? { ...b, total_days: val } : b); return [...prev, { leave_type_id: lt.id, total_days: val }] }) }} /></div>) })}</div></div>)}
               {!editing && (<div className="form-group" style={{ marginTop: 16 }}><label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={createAccount} onChange={e => setCreateAccount(e.target.checked)} /><span>Create system account (username + password)</span></label>{createAccount && (<div style={{ marginTop: 8 }}><label>System Role</label><select className="form-control" value={accountRoleId} onChange={e => setAccountRoleId(e.target.value)}><option value="role_super_admin">Super Admin</option><option value="role_hr_manager">HR Manager</option><option value="role_dept_manager">Department Manager</option><option value="role_storekeeper">Storekeeper</option><option value="role_fuel_attendant">Fuel Attendant</option><option value="role_viewer">Viewer</option></select></div>)}</div>)}
               <div className="modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary">{editing ? 'Save' : (createAccount ? 'Add & Create Account' : 'Add Employee')}</button></div>

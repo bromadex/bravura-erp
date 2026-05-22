@@ -134,7 +134,7 @@ export default function ESSLeave() {
         leave_type_id:  form.leave_type_id,
         start_date:     form.from_date,
         end_date:       form.to_date,
-        is_half_day:    form.half_day,
+        half_day:         form.half_day,
         total_leave_days: days,
         reason:         form.reason,
         status:         'pending_supervisor',
@@ -329,7 +329,7 @@ export default function ESSLeave() {
                   <td style={{ padding: '8px 8px', fontSize: 12 }}>
                     {req.start_date}
                     {req.start_date !== req.end_date ? ` → ${req.end_date}` : ''}
-                    {req.is_half_day && <span className="badge badge-yellow" style={{ fontSize: 9, marginLeft: 4 }}>½</span>}
+                    {(req.half_day || req.is_half_day) && <span className="badge badge-yellow" style={{ fontSize: 9, marginLeft: 4 }}>½</span>}
                   </td>
                   <td style={{ padding: '8px 8px', fontWeight: 700 }}>{req.total_leave_days ?? '—'}</td>
                   <td style={{ padding: '8px 8px' }}>

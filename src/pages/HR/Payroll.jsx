@@ -142,7 +142,7 @@ export default function Payroll() {
         const leaveDays = leaveRequests.filter(r =>
           r.employee_id === emp.id && r.status === 'approved' &&
           r.start_date <= selectedPeriod.end_date && r.end_date >= selectedPeriod.start_date
-        ).reduce((s, r) => s + (r.days_requested || 0), 0)
+        ).reduce((s, r) => s + (r.total_leave_days ?? r.days_requested ?? 0), 0)
 
         toInsert.push({
           id:                  crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + emp.id.slice(-4),

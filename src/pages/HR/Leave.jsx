@@ -74,7 +74,7 @@ export default function Leave() {
     leave_type_id:  '',
     start_date:     formatDate(new Date()),
     end_date:       formatDate(new Date()),
-    is_half_day:    false,
+    half_day:       false,
     half_day_type:  'morning',
     reason:         '',
     attachment_url: '',
@@ -210,10 +210,10 @@ export default function Leave() {
   useEffect(() => {
     if (form.start_date && form.end_date) {
       let days = getWorkingDays(form.start_date, form.end_date)
-      if (form.is_half_day) days = 0.5
+      if (form.half_day) days = 0.5
       setCalculatedDays(days)
     }
-  }, [form.start_date, form.end_date, form.is_half_day])
+  }, [form.start_date, form.end_date, form.half_day])
 
   // ── My requests ─────────────────────────────────────────────
   useEffect(() => {
@@ -250,7 +250,7 @@ export default function Leave() {
       return toast.error('This leave type requires an attachment')
     setSubmitting(true)
     try {
-      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, days_requested: calculatedDays, is_half_day: form.is_half_day, half_day_type: form.is_half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'draft' }
+      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, total_leave_days: calculatedDays, half_day: form.half_day, half_day_type: form.half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'draft' }
       if (draftId) {
         await updateLeaveRequest(draftId, data)
         toast.success('Draft updated')
@@ -281,10 +281,10 @@ export default function Leave() {
     }
     setSubmitting(true)
     try {
-      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, days_requested: calculatedDays, is_half_day: form.is_half_day, half_day_type: form.is_half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'draft' }
+      const data = { employee_id: currentEmployeeId, leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, total_leave_days: calculatedDays, half_day: form.half_day, half_day_type: form.half_day ? form.half_day_type : null, reason: form.reason, attachment_url: form.attachment_url, status: 'draft' }
       if (draftId) { await updateLeaveRequest(draftId, data) } else { await createLeaveRequest(data) }
       toast.success('Leave request submitted for approval')
-      setForm({ employee_id: currentEmployeeId, leave_type_id: '', start_date: formatDate(new Date()), end_date: formatDate(new Date()), is_half_day: false, half_day_type: 'morning', reason: '', attachment_url: '', status: 'draft' })
+      setForm({ employee_id: currentEmployeeId, leave_type_id: '', start_date: formatDate(new Date()), end_date: formatDate(new Date()), half_day: false, half_day_type: 'morning', reason: '', attachment_url: '', status: 'draft' })
       setDraftId(null)
       await fetchAll()
     } catch (err) { toast.error(err.message) }
@@ -310,7 +310,7 @@ export default function Leave() {
 
   const editDraft = (req) => {
     if (req.status !== 'draft') { toast.error('Only drafts can be edited.'); return }
-    setForm({ employee_id: req.employee_id, leave_type_id: req.leave_type_id, start_date: req.start_date, end_date: req.end_date, is_half_day: req.is_half_day || false, half_day_type: req.half_day_type || 'morning', reason: req.reason || '', attachment_url: req.attachment_url || '', status: 'draft' })
+    setForm({ employee_id: req.employee_id, leave_type_id: req.leave_type_id, start_date: req.start_date, end_date: req.end_date, half_day: req.half_day || req.is_half_day || false, half_day_type: req.half_day_type || 'morning', reason: req.reason || '', attachment_url: req.attachment_url || '', status: 'draft' })
     setDraftId(req.id)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -367,7 +367,7 @@ export default function Leave() {
               {getLeaveTypeName(request.leave_type_id)} · {request.start_date} → {request.end_date}
             </div>
             <div style={{ fontSize: 12, marginTop: 2 }}>
-              <strong style={{ color: 'var(--gold)' }}>{request.days_requested} day{request.days_requested !== 1 ? 's' : ''}</strong>
+              <strong style={{ color: 'var(--gold)' }}>{request.total_leave_days ?? request.days_requested} day{(request.total_leave_days ?? request.days_requested) !== 1 ? 's' : ''}</strong>
             </div>
           </div>
           <span className={`badge ${role === 'supervisor' ? 'badge-blue' : 'badge-purple'}`}>
@@ -477,11 +477,11 @@ export default function Leave() {
 
           <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={form.is_half_day}
-                onChange={e => setForm({ ...form, is_half_day: e.target.checked })} />
+              <input type="checkbox" checked={form.half_day}
+                onChange={e => setForm({ ...form, half_day: e.target.checked })} />
               <span>Half day request</span>
             </label>
-            {form.is_half_day && (
+            {form.half_day && (
               <select className="form-control" style={{ marginTop: 8 }} value={form.half_day_type}
                 onChange={e => setForm({ ...form, half_day_type: e.target.value })}>
                 <option value="morning">Morning (0.5 day)</option>
@@ -545,7 +545,7 @@ export default function Leave() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <div style={{ fontWeight: 700 }}>{getLeaveTypeName(req.leave_type_id)}</div>
-                      <div style={{ fontSize: 12 }}>{req.start_date} → {req.end_date} ({req.days_requested} days)</div>
+                      <div style={{ fontSize: 12 }}>{req.start_date} → {req.end_date} ({req.total_leave_days ?? req.days_requested} days)</div>
                       <span className={`badge ${statusBadge(req.status)}`} style={{ marginTop: 6 }}>
                         {req.status.replace(/_/g, ' ')}
                       </span>
