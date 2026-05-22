@@ -11,7 +11,7 @@ import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../.
 const today = new Date().toISOString().split('T')[0]
 
 export default function StockIn() {
-  const { items, transactions, stockIn: doStockIn, loading } = useInventory()
+  const { items, transactions, warehouses, stockIn: doStockIn, getBin, loading } = useInventory()
   const canEdit = useCanEdit('inventory', 'stock-in')
 
   const [showModal, setShowModal] = useState(false)
@@ -101,23 +101,42 @@ export default function StockIn() {
         </div>
       </div>
 
-      {showModal && <StockInModal items={items} onClose={() => setShowModal(false)} onSave={doStockIn} />}
+      {showModal && <StockInModal items={items} warehouses={warehouses} getBin={getBin} onClose={() => setShowModal(false)} onSave={doStockIn} />}
     </div>
   )
 }
 
-function StockInModal({ items, onClose, onSave }) {
-  const [form, setForm] = useState({ itemId: '', quantity: 1, date: today, deliveredBy: '', receivedBy: '', notes: '' })
+function StockInModal({ items, warehouses, getBin, onClose, onSave }) {
+  const [form, setForm] = useState({
+    itemId: '', quantity: 1, date: today, deliveredBy: '',
+    receivedBy: '', notes: '', warehouseId: 'wh_main_store', unitCost: '',
+  })
   const [saving, setSaving] = useState(false)
   const selectedItem = items.find(i => i.id === form.itemId)
+  const currentBin   = selectedItem ? getBin(selectedItem.id, form.warehouseId) : null
+  const currentQty   = currentBin?.actual_qty ?? selectedItem?.balance ?? 0
+
+  const handleItemChange = (itemId) => {
+    const item = items.find(i => i.id === itemId)
+    setForm(f => ({
+      ...f,
+      itemId,
+      unitCost:    item ? String(item.last_purchase_rate || item.cost || '') : '',
+      warehouseId: item?.default_warehouse_id || 'wh_main_store',
+    }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.itemId)   return toast.error('Select an item')
+    if (!form.itemId)  return toast.error('Select an item')
     if (!form.quantity || form.quantity <= 0) return toast.error('Enter a valid quantity')
     setSaving(true)
     try {
-      await onSave(form.itemId, parseInt(form.quantity), form.date, form.deliveredBy, form.receivedBy || 'Store', form.notes)
+      await onSave(
+        form.itemId, parseFloat(form.quantity), form.date,
+        form.deliveredBy, form.receivedBy || 'Store', form.notes,
+        form.warehouseId, form.unitCost ? parseFloat(form.unitCost) : null,
+      )
       toast.success(`+${form.quantity} ${selectedItem?.unit || 'units'} of ${selectedItem?.name} added`)
       onClose()
     } catch (err) { toast.error(err.message) }
@@ -127,32 +146,47 @@ function StockInModal({ items, onClose, onSave }) {
   return (
     <ModalDialog open onClose={onClose} title="Stock In" size="lg">
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Item *</label>
-          <select className="form-control" required value={form.itemId} onChange={e => setForm({ ...form, itemId: e.target.value })}>
-            <option value="">— Select item —</option>
-            {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit || 'pcs'}) — Balance: {i.balance}</option>)}
-          </select>
+        <div className="form-row">
+          <div className="form-group" style={{ flex: 2 }}>
+            <label>Item *</label>
+            <select className="form-control" required value={form.itemId} onChange={e => handleItemChange(e.target.value)}>
+              <option value="">— Select item —</option>
+              {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit || 'pcs'})</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Warehouse</label>
+            <select className="form-control" value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value })}>
+              {(warehouses.length ? warehouses : [{ id: 'wh_main_store', name: 'Main Store' }]).map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
         {selectedItem && (
-          <div style={{ background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, display: 'flex', gap: 16 }}>
+          <div style={{ background: 'rgba(52,211,153,.08)', border: '1px solid rgba(52,211,153,.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span>Unit: <strong>{selectedItem.unit || 'pcs'}</strong></span>
-            <span>Current Balance: <strong style={{ color: 'var(--green)' }}>{selectedItem.balance}</strong></span>
-            <span>Unit Cost: <strong>${(selectedItem.cost || 0).toFixed(2)}</strong></span>
+            <span>On Hand: <strong style={{ color: 'var(--green)' }}>{currentQty}</strong></span>
+            <span>Projected: <strong style={{ color: 'var(--teal)' }}>{currentBin?.projected_qty ?? currentQty}</strong></span>
+            <span>Valuation Rate: <strong>${(currentBin?.valuation_rate ?? selectedItem.cost ?? 0).toFixed(2)}</strong></span>
           </div>
         )}
         <div className="form-row">
-          <div className="form-group"><label>Quantity *</label><input type="number" className="form-control" required min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} /></div>
+          <div className="form-group"><label>Quantity *</label><input type="number" className="form-control" required min="0.01" step="0.01" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} /></div>
+          <div className="form-group"><label>Unit Cost (for valuation)</label><input type="number" className="form-control" min="0" step="0.01" placeholder="Auto from last purchase" value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} /></div>
           <div className="form-group"><label>Date</label><input type="date" className="form-control" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
         </div>
         <div className="form-row">
-          <div className="form-group"><label>Delivered By (Supplier/Driver)</label><input className="form-control" value={form.deliveredBy} onChange={e => setForm({ ...form, deliveredBy: e.target.value })} /></div>
+          <div className="form-group"><label>Delivered By</label><input className="form-control" value={form.deliveredBy} onChange={e => setForm({ ...form, deliveredBy: e.target.value })} /></div>
           <div className="form-group"><label>Received By</label><input className="form-control" value={form.receivedBy} onChange={e => setForm({ ...form, receivedBy: e.target.value })} /></div>
         </div>
         <div className="form-group"><label>Notes / Reference</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
         {form.itemId && form.quantity > 0 && (
           <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 12 }}>
-            After this transaction: <strong style={{ color: 'var(--green)' }}>{(selectedItem?.balance || 0) + parseInt(form.quantity || 0)} {selectedItem?.unit || 'pcs'}</strong>
+            After this transaction: <strong style={{ color: 'var(--green)' }}>
+              {(parseFloat(currentQty) + parseFloat(form.quantity || 0)).toFixed(2)} {selectedItem?.unit || 'pcs'}
+            </strong>
+            {form.unitCost && <span style={{ marginLeft: 16 }}>New Valuation Rate: <strong>${parseFloat(form.unitCost).toFixed(2)}</strong> (Moving Average)</span>}
           </div>
         )}
         <ModalActions>
