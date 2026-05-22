@@ -18,7 +18,7 @@ import { postToGL, hasGLEntry, getChartOfAccounts } from '../../engine/accountin
 import toast from 'react-hot-toast'
 
 export default function GoodsReceived() {
-  const { goodsReceived, purchaseOrders, createGoodsReceived, loading } = useProcurement()
+  const { goodsReceived, purchaseOrders, createGoodsReceived, loading, getGrnLines, invoiceLines, getMatchStatus } = useProcurement()
   const { user }   = useAuth()
   const canEdit    = useCanEdit('procurement', 'goods-received')
 
@@ -48,7 +48,11 @@ export default function GoodsReceived() {
   useEffect(() => {
     if (!viewGRN?.id) { setGrnGLPosted(false); return }
     setGrnGLLines({ inventory: '', grni: '' })
-    hasGLEntry(`GRN-${viewGRN.id}`).then(({ exists }) => setGrnGLPosted(exists))
+    // Check both auto-posted reference (GRN-<number>) and manual reference (GRN-<id>)
+    Promise.all([
+      hasGLEntry(`GRN-${viewGRN.grn_number}`),
+      hasGLEntry(`GRN-${viewGRN.id}`),
+    ]).then(([byNum, byId]) => setGrnGLPosted(byNum.exists || byId.exists))
   }, [viewGRN?.id])
 
   const emptyForm = () => ({
@@ -377,12 +381,18 @@ export default function GoodsReceived() {
                 Saving this GRN will <strong>automatically update Inventory</strong> — items will be added to or created in the stock list. No separate Stock In entry is needed.
               </div>
 
-              <div className="modal-actions">
+              <div className="modal-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving || itemsWithQty.length === 0}>
-                  <span className="material-icons">move_to_inbox</span>
-                  {saving ? 'Saving…' : `Save GRN & Stock In ${itemsWithQty.length} Item${itemsWithQty.length !== 1 ? 's' : ''}`}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  <button type="submit" className="btn btn-primary" disabled={saving || itemsWithQty.length === 0}>
+                    <span className="material-icons">move_to_inbox</span>
+                    {saving ? 'Saving…' : `Save GRN & Stock In ${itemsWithQty.length} Item${itemsWithQty.length !== 1 ? 's' : ''}`}
+                  </button>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span className="material-icons" style={{ fontSize: 12 }}>account_balance</span>
+                    Submitting will automatically post to GL if configured
+                  </span>
+                </div>
               </div>
             </form>
           </div>
@@ -390,61 +400,139 @@ export default function GoodsReceived() {
       )}
 
       {/* View GRN modal */}
-      {viewGRN && (
-        <div className="overlay" onClick={() => setViewGRN(null)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div className="modal-title" style={{ marginBottom: 4 }}>{viewGRN.grn_number}</div>
-                <span className={`badge ${grnStatus(viewGRN).cls}`}>{grnStatus(viewGRN).label}</span>
+      {viewGRN && (() => {
+        // Prefer normalized lines; fall back to JSONB for old records
+        const normalizedLines = getGrnLines(viewGRN.id)
+        const useNormalized   = normalizedLines.length > 0
+        const displayItems    = useNormalized
+          ? normalizedLines.map(l => ({
+              name:      l.item_name,
+              category:  l.category,
+              unit:      l.unit,
+              ordered:   l.qty_ordered,
+              received:  l.qty_received,
+              unit_cost: l.unit_rate,
+              lot_batch: l.lot_batch,
+            }))
+          : parseItems(viewGRN.items)
+
+        // 3-way match: find invoice lines that reference this GRN's lines
+        const linkedInvLines = invoiceLines.filter(il =>
+          normalizedLines.some(nl => nl.id === il.grn_line_id)
+        )
+        const hasMatchData = linkedInvLines.length > 0
+
+        return (
+          <div className="overlay" onClick={() => setViewGRN(null)}>
+            <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <div className="modal-title" style={{ marginBottom: 4 }}>{viewGRN.grn_number}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className={`badge ${grnStatus(viewGRN).cls}`}>{grnStatus(viewGRN).label}</span>
+                    {grnGLPosted && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '3px 8px', borderRadius: 6 }}>
+                        <span className="material-icons" style={{ fontSize: 13 }}>account_balance</span> GL Posted
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => window.print()} className="btn btn-secondary btn-sm">
+                  <span className="material-icons" style={{ fontSize: 14 }}>print</span> Print
+                </button>
               </div>
-              <button onClick={() => window.print()} className="btn btn-secondary btn-sm">
-                <span className="material-icons" style={{ fontSize: 14 }}>print</span> Print
-              </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 13 }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Date:</span> <strong>{viewGRN.date}</strong></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Supplier:</span> <strong>{viewGRN.supplier_name || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Driver / Vehicle:</span> {viewGRN.driver || '—'}{viewGRN.vehicle ? ` / ${viewGRN.vehicle}` : ''}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Received By:</span> {viewGRN.received_by || '—'}</div>
-              {viewGRN.notes && <div style={{ gridColumn: 'span 2', color: 'var(--text-dim)', fontSize: 12 }}>{viewGRN.notes}</div>}
-            </div>
-            <div className="table-wrap">
-              <table className="stock-table">
-                <thead>
-                  <tr><th>Item</th><th>Category</th><th>Unit</th><th>Ordered</th><th>Received</th><th>Unit Cost</th><th>Total</th><th>Lot/Batch</th></tr>
-                </thead>
-                <tbody>
-                  {parseItems(viewGRN.items).map((it, i) => {
-                    const isShort = it.ordered > 0 && it.received < it.ordered
-                    return (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600 }}>{it.name}</td>
-                        <td>{it.category}</td>
-                        <td>{it.unit || 'pcs'}</td>
-                        <td style={{ fontFamily: 'var(--mono)' }}>{it.ordered || '—'}</td>
-                        <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>
-                          <span style={{ color: isShort ? 'var(--yellow)' : 'var(--green)' }}>{it.received}</span>
-                          {isShort && <span style={{ fontSize: 10, color: 'var(--yellow)', marginLeft: 4 }}>short</span>}
-                        </td>
-                        <td style={{ fontFamily: 'var(--mono)' }}>${(it.unit_cost || 0).toFixed(2)}</td>
-                        <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${((it.received || 0) * (it.unit_cost || 0)).toFixed(2)}</td>
-                        <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{it.lot_batch || '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="modal-actions">
-              {grnGLPosted
-                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
-                : <button className="btn btn-secondary" onClick={() => setGrnGLModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>}
-              <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16, fontSize: 13 }}>
+                <div><span style={{ color: 'var(--text-dim)' }}>Date:</span> <strong>{viewGRN.date}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Supplier:</span> <strong>{viewGRN.supplier_name || '—'}</strong></div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Driver / Vehicle:</span> {viewGRN.driver || '—'}{viewGRN.vehicle ? ` / ${viewGRN.vehicle}` : ''}</div>
+                <div><span style={{ color: 'var(--text-dim)' }}>Received By:</span> {viewGRN.received_by || '—'}</div>
+                {viewGRN.notes && <div style={{ gridColumn: 'span 2', color: 'var(--text-dim)', fontSize: 12 }}>{viewGRN.notes}</div>}
+              </div>
+
+              {/* Line items table */}
+              <div className="table-wrap">
+                <table className="stock-table">
+                  <thead>
+                    <tr><th>Item</th><th>Category</th><th>Unit</th><th>Ordered</th><th>Received</th><th>Unit Cost</th><th>Total</th><th>Lot/Batch</th></tr>
+                  </thead>
+                  <tbody>
+                    {displayItems.map((it, i) => {
+                      const isShort = it.ordered > 0 && it.received < it.ordered
+                      return (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600 }}>{it.name}</td>
+                          <td>{it.category}</td>
+                          <td>{it.unit || 'pcs'}</td>
+                          <td style={{ fontFamily: 'var(--mono)' }}>{it.ordered || '—'}</td>
+                          <td style={{ fontFamily: 'var(--mono)', fontWeight: 700 }}>
+                            <span style={{ color: isShort ? 'var(--yellow)' : 'var(--green)' }}>{it.received}</span>
+                            {isShort && <span style={{ fontSize: 10, color: 'var(--yellow)', marginLeft: 4 }}>short</span>}
+                          </td>
+                          <td style={{ fontFamily: 'var(--mono)' }}>${(it.unit_cost || 0).toFixed(2)}</td>
+                          <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>${((it.received || 0) * (it.unit_cost || 0)).toFixed(2)}</td>
+                          <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{it.lot_batch || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 3-way match section — only shown when invoice lines link to this GRN */}
+              {hasMatchData && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="material-icons" style={{ fontSize: 14 }}>compare_arrows</span>
+                    3-WAY MATCH
+                  </div>
+                  <div className="table-wrap">
+                    <table className="stock-table" style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>PO Qty</th><th>PO Rate</th>
+                          <th>GRN Qty</th><th>GRN Rate</th>
+                          <th>Inv Qty</th><th>Inv Rate</th>
+                          <th>Match</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {linkedInvLines.map((il, i) => {
+                          const matchCol = il.match_status === 'Matched' ? 'var(--green)'
+                            : il.match_status === 'Pending' ? 'var(--text-dim)'
+                            : 'var(--red)'
+                          return (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600 }}>{il.item_name}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>{il.po_qty ?? '—'}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>{il.po_rate != null ? `$${Number(il.po_rate).toFixed(2)}` : '—'}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>{il.grn_qty ?? '—'}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>{il.grn_rate != null ? `$${Number(il.grn_rate).toFixed(2)}` : '—'}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>{il.qty}</td>
+                              <td style={{ fontFamily: 'var(--mono)' }}>${Number(il.unit_rate || 0).toFixed(2)}</td>
+                              <td>
+                                <span style={{ color: matchCol, fontWeight: 600 }}>{il.match_status}</span>
+                                {il.match_notes && <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{il.match_notes}</div>}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                {grnGLPosted
+                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
+                  : <button className="btn btn-secondary" onClick={() => setGrnGLModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>}
+                <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* GRN GL Posting Modal */}
       {grnGLModal && viewGRN && (
