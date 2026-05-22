@@ -77,6 +77,7 @@ const DashboardOverview = lazy(() => import('./pages/Dashboard/DashboardOverview
 const StockBalance       = lazy(() => import('./pages/Inventory/StockBalance'))
 const StockIn            = lazy(() => import('./pages/Inventory/StockIn'))
 const StockOut           = lazy(() => import('./pages/Inventory/StockOut'))
+const StockTransfers     = lazy(() => import('./pages/Inventory/StockTransfers'))
 const Transactions       = lazy(() => import('./pages/Inventory/Transactions'))
 const StockTaking        = lazy(() => import('./pages/Inventory/StockTaking'))
 const Categories         = lazy(() => import('./pages/Inventory/Categories'))
@@ -403,6 +404,7 @@ function AppRoutes() {
           <Route index                          element={<StockBalance />} />
           <Route path="stock-balance"           element={<StockBalance />} />
           <Route path="stock-in"                element={<StockIn />} />
+          <Route path="stock-transfers"         element={<StockTransfers />} />
           <Route path="store-requisitions"      element={<StoreRequisitions />} />
           <Route path="stock-out"               element={<StockOut />} />
           <Route path="stock-taking"            element={<StockTaking />} />

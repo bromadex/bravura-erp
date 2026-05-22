@@ -102,6 +102,7 @@ const ALL_MODULES = {
         label: 'Stock Operations', pages: [
           { id: 'stock-balance',     label: 'Stock Balance',     icon: 'list_alt'      },
           { id: 'stock-in',          label: 'Stock In',          icon: 'add_circle'    },
+          { id: 'stock-transfers',   label: 'Stock Transfers',   icon: 'sync_alt'      },
           { id: 'store-requisitions',label: 'Store Requisitions',icon: 'assignment_returned' },
           { id: 'stock-out',         label: 'Stock Out',         icon: 'remove_circle' },
           { id: 'stock-taking',      label: 'Stock Taking',      icon: 'fact_check'    },
