@@ -357,22 +357,27 @@ export function ProcurementProvider({ children }) {
       }]).catch(() => null) // non-blocking — don't fail GRN if perf log fails
     }
 
-    // Auto-update inventory stock
+    // Auto-update inventory stock + write Stock Ledger Entries
     for (const it of grn.items) {
       const { data: existing } = await supabase.from('items').select('*').ilike('name', it.name).maybeSingle()
+      let itemId = existing?.id
       if (!existing) {
+        itemId = generateId()
         await supabase.from('items').insert([{
-          id: generateId(), name: it.name, category: it.category,
+          id: itemId, name: it.name, category: it.category,
           unit: it.unit || 'pcs', balance: it.received, total_in: it.received,
           total_out: 0, cost: it.unit_cost || 0, threshold: 5, notes: '',
+          last_purchase_rate: it.unit_cost || 0,
         }])
       } else {
         await supabase.from('items').update({
-          balance:  existing.balance + it.received,
-          total_in: (existing.total_in || 0) + it.received,
-          cost: it.unit_cost > 0 ? it.unit_cost : existing.cost,
+          balance:             existing.balance + it.received,
+          total_in:            (existing.total_in || 0) + it.received,
+          cost:                it.unit_cost > 0 ? it.unit_cost : existing.cost,
+          last_purchase_rate:  it.unit_cost > 0 ? it.unit_cost : (existing.last_purchase_rate || existing.cost),
         }).eq('id', existing.id)
       }
+      // Legacy transaction record
       await supabase.from('transactions').insert([{
         id: generateId(), type: 'GRN', item_name: it.name, category: it.category,
         qty: it.received, date: grn.date,
@@ -382,6 +387,23 @@ export function ProcurementProvider({ children }) {
         user_name: grn.received_by || '',
         created_at: new Date().toISOString(),
       }])
+      // ERPNext-style Stock Ledger Entry (triggers bin update via DB trigger)
+      if (itemId) {
+        await supabase.from('stock_ledger_entries').insert([{
+          id:                generateId(),
+          item_id:           itemId,
+          warehouse_id:      it.warehouse_id || 'wh_main_store',
+          voucher_type:      'Purchase Receipt',
+          voucher_no:        grnNumber,
+          voucher_detail_no: it.name,
+          actual_qty:        parseFloat(it.received) || 0,
+          incoming_rate:     parseFloat(it.unit_cost) || 0,
+          outgoing_rate:     0,
+          posting_date:      grn.date,
+          created_at:        new Date().toISOString(),
+          updated_at:        new Date().toISOString(),
+        }]).catch(() => null) // non-blocking if SLE table doesn't exist yet
+      }
     }
 
     if (grn.po_id) {

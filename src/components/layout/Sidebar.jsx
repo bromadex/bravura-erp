@@ -100,17 +100,19 @@ const ALL_MODULES = {
     sections: [
       {
         label: 'Stock Management', pages: [
-          { id: 'stock-balance', label: 'Stock Balance', icon: 'list_alt'      },
-          { id: 'stock-in',      label: 'Stock In',      icon: 'add_circle'    },
-          { id: 'stock-out',     label: 'Stock Out',     icon: 'remove_circle' },
-          { id: 'transactions',  label: 'Transactions',  icon: 'swap_horiz'    },
-          { id: 'stock-taking',  label: 'Stock Taking',  icon: 'fact_check'    },
-          { id: 'categories',    label: 'Categories',    icon: 'category'      },
+          { id: 'stock-balance',    label: 'Stock Balance',    icon: 'list_alt'      },
+          { id: 'stock-in',         label: 'Stock In',         icon: 'add_circle'    },
+          { id: 'stock-out',        label: 'Stock Out',        icon: 'remove_circle' },
+          { id: 'transactions',     label: 'Transactions',     icon: 'swap_horiz'    },
+          { id: 'stock-taking',     label: 'Stock Taking',     icon: 'fact_check'    },
+          { id: 'material-requests',label: 'Material Requests',icon: 'assignment'    },
+          { id: 'categories',       label: 'Categories',       icon: 'category'      },
         ],
       },
       {
         label: 'Configuration', pages: [
-          { id: 'locations', label: 'Storage Locations', icon: 'location_on' },
+          { id: 'warehouses', label: 'Warehouses',       icon: 'warehouse'     },
+          { id: 'locations',  label: 'Storage Locations',icon: 'location_on'   },
         ],
       },
     ],

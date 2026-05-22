@@ -74,13 +74,15 @@ const NotificationCenter = lazy(() => import('./pages/Notifications/Notification
 const DashboardOverview = lazy(() => import('./pages/Dashboard/DashboardOverview'))
 
 // Inventory
-const StockBalance     = lazy(() => import('./pages/Inventory/StockBalance'))
-const StockIn          = lazy(() => import('./pages/Inventory/StockIn'))
-const StockOut         = lazy(() => import('./pages/Inventory/StockOut'))
-const Transactions     = lazy(() => import('./pages/Inventory/Transactions'))
-const StockTaking      = lazy(() => import('./pages/Inventory/StockTaking'))
-const Categories       = lazy(() => import('./pages/Inventory/Categories'))
-const StorageLocations = lazy(() => import('./pages/Inventory/StorageLocations'))
+const StockBalance       = lazy(() => import('./pages/Inventory/StockBalance'))
+const StockIn            = lazy(() => import('./pages/Inventory/StockIn'))
+const StockOut           = lazy(() => import('./pages/Inventory/StockOut'))
+const Transactions       = lazy(() => import('./pages/Inventory/Transactions'))
+const StockTaking        = lazy(() => import('./pages/Inventory/StockTaking'))
+const Categories         = lazy(() => import('./pages/Inventory/Categories'))
+const StorageLocations   = lazy(() => import('./pages/Inventory/StorageLocations'))
+const MaterialRequests   = lazy(() => import('./pages/Inventory/MaterialRequests'))
+const Warehouses         = lazy(() => import('./pages/Inventory/Warehouses'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -402,8 +404,10 @@ function AppRoutes() {
           <Route path="stock-out"     element={<StockOut />} />
           <Route path="transactions"  element={<Transactions />} />
           <Route path="stock-taking"  element={<StockTaking />} />
-          <Route path="categories"    element={<Categories />} />
-          <Route path="locations"     element={<StorageLocations />} />
+          <Route path="categories"         element={<Categories />} />
+          <Route path="locations"          element={<StorageLocations />} />
+          <Route path="material-requests"  element={<MaterialRequests />} />
+          <Route path="warehouses"         element={<Warehouses />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
