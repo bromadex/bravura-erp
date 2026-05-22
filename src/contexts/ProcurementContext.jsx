@@ -32,6 +32,7 @@ export function ProcurementProvider({ children }) {
   const [rfqLines,             setRfqLines]             = useState([])
   const [quotLines,            setQuotLines]            = useState([])
   const [stockTransfers,       setStockTransfers]       = useState([])
+  const [landedCostVouchers,   setLandedCostVouchers]   = useState([])
 
   const generateId = () => crypto.randomUUID()
 
@@ -41,7 +42,7 @@ export function ProcurementProvider({ children }) {
     setLoading(true)
     try {
       const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes,
-             polRes, grlRes, pilRes, rflRes, qllRes] = await Promise.all([
+             polRes, grlRes, pilRes, rflRes, qllRes, lcvRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
@@ -56,6 +57,7 @@ export function ProcurementProvider({ children }) {
         safe(supabase.from('purchase_invoice_lines').select('*').order('created_at')),
         safe(supabase.from('rfq_lines').select('*').order('created_at')),
         safe(supabase.from('quotation_lines').select('*').order('created_at')),
+        safe(supabase.from('landed_cost_vouchers').select('*, landed_cost_lines(*)').order('created_at', { ascending: false })),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
@@ -71,6 +73,7 @@ export function ProcurementProvider({ children }) {
       if (pilRes.data) setInvoiceLines(pilRes.data)
       if (rflRes.data) setRfqLines(rflRes.data)
       if (qllRes.data) setQuotLines(qllRes.data)
+      if (lcvRes.data) setLandedCostVouchers(lcvRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -705,11 +708,53 @@ export function ProcurementProvider({ children }) {
     return 'Partial'
   }
 
+  // ── Landed Cost Vouchers ──────────────────────────────────
+  const createLCV = async (lcv, lines) => {
+    const id = generateId()
+    const lcvNumber = `LCV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`
+    const totalCost = lines.reduce((s, l) => s + parseFloat(l.amount || 0), 0)
+    const { error } = await supabase.from('landed_cost_vouchers').insert([{
+      id, lcv_number: lcvNumber, ...lcv,
+      total_landed_cost: totalCost, status: 'Draft',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    for (const line of lines) {
+      await supabase.from('landed_cost_lines').insert([{
+        id: generateId(), lcv_id: id, ...line, created_at: new Date().toISOString(),
+      }]).catch(() => null)
+    }
+    await fetchAll()
+    return { id, lcv_number: lcvNumber }
+  }
+
+  const applyLCV = async (id, allocations) => {
+    // Insert allocations first
+    for (const alloc of allocations) {
+      await supabase.from('landed_cost_item_allocations').insert([{
+        id: generateId(), lcv_id: id, ...alloc, created_at: new Date().toISOString(),
+      }]).catch(() => null)
+    }
+    // Call DB function to update valuation
+    const { error } = await supabase.rpc('fn_apply_landed_costs', { p_lcv_id: id })
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const cancelLCV = async (id) => {
+    const { error } = await supabase.from('landed_cost_vouchers').update({
+      status: 'Cancelled', updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
   return (
     <ProcurementContext.Provider value={{
       suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived,
       rfqs, rfqQuotations, purchaseInvoices, budgets, loading,
       poLines, grnLines, invoiceLines, rfqLines, quotLines,
+      landedCostVouchers,
       getPoLines, getGrnLines, getInvoiceLines, getMatchStatus,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
@@ -721,6 +766,7 @@ export function ProcurementProvider({ children }) {
       addQuotation, selectQuotation, deleteQuotation,
       createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
       createBudget, updateBudget, deleteBudget, checkBudget,
+      createLCV, applyLCV, cancelLCV,
       fetchAll,
     }}>
       {children}

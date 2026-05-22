@@ -85,6 +85,7 @@ const ALL_MODULES = {
         { id: 'quotation-comparison',  label: 'Quote Comparison',     icon: 'compare'        },
         { id: 'purchase-orders',       label: 'Purchase Orders',      icon: 'shopping_bag'   },
         { id: 'goods-received',        label: 'Goods Received (GRN)', icon: 'move_to_inbox'  },
+        { id: 'landed-costs',          label: 'Landed Costs',         icon: 'local_shipping' },
         { id: 'invoices',              label: 'Purchase Invoices',    icon: 'receipt_long'   },
       ],
     }, {
