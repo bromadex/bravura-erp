@@ -390,11 +390,13 @@ function AppRoutes() {
         <Route path="/module/inventory" element={
           <ProtectedRoute>
             <PermissionRoute module="inventory" page="stock-balance">
-              <InventoryProvider>
-                <LeaveProvider>
-                  <Layout module="inventory" />
-                </LeaveProvider>
-              </InventoryProvider>
+              <ProcurementProvider>
+                <InventoryProvider>
+                  <LeaveProvider>
+                    <Layout module="inventory" />
+                  </LeaveProvider>
+                </InventoryProvider>
+              </ProcurementProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>
@@ -414,9 +416,11 @@ function AppRoutes() {
         <Route path="/module/procurement" element={
           <ProtectedRoute>
             <PermissionRoute module="procurement" page="suppliers">
-              <ProcurementProvider>
-                <Layout module="procurement" />
-              </ProcurementProvider>
+              <InventoryProvider>
+                <ProcurementProvider>
+                  <Layout module="procurement" />
+                </ProcurementProvider>
+              </InventoryProvider>
             </PermissionRoute>
           </ProtectedRoute>
         }>
