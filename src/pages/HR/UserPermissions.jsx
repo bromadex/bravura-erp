@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { useCanManagePermissions } from '../../hooks/usePermission'
 import { ACTION_LABELS, DEFAULT_ROLE_ACTIONS } from '../../constants/permissions'
 import { ROLE_LABELS } from '../../constants/roles'
+import bcrypt from 'bcryptjs'
 
 const MODULES = [
   { name: 'dashboard',   pages: ['overview'] },
@@ -175,11 +176,12 @@ export default function UserPermissions() {
     setResetResult(null)
     try {
       const newPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
+      const newHash = await bcrypt.hash(newPassword, 12)
       const { error } = await supabase
         .from('app_users')
         .update({
-          password_plain:       newPassword,
-          password_hash:        btoa(newPassword),
+          password_hash:        newHash,
+          password_plain:       null,
           must_change_password: true,
         })
         .eq('id', resetEmployee.system_user_id)

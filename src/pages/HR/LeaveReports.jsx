@@ -44,7 +44,7 @@ export default function LeaveReports() {
     approvedInRange.forEach(r => {
       if (map[r.leave_type_id]) {
         map[r.leave_type_id].count++
-        map[r.leave_type_id].days += r.days_requested || 0
+        map[r.leave_type_id].days += r.total_leave_days ?? r.days_requested ?? 0
       }
     })
     return Object.values(map).sort((a, b) => b.days - a.days)
@@ -58,7 +58,7 @@ export default function LeaveReports() {
     })
     approvedInRange.forEach(r => {
       if (map[r.employee_id]) {
-        map[r.employee_id].days  += r.days_requested || 0
+        map[r.employee_id].days  += r.total_leave_days ?? r.days_requested ?? 0
         map[r.employee_id].count++
       }
     })
@@ -97,7 +97,7 @@ export default function LeaveReports() {
       .map(r => {
         const emp = employees.find(e => e.id === r.employee_id)
         const lt  = leaveTypes.find(l => l.id === r.leave_type_id)
-        return { name: emp?.name || '—', type: lt?.name || '—', start: r.start_date, end: r.end_date, days: r.days_requested, status: r.status.replace(/_/g, ' '), created: r.created_at?.split('T')[0] }
+        return { name: emp?.name || '—', type: lt?.name || '—', start: r.start_date, end: r.end_date, days: r.total_leave_days ?? r.days_requested, status: r.status.replace(/_/g, ' '), created: r.created_at?.split('T')[0] }
       })
   }, [leaveRequests, filteredEmployees, employees, leaveTypes])
 
@@ -120,7 +120,7 @@ export default function LeaveReports() {
     toast.success('Exported to Excel')
   }
 
-  const totalDays = approvedInRange.reduce((s, r) => s + (r.days_requested || 0), 0)
+  const totalDays = approvedInRange.reduce((s, r) => s + (r.total_leave_days ?? r.days_requested ?? 0), 0)
   const totalReqs = approvedInRange.length
 
   const VIEWS = [

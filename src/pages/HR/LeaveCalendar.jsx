@@ -239,7 +239,7 @@ export default function LeaveCalendar() {
                       )}
                     </div>
                     <span className="badge badge-green" style={{ fontSize: 10 }}>
-                      {entry.req.days_requested} day{entry.req.days_requested !== 1 ? 's' : ''}
+                      {entry.req.total_leave_days ?? entry.req.days_requested} day{(entry.req.total_leave_days ?? entry.req.days_requested) !== 1 ? 's' : ''}
                     </span>
                   </div>
                 ))}

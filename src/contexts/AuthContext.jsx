@@ -11,6 +11,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLoginAttempt, auditLogout } from '../engine/auditEngine'
+import bcrypt from 'bcryptjs'
 
 const AuthContext = createContext(null)
 
@@ -189,7 +190,22 @@ export function AuthProvider({ children }) {
       auditLoginAttempt({ username, success: false, details: 'User not found or inactive' })
       throw new Error('User not found or inactive')
     }
-    const pwMatch = data.password_plain === password || atob(data.password_hash || '') === password
+    // Check bcrypt hash (new) or legacy plaintext/base64 (old), auto-upgrade legacy on match
+    const isBcryptHash = data.password_hash?.startsWith('$2')
+    let pwMatch = false
+    if (isBcryptHash) {
+      pwMatch = await bcrypt.compare(password, data.password_hash)
+    } else {
+      const legacyMatch = data.password_plain === password ||
+        (data.password_hash ? atob(data.password_hash) === password : false)
+      if (legacyMatch) {
+        pwMatch = true
+        const newHash = await bcrypt.hash(password, 12)
+        await supabase.from('app_users')
+          .update({ password_hash: newHash, password_plain: null })
+          .eq('id', data.id)
+      }
+    }
     if (!pwMatch) {
       auditLoginAttempt({ username, success: false, details: 'Incorrect password', userId: data.id })
       throw new Error('Incorrect password')

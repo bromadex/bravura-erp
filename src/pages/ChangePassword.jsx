@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import bcrypt from 'bcryptjs'
 
 export default function ChangePassword() {
   const { user, logout } = useAuth()
@@ -36,26 +37,30 @@ export default function ChangePassword() {
       // Verify current password
       const { data, error } = await supabase
         .from('app_users')
-        .select('password_plain, password_hash')
+        .select('password_hash, password_plain')
         .eq('id', user.id)
         .single()
 
       if (error) throw new Error('User not found')
 
-      const isValid = data.password_plain === form.currentPassword || 
-                      atob(data.password_hash || '') === form.currentPassword
-      
+      const isBcrypt = data.password_hash?.startsWith('$2')
+      const isValid  = isBcrypt
+        ? await bcrypt.compare(form.currentPassword, data.password_hash)
+        : (data.password_plain === form.currentPassword ||
+           (data.password_hash ? atob(data.password_hash) === form.currentPassword : false))
+
       if (!isValid) {
         toast.error('Current password is incorrect')
         return
       }
 
       // Update password
+      const newHash = await bcrypt.hash(form.newPassword, 12)
       const { error: updateError } = await supabase
         .from('app_users')
         .update({
-          password_plain: form.newPassword,
-          password_hash: btoa(form.newPassword),
+          password_hash: newHash,
+          password_plain: null,
           must_change_password: false
         })
         .eq('id', user.id)

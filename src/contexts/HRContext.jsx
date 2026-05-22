@@ -26,6 +26,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { calculateDailyOvertime, getWeekStartEnd } from '../utils/attendanceUtils'
 import { auditLog } from '../engine/auditEngine'
+import bcrypt from 'bcryptjs'
 
 const HRContext = createContext(null)
 
@@ -102,6 +103,7 @@ export function HRProvider({ children }) {
       if (error || !data) { exists = false } else { counter++; username = `${baseUsername}${counter}` }
     }
     const rawPassword = Math.random().toString(36).slice(-8) + (Math.floor(Math.random() * 90) + 10)
+    const passwordHash = await bcrypt.hash(rawPassword, 12)
     const { data, error } = await supabase.from('app_users').insert([{
       id:                   generateId(),
       username,
@@ -109,8 +111,7 @@ export function HRProvider({ children }) {
       role_id:              roleId,
       is_active:            true,
       must_change_password: true,
-      password_plain:       rawPassword,
-      password_hash:        btoa(rawPassword),
+      password_hash:        passwordHash,
       employee_id:          employeeId,
       created_at:           new Date().toISOString()
     }]).select().single()
@@ -598,11 +599,12 @@ export function HRProvider({ children }) {
       const hasClockedIn = attendance.some(a => a.employee_id === request.employee_id && a.date === request.start_date && a.clock_in)
       if (hasClockedIn) throw new Error('Employee has already clocked in on the leave start date.')
       const { remaining } = getEmployeeLeaveBalance(request.employee_id, request.leave_type_id)
-      if (remaining < request.days_requested) throw new Error(`Insufficient balance. Available: ${remaining} days`)
+      const leaveDays = request.total_leave_days ?? request.days_requested
+      if (remaining < leaveDays) throw new Error(`Insufficient balance. Available: ${remaining} days`)
       const { data: rpcData, error: fnError } = await supabase.rpc('deduct_leave_balance', {
         p_employee_id:   request.employee_id,
         p_leave_type_id: request.leave_type_id,
-        p_days:          request.days_requested,
+        p_days:          leaveDays,
         p_year:          new Date(request.start_date).getFullYear()
       })
       if (fnError) throw new Error('Failed to deduct leave balance')
