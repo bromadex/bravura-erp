@@ -11,7 +11,7 @@ import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../.
 const today = new Date().toISOString().split('T')[0]
 
 export default function StockIn() {
-  const { items, transactions, warehouses, stockIn: doStockIn, getBin, loading } = useInventory()
+  const { items, transactions, warehouses, stockIn: doStockIn, getBin, loading, recordBatch, registerSerial } = useInventory()
   const canEdit = useCanEdit('inventory', 'stock-in')
 
   const [showModal, setShowModal] = useState(false)
@@ -101,15 +101,16 @@ export default function StockIn() {
         </div>
       </div>
 
-      {showModal && <StockInModal items={items} warehouses={warehouses} getBin={getBin} onClose={() => setShowModal(false)} onSave={doStockIn} />}
+      {showModal && <StockInModal items={items} warehouses={warehouses} getBin={getBin} onClose={() => setShowModal(false)} onSave={doStockIn} recordBatch={recordBatch} registerSerial={registerSerial} />}
     </div>
   )
 }
 
-function StockInModal({ items, warehouses, getBin, onClose, onSave }) {
+function StockInModal({ items, warehouses, getBin, onClose, onSave, recordBatch, registerSerial }) {
   const [form, setForm] = useState({
     itemId: '', quantity: 1, date: today, deliveredBy: '',
     receivedBy: '', notes: '', warehouseId: 'wh_main_store', unitCost: '',
+    batchNo: '', expiryDate: '', serialNos: '',
   })
   const [saving, setSaving] = useState(false)
   const selectedItem = items.find(i => i.id === form.itemId)
@@ -130,6 +131,8 @@ function StockInModal({ items, warehouses, getBin, onClose, onSave }) {
     e.preventDefault()
     if (!form.itemId)  return toast.error('Select an item')
     if (!form.quantity || form.quantity <= 0) return toast.error('Enter a valid quantity')
+    if (selectedItem?.has_batch_no && !form.batchNo.trim()) return toast.error('Batch No is required for this item')
+    if (selectedItem?.has_serial_no && !form.serialNos.trim()) return toast.error('Serial number(s) required for this item')
     setSaving(true)
     try {
       await onSave(
@@ -137,6 +140,30 @@ function StockInModal({ items, warehouses, getBin, onClose, onSave }) {
         form.deliveredBy, form.receivedBy || 'Store', form.notes,
         form.warehouseId, form.unitCost ? parseFloat(form.unitCost) : null,
       )
+      // Register batch if item is batch-tracked
+      if (selectedItem?.has_batch_no && form.batchNo.trim()) {
+        await recordBatch({
+          batch_no:    form.batchNo.trim(),
+          item_id:     form.itemId,
+          item_name:   selectedItem.name,
+          qty:         parseFloat(form.quantity),
+          warehouse_id: form.warehouseId,
+          expiry_date: form.expiryDate || null,
+        }).catch(() => null)
+      }
+      // Register serials if item is serial-tracked
+      if (selectedItem?.has_serial_no && form.serialNos.trim()) {
+        const nos = form.serialNos.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+        for (const sno of nos) {
+          await registerSerial({
+            serial_no:    sno,
+            item_id:      form.itemId,
+            item_name:    selectedItem.name,
+            warehouse_id: form.warehouseId,
+            purchase_rate: form.unitCost ? parseFloat(form.unitCost) : 0,
+          }).catch(() => null)
+        }
+      }
       toast.success(`+${form.quantity} ${selectedItem?.unit || 'units'} of ${selectedItem?.name} added`)
       onClose()
     } catch (err) { toast.error(err.message) }
@@ -181,6 +208,24 @@ function StockInModal({ items, warehouses, getBin, onClose, onSave }) {
           <div className="form-group"><label>Received By</label><input className="form-control" value={form.receivedBy} onChange={e => setForm({ ...form, receivedBy: e.target.value })} /></div>
         </div>
         <div className="form-group"><label>Notes / Reference</label><textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+        {selectedItem?.has_batch_no && (
+          <div className="form-row">
+            <div className="form-group">
+              <label>Batch No *</label>
+              <input className="form-control" placeholder="e.g. BATCH-2026-001" value={form.batchNo} onChange={e => setForm({ ...form, batchNo: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Expiry Date</label>
+              <input type="date" className="form-control" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
+            </div>
+          </div>
+        )}
+        {selectedItem?.has_serial_no && (
+          <div className="form-group">
+            <label>Serial Numbers * <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>— one per line or comma-separated</span></label>
+            <textarea className="form-control" rows="3" placeholder="SN-001&#10;SN-002&#10;SN-003" value={form.serialNos} onChange={e => setForm({ ...form, serialNos: e.target.value })} />
+          </div>
+        )}
         {form.itemId && form.quantity > 0 && (
           <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 12 }}>
             After this transaction: <strong style={{ color: 'var(--green)' }}>

@@ -22,14 +22,19 @@ export function InventoryProvider({ children }) {
   const [transactions,    setTransactions]    = useState([])
   const [stockTransfers,  setStockTransfers]  = useState([])
   const [loading,         setLoading]         = useState(true)
+  const [reservations,    setReservations]    = useState([])
+  const [batches,         setBatches]         = useState([])
+  const [serials,         setSerials]         = useState([])
 
   const generateId = () =>
     crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
 
+  const safe = (q) => Promise.resolve(q).catch(() => ({ data: null }))
+
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [itemsRes, binsRes, whRes, sleRes, stRes, catRes, mrRes, mrItemRes, rlRes, txRes, stxRes] =
+      const [itemsRes, binsRes, whRes, sleRes, stRes, catRes, mrRes, mrItemRes, rlRes, txRes, stxRes, resRes, batRes, serRes] =
         await Promise.all([
           supabase.from('items').select('*').order('name'),
           supabase.from('bins').select('*, warehouses(code, name, type)').order('item_id'),
@@ -43,6 +48,9 @@ export function InventoryProvider({ children }) {
           supabase.from('item_reorder_levels').select('*'),
           supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(500),
           supabase.from('stock_transfers').select('*, stock_transfer_lines(*)').order('created_at', { ascending: false }),
+          safe(supabase.from('stock_reservations').select('*').eq('status', 'Active').order('created_at', { ascending: false })),
+          safe(supabase.from('item_batches').select('*').eq('status', 'Active').order('expiry_date')),
+          safe(supabase.from('item_serials').select('*').order('created_at', { ascending: false })),
         ])
       if (itemsRes.data)   setItems(itemsRes.data)
       if (binsRes.data)    setBins(binsRes.data)
@@ -55,6 +63,9 @@ export function InventoryProvider({ children }) {
       if (rlRes.data)      setReorderLevels(rlRes.data)
       if (txRes.data)      setTransactions(txRes.data)
       if (stxRes.data)     setStockTransfers(stxRes.data)
+      if (resRes.data)     setReservations(resRes.data)
+      if (batRes.data)     setBatches(batRes.data)
+      if (serRes.data)     setSerials(serRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load inventory data')
@@ -195,8 +206,12 @@ export function InventoryProvider({ children }) {
     if (!item) throw new Error('Item not found')
     const wh  = warehouseId || item.default_warehouse_id || DEFAULT_WAREHOUSE
     const bin = getBin(itemId, wh)
-    const availQty = bin?.actual_qty ?? item.balance ?? 0
-    if (quantity > availQty) throw new Error(`Insufficient stock. Available: ${availQty}`)
+    const actualQty = bin?.actual_qty ?? item.balance ?? 0
+    const activeReserved = reservations
+      .filter(r => r.item_id === itemId && r.warehouse_id === wh && r.status === 'Active')
+      .reduce((s, r) => s + (r.reserved_qty - r.consumed_qty), 0)
+    const availQty = Math.max(actualQty - activeReserved, 0)
+    if (quantity > availQty) throw new Error(`Insufficient stock. Available: ${availQty} (${actualQty} on hand, ${activeReserved} reserved)`)
 
     const sleId = generateId()
     const txId  = generateId()
@@ -613,6 +628,149 @@ export function InventoryProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Reservation Engine ────────────────────────────────────────
+
+  // Reserve stock when a store requisition is approved
+  const reserveStock = async (itemId, warehouseId, qty, voucherType, voucherNo, voucherId, reservedBy, reservedByName) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) throw new Error('Item not found')
+    const bin = getBin(itemId, warehouseId)
+    const actualQty = bin?.actual_qty ?? item.balance ?? 0
+    // Check existing active reservations
+    const alreadyReserved = reservations
+      .filter(r => r.item_id === itemId && r.warehouse_id === warehouseId && r.status === 'Active')
+      .reduce((s, r) => s + (r.reserved_qty - r.consumed_qty), 0)
+    const available = actualQty - alreadyReserved
+    if (qty > available) throw new Error(`Insufficient stock. Available: ${available.toFixed(2)}, Requested: ${qty}`)
+
+    const id = generateId()
+    const { error } = await supabase.from('stock_reservations').insert([{
+      id, item_id: itemId, item_name: item.name,
+      warehouse_id: warehouseId || DEFAULT_WAREHOUSE,
+      reserved_qty: qty, consumed_qty: 0,
+      voucher_type: voucherType, voucher_no: voucherNo, voucher_id: voucherId,
+      reserved_by: reservedBy, reserved_by_name: reservedByName,
+      status: 'Active',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    // Update bins.reserved_qty
+    await supabase.from('bins').update({
+      reserved_qty: (bin?.reserved_qty || 0) + qty,
+      updated_at: new Date().toISOString(),
+    }).eq('item_id', itemId).eq('warehouse_id', warehouseId || DEFAULT_WAREHOUSE)
+    await fetchAll()
+    return id
+  }
+
+  // Release a reservation (on rejection or cancellation)
+  const releaseReservation = async (reservationId) => {
+    const res = reservations.find(r => r.id === reservationId)
+    if (!res) return
+    await supabase.from('stock_reservations').update({
+      status: 'Released', updated_at: new Date().toISOString(),
+    }).eq('id', reservationId)
+    // Recalculate reserved_qty for that bin
+    const activeRes = reservations.filter(r =>
+      r.item_id === res.item_id && r.warehouse_id === res.warehouse_id &&
+      r.status === 'Active' && r.id !== reservationId
+    )
+    const totalReserved = activeRes.reduce((s, r) => s + (r.reserved_qty - r.consumed_qty), 0)
+    await supabase.from('bins').update({ reserved_qty: totalReserved, updated_at: new Date().toISOString() })
+      .eq('item_id', res.item_id).eq('warehouse_id', res.warehouse_id)
+    await fetchAll()
+  }
+
+  // Release ALL active reservations for a voucher (e.g. requisition cancelled)
+  const releaseVoucherReservations = async (voucherId) => {
+    const voucherRes = reservations.filter(r => r.voucher_id === voucherId && r.status === 'Active')
+    for (const res of voucherRes) {
+      await releaseReservation(res.id)
+    }
+  }
+
+  // Consume reservation when stock is actually issued
+  const consumeReservation = async (reservationId, consumedQty) => {
+    const res = reservations.find(r => r.id === reservationId)
+    if (!res) return
+    const newConsumed = (res.consumed_qty || 0) + consumedQty
+    const newStatus = newConsumed >= res.reserved_qty ? 'Consumed' : 'Partially Consumed'
+    await supabase.from('stock_reservations').update({
+      consumed_qty: newConsumed, status: newStatus, updated_at: new Date().toISOString(),
+    }).eq('id', reservationId)
+    await fetchAll()
+  }
+
+  // Get available qty (actual minus active reservations)
+  const getAvailableQty = (itemId, warehouseId = DEFAULT_WAREHOUSE) => {
+    const bin = getBin(itemId, warehouseId)
+    const actual = bin?.actual_qty ?? 0
+    const reserved = reservations
+      .filter(r => r.item_id === itemId && r.warehouse_id === warehouseId && r.status === 'Active')
+      .reduce((s, r) => s + (r.reserved_qty - r.consumed_qty), 0)
+    return Math.max(actual - reserved, 0)
+  }
+
+  // Get reservations for a specific voucher
+  const getVoucherReservations = (voucherId) =>
+    reservations.filter(r => r.voucher_id === voucherId)
+
+  // ── Batch / Serial tracking ───────────────────────────────────
+
+  // Create or update a batch record (called after GRN / Stock In)
+  const recordBatch = async (batchData) => {
+    const { batch_no, item_id, item_name, qty, warehouse_id, supplier, expiry_date, grn_id, grn_number } = batchData
+    // Check if batch exists
+    const { data: existing } = await supabase.from('item_batches')
+      .select('*').eq('batch_no', batch_no).eq('item_id', item_id).maybeSingle()
+    if (existing) {
+      await supabase.from('item_batches').update({
+        qty_available: (existing.qty_available || 0) + qty,
+        qty_received:  (existing.qty_received || 0) + qty,
+        updated_at: new Date().toISOString(),
+      }).eq('id', existing.id)
+    } else {
+      await supabase.from('item_batches').insert([{
+        id: generateId(), batch_no, item_id, item_name,
+        supplier: supplier || null, source_grn_id: grn_id || null, source_grn_number: grn_number || null,
+        expiry_date: expiry_date || null, qty_received: qty, qty_available: qty, qty_consumed: 0,
+        warehouse_id: warehouse_id || DEFAULT_WAREHOUSE, status: 'Active',
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      }])
+    }
+    await fetchAll()
+  }
+
+  // Register a serial number (called after GRN / Stock In)
+  const registerSerial = async (serialData) => {
+    const { serial_no, item_id, item_name, warehouse_id, grn_id, grn_number, warranty_expiry, purchase_rate } = serialData
+    const { error } = await supabase.from('item_serials').insert([{
+      id: generateId(), serial_no, item_id, item_name,
+      warehouse_id: warehouse_id || DEFAULT_WAREHOUSE, status: 'In Stock',
+      source_grn_id: grn_id || null, source_grn_number: grn_number || null,
+      warranty_expiry: warranty_expiry || null, purchase_rate: purchase_rate || 0,
+      history: [{ date: new Date().toISOString(), action: 'Received', user: 'System', to_status: 'In Stock' }],
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error && error.code !== '23505') throw error // ignore duplicate serial_no
+    await fetchAll()
+  }
+
+  // Issue a serial (mark as Issued, update history)
+  const issueSerial = async (serialId, issuedTo, department, date) => {
+    const serial = serials.find(s => s.id === serialId)
+    if (!serial) throw new Error('Serial not found')
+    const historyEntry = { date: new Date().toISOString(), action: 'Issued', to_status: 'Issued', issued_to: issuedTo, department }
+    const { error } = await supabase.from('item_serials').update({
+      status: 'Issued', issued_to: issuedTo, issued_to_department: department,
+      issued_date: date || new Date().toISOString().split('T')[0],
+      history: [...(serial.history || []), historyEntry],
+      updated_at: new Date().toISOString(),
+    }).eq('id', serialId)
+    if (error) throw error
+    await fetchAll()
+  }
+
   // Auto-create MRs for all items below reorder level
   const autoCreateReorderMRs = async (createdBy) => {
     const belowReorder = getItemsBelowReorder()
@@ -637,6 +795,7 @@ export function InventoryProvider({ children }) {
       transactions,  // legacy
       stockTransfers,
       loading,
+      reservations, batches, serials,
       // Bin helpers
       getBin, getActualQty, getProjectedQty, getValuationRate,
       getSLEsForItem,
@@ -656,6 +815,11 @@ export function InventoryProvider({ children }) {
       // Stock transfers
       createStockTransfer, submitStockTransfer, approveStockTransfer,
       completeStockTransfer, cancelStockTransfer,
+      // Reservation engine
+      reserveStock, releaseReservation, releaseVoucherReservations, consumeReservation,
+      getAvailableQty, getVoucherReservations,
+      // Batch / serial tracking
+      recordBatch, registerSerial, issueSerial,
       fetchAll,
     }}>
       {children}

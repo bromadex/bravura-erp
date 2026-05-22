@@ -84,6 +84,7 @@ const Categories         = lazy(() => import('./pages/Inventory/Categories'))
 const StorageLocations   = lazy(() => import('./pages/Inventory/StorageLocations'))
 const MaterialRequests   = lazy(() => import('./pages/Inventory/MaterialRequests'))
 const Warehouses         = lazy(() => import('./pages/Inventory/Warehouses'))
+const BatchSerials       = lazy(() => import('./pages/Inventory/BatchSerials'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -413,6 +414,7 @@ function AppRoutes() {
           <Route path="categories"              element={<Categories />} />
           <Route path="warehouses"              element={<Warehouses />} />
           <Route path="locations"               element={<StorageLocations />} />
+          <Route path="batch-serials"           element={<BatchSerials />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}

@@ -145,21 +145,52 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
-  // Step 1: HOD approves — checks stock, auto-creates PRs for shortages
+  // Step 1: HOD approves — checks stock, creates reservations for in-stock items, auto-creates PRs for shortages
   const approveStoreRequisition = async (id, approverName, approverId) => {
     const req = storeRequisitions.find(r => r.id === id)
     if (!req) throw new Error('Requisition not found')
 
-    const items    = typeof req.items === 'string' ? JSON.parse(req.items || '[]') : (req.items || [])
+    const reqItems = typeof req.items === 'string' ? JSON.parse(req.items || '[]') : (req.items || [])
     const deficits = []
+    const DEFAULT_WH = 'wh_main_store'
 
-    for (const it of items) {
+    for (const it of reqItems) {
       const { data: itemData } = await supabase
         .from('items')
-        .select('balance, id')
+        .select('balance, id, default_warehouse_id')
         .ilike('name', it.name)
         .maybeSingle()
       const balance = itemData?.balance || 0
+      const canReserve = Math.min(it.qty, balance)
+
+      // Create stock reservation for whatever is available
+      if (canReserve > 0 && itemData?.id) {
+        const warehouseId = itemData.default_warehouse_id || DEFAULT_WH
+        const srNum = req.sr_number || req.req_number || id
+        await supabase.from('stock_reservations').insert([{
+          id:               crypto.randomUUID(),
+          item_id:          itemData.id,
+          item_name:        it.name,
+          warehouse_id:     warehouseId,
+          reserved_qty:     canReserve,
+          consumed_qty:     0,
+          voucher_type:     'Store Requisition',
+          voucher_no:       srNum,
+          voucher_id:       id,
+          reserved_by:      approverId,
+          reserved_by_name: approverName,
+          status:           'Active',
+          created_at:       new Date().toISOString(),
+          updated_at:       new Date().toISOString(),
+        }]).catch(() => null)
+        // Bump bins.reserved_qty
+        await supabase.rpc('fn_increment_bin_reserved', {
+          p_item_id:      itemData.id,
+          p_warehouse_id: warehouseId,
+          p_qty_delta:    canReserve,
+        }).catch(() => null)
+      }
+
       if (it.qty > balance) {
         deficits.push({ ...it, deficit: it.qty - balance, available: balance })
       }
@@ -297,6 +328,25 @@ export function ProcurementProvider({ children }) {
       updated_at:       new Date().toISOString(),
     }).eq('id', id)
     if (error) throw error
+    // Release any active reservations for this voucher
+    const { data: activeRes } = await supabase.from('stock_reservations')
+      .select('id, item_id, warehouse_id, reserved_qty, consumed_qty')
+      .eq('voucher_id', id).eq('status', 'Active')
+    if (activeRes?.length) {
+      await supabase.from('stock_reservations')
+        .update({ status: 'Released', updated_at: new Date().toISOString() })
+        .eq('voucher_id', id).eq('status', 'Active')
+      for (const res of activeRes) {
+        const remaining = (res.reserved_qty || 0) - (res.consumed_qty || 0)
+        if (remaining > 0) {
+          await supabase.rpc('fn_increment_bin_reserved', {
+            p_item_id:      res.item_id,
+            p_warehouse_id: res.warehouse_id,
+            p_qty_delta:    -remaining,
+          }).catch(() => null)
+        }
+      }
+    }
     await fetchAll()
   }
 

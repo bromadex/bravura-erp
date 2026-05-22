@@ -114,7 +114,8 @@ const ALL_MODULES = {
         label: 'Configuration', pages: [
           { id: 'categories', label: 'Categories',       icon: 'category'   },
           { id: 'warehouses', label: 'Warehouses',       icon: 'warehouse'  },
-          { id: 'locations',  label: 'Storage Locations',icon: 'location_on'},
+          { id: 'locations',    label: 'Storage Locations',icon: 'location_on'},
+          { id: 'batch-serials', label: 'Batch & Serials',  icon: 'qr_code_2'  },
         ],
       },
     ],
