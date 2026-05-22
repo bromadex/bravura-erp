@@ -398,16 +398,16 @@ function AppRoutes() {
             </PermissionRoute>
           </ProtectedRoute>
         }>
-          <Route index                element={<StockBalance />} />
-          <Route path="stock-balance" element={<StockBalance />} />
-          <Route path="stock-in"      element={<StockIn />} />
-          <Route path="stock-out"     element={<StockOut />} />
-          <Route path="transactions"  element={<Transactions />} />
-          <Route path="stock-taking"  element={<StockTaking />} />
-          <Route path="categories"         element={<Categories />} />
-          <Route path="locations"          element={<StorageLocations />} />
-          <Route path="material-requests"  element={<MaterialRequests />} />
-          <Route path="warehouses"         element={<Warehouses />} />
+          <Route index                          element={<StockBalance />} />
+          <Route path="stock-balance"           element={<StockBalance />} />
+          <Route path="stock-in"                element={<StockIn />} />
+          <Route path="store-requisitions"      element={<StoreRequisitions />} />
+          <Route path="stock-out"               element={<StockOut />} />
+          <Route path="stock-taking"            element={<StockTaking />} />
+          <Route path="transactions"            element={<Transactions />} />
+          <Route path="categories"              element={<Categories />} />
+          <Route path="warehouses"              element={<Warehouses />} />
+          <Route path="locations"               element={<StorageLocations />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -422,8 +422,8 @@ function AppRoutes() {
         }>
           <Route index                          element={<ProcurementDashboard />}  />
           <Route path="dashboard"               element={<ProcurementDashboard />}  />
+          <Route path="material-requests"        element={<MaterialRequests />}      />
           <Route path="suppliers"               element={<Suppliers />}             />
-          <Route path="store-requisitions"      element={<StoreRequisitions />}     />
           <Route path="purchase-requisitions"   element={<PurchaseRequisitions />}  />
           <Route path="rfq"                     element={<RequestForQuotation />}   />
           <Route path="quotations"              element={<SupplierQuotations />}    />

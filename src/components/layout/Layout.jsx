@@ -16,7 +16,8 @@ const MODULE_LABELS = {
 const PAGE_LABELS = {
   'stock-balance': 'Stock Balance', 'stock-in': 'Stock In', 'stock-out': 'Stock Out',
   'stock-taking': 'Stock Taking', 'transactions': 'Transactions', 'categories': 'Categories',
-  'material-requests': 'Material Requests', 'warehouses': 'Warehouses',
+  'store-requisitions': 'Store Requisitions', 'warehouses': 'Warehouses',
+  'material-requests': 'Material Requests',
   'suppliers': 'Suppliers', 'store-requisitions': 'Store Requisitions',
   'purchase-requisitions': 'Purchase Requisitions', 'purchase-orders': 'Purchase Orders',
   'goods-received': 'Goods Received',
