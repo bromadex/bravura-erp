@@ -86,6 +86,7 @@ const MaterialRequests   = lazy(() => import('./pages/Inventory/MaterialRequests
 const Warehouses         = lazy(() => import('./pages/Inventory/Warehouses'))
 const BatchSerials       = lazy(() => import('./pages/Inventory/BatchSerials'))
 const StockAgeingReport  = lazy(() => import('./pages/Inventory/StockAgeingReport'))
+const ForecastReorder    = lazy(() => import('./pages/Inventory/ForecastReorder'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -103,6 +104,7 @@ const BudgetControl        = lazy(() => import('./pages/Procurement/BudgetContro
 const LandedCostVouchers   = lazy(() => import('./pages/Procurement/LandedCostVouchers'))
 const SupplierPriceLists   = lazy(() => import('./pages/Procurement/SupplierPriceLists'))
 const CostCentreReport     = lazy(() => import('./pages/Procurement/CostCentreReport'))
+const BudgetVsActual       = lazy(() => import('./pages/Procurement/BudgetVsActual'))
 
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
@@ -419,6 +421,7 @@ function AppRoutes() {
           <Route path="locations"               element={<StorageLocations />} />
           <Route path="batch-serials"           element={<BatchSerials />} />
           <Route path="stock-ageing"            element={<StockAgeingReport />} />
+          <Route path="forecast-reorder"        element={<ForecastReorder />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -449,6 +452,7 @@ function AppRoutes() {
           <Route path="supplier-performance"    element={<SupplierPerformance />}   />
           <Route path="supplier-price-lists"    element={<SupplierPriceLists />}    />
           <Route path="cost-centre-report"      element={<CostCentreReport />}      />
+          <Route path="budget-vs-actual"        element={<BudgetVsActual />}        />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
