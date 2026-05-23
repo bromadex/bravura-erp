@@ -2,7 +2,8 @@
 // Accounts payable — record supplier invoices, track payment status,
 // 3-way match verification, aging analysis.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -56,12 +57,14 @@ function MatchBadge({ status }) {
 
 export default function PurchaseInvoices() {
   const {
-    purchaseInvoices, purchaseOrders, suppliers,
+    purchaseInvoices, purchaseOrders, goodsReceived, suppliers,
     createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
     getInvoiceLines, getMatchStatus,
     loading,
   } = useProcurement()
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const prefillRef = useRef(false)
 
   const [activeTab, setActiveTab] = useState('invoices')
 
@@ -109,10 +112,36 @@ export default function PurchaseInvoices() {
   const [editSaving, setEditSaving] = useState(false)
   const [matchRunning, setMatchRunning] = useState(false)
 
-  // ── Reset forms when modals open ──────────────────────────
+  // ── URL param pre-fill (GRN→Invoice chain) ───────────────
   useEffect(() => {
-    if (createOpen) setForm(emptyForm())
-  }, [createOpen])
+    const grnId = searchParams.get('grn_id')
+    const poId  = searchParams.get('po_id')
+    if ((grnId || poId) && !prefillRef.current) {
+      prefillRef.current = { grnId: grnId || '', poId: poId || '' }
+      setCreateOpen(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Reset or pre-fill form when create modal opens ────────
+  useEffect(() => {
+    if (!createOpen) return
+    if (prefillRef.current) {
+      const { grnId, poId } = prefillRef.current
+      prefillRef.current = false
+      const po  = purchaseOrders.find(p => p.id === poId)
+      const grn = goodsReceived.find(g => g.id === grnId)
+      const src = po || grn
+      setForm({
+        ...emptyForm(),
+        grn_id:        grnId,
+        po_id:         poId,
+        supplier_id:   src?.supplier_id   || '',
+        supplier_name: src?.supplier_name || '',
+      })
+    } else {
+      setForm(emptyForm())
+    }
+  }, [createOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (payInv) {
