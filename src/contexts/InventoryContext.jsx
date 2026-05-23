@@ -156,8 +156,7 @@ export function InventoryProvider({ children }) {
   }
 
   // ── Stock In ──────────────────────────────────────────────────
-  // Creates an SLE (which triggers bin update via DB trigger).
-  // Also keeps legacy items.balance / transactions in sync.
+  // SLE is the single write. DB trigger (trg_sle_update_bin) maintains bins.
   const stockIn = async (itemId, quantity, date, deliveredBy, receivedBy, notes, warehouseId, unitCost) => {
     const item = items.find(i => i.id === itemId)
     if (!item) throw new Error('Item not found')
@@ -165,36 +164,25 @@ export function InventoryProvider({ children }) {
     const cost = unitCost != null ? parseFloat(unitCost) : (item.cost || 0)
 
     const sleId = generateId()
-    const txId  = generateId()
 
     const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
-      id:              sleId,
-      item_id:         itemId,
-      warehouse_id:    wh,
+      id:               sleId,
+      item_id:          itemId,
+      warehouse_id:     wh,
       posting_datetime: new Date(date || Date.now()).toISOString(),
-      voucher_type:    'StockIn',
-      voucher_no:      `SI-${Date.now()}`,
-      actual_qty:      quantity,
-      incoming_rate:   cost,
-      created_by:      receivedBy || '',
+      voucher_type:     'StockIn',
+      transaction_type: 'Receipt',
+      voucher_no:       `SI-${Date.now()}`,
+      actual_qty:       quantity,
+      incoming_rate:    cost,
+      created_by:       receivedBy || '',
     }])
     if (sleErr) throw sleErr
 
-    // Legacy: keep items.balance and transactions in sync
-    await Promise.all([
-      supabase.from('items').update({
-        balance:  (item.balance || 0) + quantity,
-        total_in: (item.total_in  || 0) + quantity,
-        cost:     cost,
-      }).eq('id', itemId),
-      supabase.from('transactions').insert([{
-        id: txId, type: 'IN', item_id: itemId,
-        item_name: item.name, category: item.category,
-        qty: quantity, date: date || new Date().toISOString().split('T')[0],
-        delivered_by: deliveredBy, received_by: receivedBy, notes,
-        user_name: receivedBy, created_at: new Date().toISOString(),
-      }]),
-    ])
+    // Update item cost metadata (not balance — that comes from SLE/bins)
+    if (cost > 0) {
+      await supabase.from('items').update({ cost }).eq('id', itemId)
+    }
 
     auditLog({ module: 'inventory', action: 'STOCK_IN', entityType: 'sle', entityId: sleId, entityName: item.name, userName: receivedBy || '' })
     await fetchAll()
@@ -206,7 +194,7 @@ export function InventoryProvider({ children }) {
     if (!item) throw new Error('Item not found')
     const wh  = warehouseId || item.default_warehouse_id || DEFAULT_WAREHOUSE
     const bin = getBin(itemId, wh)
-    const actualQty = bin?.actual_qty ?? item.balance ?? 0
+    const actualQty = bin?.actual_qty ?? 0
     const activeReserved = reservations
       .filter(r => r.item_id === itemId && r.warehouse_id === wh && r.status === 'Active')
       .reduce((s, r) => s + (r.reserved_qty - r.consumed_qty), 0)
@@ -214,36 +202,19 @@ export function InventoryProvider({ children }) {
     if (quantity > availQty) throw new Error(`Insufficient stock. Available: ${availQty} (${actualQty} on hand, ${activeReserved} reserved)`)
 
     const sleId = generateId()
-    const txId  = generateId()
 
     const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
-      id:              sleId,
-      item_id:         itemId,
-      warehouse_id:    wh,
+      id:               sleId,
+      item_id:          itemId,
+      warehouse_id:     wh,
       posting_datetime: new Date(date || Date.now()).toISOString(),
-      voucher_type:    'StockOut',
-      voucher_no:      `SO-${Date.now()}`,
-      actual_qty:      -quantity,
-      created_by:      authorizedBy || '',
+      voucher_type:     'StockOut',
+      transaction_type: 'Issue',
+      voucher_no:       `SO-${Date.now()}`,
+      actual_qty:       -quantity,
+      created_by:       authorizedBy || '',
     }])
     if (sleErr) throw sleErr
-
-    await Promise.all([
-      supabase.from('items').update({
-        balance:   (item.balance || 0) - quantity,
-        total_out: (item.total_out || 0) + quantity,
-      }).eq('id', itemId),
-      supabase.from('transactions').insert([{
-        id: txId, type: 'OUT', item_id: itemId,
-        item_name: item.name, category: item.category,
-        qty: quantity, date: date || new Date().toISOString().split('T')[0],
-        issued_to: issuedTo, authorized_by: authorizedBy, notes: purpose,
-        user_name: authorizedBy, created_at: new Date().toISOString(),
-        cost_center: costCenter || null,
-        department: department || null,
-        project: project || null,
-      }]),
-    ])
 
     // Auto GL: DR Department Expense / CR Inventory
     try {
@@ -299,28 +270,18 @@ export function InventoryProvider({ children }) {
 
     if (variance !== 0) {
       const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
-        id:              sleId,
-        item_id:         itemId,
-        warehouse_id:    wh,
+        id:               sleId,
+        item_id:          itemId,
+        warehouse_id:     wh,
         posting_datetime: new Date(date || Date.now()).toISOString(),
-        voucher_type:    'StockReconciliation',
-        voucher_no:      `RECON-${stId.slice(-6).toUpperCase()}`,
-        actual_qty:      variance,
-        incoming_rate:   variance > 0 ? (item.cost || 0) : 0,
-        created_by:      countedBy || '',
+        voucher_type:     'StockReconciliation',
+        transaction_type: 'Reconciliation',
+        voucher_no:       `RECON-${stId.slice(-6).toUpperCase()}`,
+        actual_qty:       variance,
+        incoming_rate:    variance > 0 ? (item.cost || 0) : 0,
+        created_by:       countedBy || '',
       }])
       if (sleErr) throw sleErr
-
-      await Promise.all([
-        supabase.from('items').update({ balance: countedQty }).eq('id', itemId),
-        supabase.from('transactions').insert([{
-          id: generateId(), type: 'ADJUSTMENT', item_id: itemId,
-          item_name: item.name, category: item.category,
-          qty: Math.abs(variance), date, done_by: countedBy,
-          notes: `Stock reconciliation (${variance > 0 ? '+' : ''}${variance})`,
-          user_name: countedBy, created_at: new Date().toISOString(),
-        }]),
-      ])
 
       if (variance < 0) {
         // Shrinkage: DR Inventory Shrinkage Expense / CR Inventory
@@ -360,13 +321,7 @@ export function InventoryProvider({ children }) {
   }
 
   const deleteTransaction = async (tx) => {
-    const item = items.find(i => i.id === tx.item_id)
-    if (item) {
-      let newBalance = item.balance
-      if (tx.type === 'IN' || tx.type === 'GRN') newBalance = item.balance - tx.qty
-      else if (tx.type === 'OUT') newBalance = item.balance + tx.qty
-      await supabase.from('items').update({ balance: newBalance }).eq('id', item.id)
-    }
+    // Balance is maintained by SLE/bins — only delete the legacy log row
     await supabase.from('transactions').delete().eq('id', tx.id)
     auditLog({ module: 'inventory', action: 'DELETE', entityType: 'transaction', entityId: tx.id, entityName: tx.item_name || '' })
     await fetchAll()
@@ -376,16 +331,17 @@ export function InventoryProvider({ children }) {
   const createGRNLedgerEntry = async (itemId, warehouseId, qty, unitCost, voucherNo, detailNo) => {
     const item = items.find(i => i.id === itemId)
     const { error } = await supabase.from('stock_ledger_entries').insert([{
-      id:              generateId(),
-      item_id:         itemId,
-      warehouse_id:    warehouseId || DEFAULT_WAREHOUSE,
+      id:               generateId(),
+      item_id:          itemId,
+      warehouse_id:     warehouseId || DEFAULT_WAREHOUSE,
       posting_datetime: new Date().toISOString(),
-      voucher_type:    'PurchaseReceipt',
-      voucher_no:      voucherNo,
+      voucher_type:     'PurchaseReceipt',
+      transaction_type: 'Receipt',
+      voucher_no:       voucherNo,
       voucher_detail_no: detailNo,
-      actual_qty:      qty,
-      incoming_rate:   unitCost || 0,
-      created_by:      'system',
+      actual_qty:       qty,
+      incoming_rate:    unitCost || 0,
+      created_by:       'system',
     }])
     if (error) throw error
     // Update last_purchase_rate on item
@@ -594,25 +550,37 @@ export function InventoryProvider({ children }) {
     for (const line of lines) {
       const qty = parseFloat(line.qty) || 0
       if (qty <= 0) continue
-      await supabase.from('stock_ledger_entries').insert([{
-        id: generateId(), item_id: line.item_id,
-        warehouse_id: transfer.from_warehouse_id,
-        voucher_type: 'Stock Transfer', voucher_no: transfer.transfer_no,
-        actual_qty: -qty, outgoing_rate: line.valuation_rate || 0, incoming_rate: 0,
-        posting_date: today, created_at: now, updated_at: now,
-      }]).catch(() => null)
-      await supabase.from('stock_ledger_entries').insert([{
-        id: generateId(), item_id: line.item_id,
-        warehouse_id: transfer.to_warehouse_id,
-        voucher_type: 'Stock Transfer', voucher_no: transfer.transfer_no,
-        actual_qty: qty, incoming_rate: line.valuation_rate || 0, outgoing_rate: 0,
-        posting_date: today, created_at: now, updated_at: now,
-      }]).catch(() => null)
+      // Out leg: debit from source warehouse
+      const { error: outErr } = await supabase.from('stock_ledger_entries').insert([{
+        id:               generateId(),
+        item_id:          line.item_id,
+        warehouse_id:     transfer.from_warehouse_id,
+        voucher_type:     'StockTransfer',
+        transaction_type: 'Transfer',
+        voucher_no:       transfer.transfer_no,
+        actual_qty:       -qty,
+        outgoing_rate:    line.valuation_rate || 0,
+        incoming_rate:    0,
+        posting_datetime: now,
+        created_by:       'system',
+      }])
+      if (outErr) throw outErr
+      // In leg: credit to destination warehouse
+      const { error: inErr } = await supabase.from('stock_ledger_entries').insert([{
+        id:               generateId(),
+        item_id:          line.item_id,
+        warehouse_id:     transfer.to_warehouse_id,
+        voucher_type:     'StockTransfer',
+        transaction_type: 'Transfer',
+        voucher_no:       transfer.transfer_no,
+        actual_qty:       qty,
+        incoming_rate:    line.valuation_rate || 0,
+        outgoing_rate:    0,
+        posting_datetime: now,
+        created_by:       'system',
+      }])
+      if (inErr) throw inErr
       await supabase.from('stock_transfer_lines').update({ qty_transferred: qty }).eq('id', line.id)
-      if (line.item_id) {
-        const { data: item } = await supabase.from('items').select('balance').eq('id', line.item_id).maybeSingle()
-        if (item) await supabase.from('items').update({ balance: (item.balance || 0) - qty }).eq('id', line.item_id)
-      }
     }
     await supabase.from('stock_transfers').update({
       status: 'Completed', completed_at: now, updated_at: now,
