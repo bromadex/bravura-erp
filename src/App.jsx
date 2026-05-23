@@ -86,9 +86,11 @@ const Categories         = lazy(() => import('./pages/Inventory/Categories'))
 const StorageLocations   = lazy(() => import('./pages/Inventory/StorageLocations'))
 const MaterialRequests   = lazy(() => import('./pages/Inventory/MaterialRequests'))
 const Warehouses         = lazy(() => import('./pages/Inventory/Warehouses'))
-const BatchSerials       = lazy(() => import('./pages/Inventory/BatchSerials'))
-const StockAgeingReport  = lazy(() => import('./pages/Inventory/StockAgeingReport'))
-const ForecastReorder    = lazy(() => import('./pages/Inventory/ForecastReorder'))
+const BatchSerials          = lazy(() => import('./pages/Inventory/BatchSerials'))
+const StockAgeingReport     = lazy(() => import('./pages/Inventory/StockAgeingReport'))
+const ForecastReorder       = lazy(() => import('./pages/Inventory/ForecastReorder'))
+const InventoryDashboard    = lazy(() => import('./pages/Inventory/InventoryDashboard'))
+const DepartmentConsumption = lazy(() => import('./pages/Inventory/DepartmentConsumption'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -410,7 +412,8 @@ function AppRoutes() {
             </PermissionRoute>
           </ProtectedRoute>
         }>
-          <Route index                          element={<StockBalance />} />
+          <Route index                          element={<InventoryDashboard />} />
+          <Route path="dashboard"               element={<InventoryDashboard />} />
           <Route path="stock-balance"           element={<StockBalance />} />
           <Route path="stock-in"                element={<StockIn />} />
           <Route path="stock-transfers"         element={<StockTransfers />} />
@@ -424,6 +427,7 @@ function AppRoutes() {
           <Route path="batch-serials"           element={<BatchSerials />} />
           <Route path="stock-ageing"            element={<StockAgeingReport />} />
           <Route path="forecast-reorder"        element={<ForecastReorder />} />
+          <Route path="dept-consumption"        element={<DepartmentConsumption />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}

@@ -136,14 +136,14 @@ CREATE OR REPLACE VIEW v_overdue_pos AS
     po.po_number,
     po.supplier_name,
     po.order_date,
-    po.expected_date,
+    po.delivery_date,
     po.total_amount,
     po.status,
     po.department,
-    CURRENT_DATE - po.expected_date::date AS days_overdue
+    CURRENT_DATE - po.delivery_date::date AS days_overdue
   FROM purchase_orders po
-  WHERE po.expected_date IS NOT NULL
-    AND po.expected_date::date < CURRENT_DATE
+  WHERE po.delivery_date IS NOT NULL
+    AND po.delivery_date::date < CURRENT_DATE
     AND po.status NOT IN ('Received', 'Cancelled', 'Closed');
 
 -- ── 4. Audit Summary Function ────────────────────────────────

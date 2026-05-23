@@ -26,6 +26,8 @@ const PAGE_LABELS = {
   'budget-vs-actual': 'Budget vs Actual',
   'governance-policies': 'Governance Policies',
   'inventory-audit-log': 'Ops Audit Log',
+  'dashboard': 'Dashboard',
+  'dept-consumption': 'Department Consumption',
   'material-requests': 'Material Requests',
   'suppliers': 'Suppliers', 'store-requisitions': 'Store Requisitions',
   'purchase-requisitions': 'Purchase Requisitions', 'purchase-orders': 'Purchase Orders',
