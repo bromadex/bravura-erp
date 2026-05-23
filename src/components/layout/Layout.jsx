@@ -18,6 +18,7 @@ const PAGE_LABELS = {
   'stock-transfers': 'Stock Transfers',
   'stock-taking': 'Stock Taking', 'transactions': 'Transactions', 'categories': 'Categories',
   'store-requisitions': 'Store Requisitions', 'warehouses': 'Warehouses',
+  'batch-serials': 'Batch & Serial Tracking',
   'material-requests': 'Material Requests',
   'suppliers': 'Suppliers', 'store-requisitions': 'Store Requisitions',
   'purchase-requisitions': 'Purchase Requisitions', 'purchase-orders': 'Purchase Orders',
