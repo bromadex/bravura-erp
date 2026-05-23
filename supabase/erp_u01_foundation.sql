@@ -358,3 +358,254 @@ CREATE INDEX IF NOT EXISTS idx_pret_created_at
 
 CREATE INDEX IF NOT EXISTS idx_numbering_series_key
   ON numbering_series (series_key);
+
+
+-- ============================================================
+-- ERP Upgrade Phase 1 — Addendum
+-- docstatus / amendment_no / cancel_reason, quality_inspections,
+-- tax configuration tables
+-- ============================================================
+
+
+-- ── 15. DOCSTATUS — ERPNext document lifecycle ──────────────
+-- 0 = Draft      (mutable, no financial/stock impact posted)
+-- 1 = Submitted  (immutable, all impacts live)
+-- 2 = Cancelled  (reversed, immutable)
+-- Separate from the workflow status field (Draft/Pending/Approved/…).
+-- amendment_no: increments each time a cancelled doc is re-created as an amendment.
+-- cancel_reason: free-text reason captured at cancellation time.
+
+ALTER TABLE material_requests
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+ALTER TABLE purchase_requisitions
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+-- purchase_orders already has cancellation_reason from procurement_enhancements.sql
+ALTER TABLE purchase_orders
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0;
+
+ALTER TABLE goods_received
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+ALTER TABLE purchase_invoices
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+ALTER TABLE store_requisitions
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+ALTER TABLE stock_transfers
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+ALTER TABLE landed_cost_vouchers
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+-- payment_vouchers already has cancellation_reason from Phase 1 CREATE TABLE above
+ALTER TABLE payment_vouchers
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0;
+
+ALTER TABLE purchase_returns
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+-- rfq already has cancellation_reason
+ALTER TABLE rfq
+  ADD COLUMN IF NOT EXISTS docstatus    SMALLINT NOT NULL DEFAULT 0
+    CHECK (docstatus IN (0, 1, 2)),
+  ADD COLUMN IF NOT EXISTS amendment_no INT NOT NULL DEFAULT 0;
+
+-- Indexes for docstatus on the highest-volume tables
+CREATE INDEX IF NOT EXISTS idx_mr_docstatus   ON material_requests    (docstatus);
+CREATE INDEX IF NOT EXISTS idx_pr_docstatus   ON purchase_requisitions (docstatus);
+CREATE INDEX IF NOT EXISTS idx_po_docstatus   ON purchase_orders       (docstatus);
+CREATE INDEX IF NOT EXISTS idx_grn_docstatus  ON goods_received        (docstatus);
+CREATE INDEX IF NOT EXISTS idx_pi_docstatus   ON purchase_invoices     (docstatus);
+CREATE INDEX IF NOT EXISTS idx_sr_docstatus   ON store_requisitions    (docstatus);
+CREATE INDEX IF NOT EXISTS idx_pv_docstatus   ON payment_vouchers      (docstatus);
+CREATE INDEX IF NOT EXISTS idx_pret_docstatus ON purchase_returns       (docstatus);
+
+
+-- ── 16. QUALITY INSPECTIONS ──────────────────────────────────
+-- One inspection per GRN line (or per purchase return line for returns).
+-- Inspectors fill in per-parameter actual values; the row is Accepted
+-- when all critical parameters pass.
+
+CREATE TABLE IF NOT EXISTS quality_inspections (
+  id                  TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  qi_number           TEXT UNIQUE NOT NULL,
+  inspection_type     TEXT NOT NULL DEFAULT 'Incoming',
+  -- Incoming | Outgoing | In-Process
+  status              TEXT NOT NULL DEFAULT 'Pending',
+  -- Pending | Accepted | Rejected | Partially Accepted
+  docstatus           SMALLINT NOT NULL DEFAULT 0,
+  amendment_no        INT NOT NULL DEFAULT 0,
+  cancel_reason       TEXT,
+
+  -- Source links
+  grn_id              TEXT REFERENCES goods_received(id),
+  grn_line_id         TEXT REFERENCES grn_lines(id),
+  purchase_return_id  TEXT REFERENCES purchase_returns(id),
+
+  -- Item
+  item_id             TEXT NOT NULL REFERENCES items(id),
+  item_name           TEXT NOT NULL,
+  batch_no            TEXT,
+  warehouse_id        TEXT REFERENCES warehouses(id),
+
+  -- Quantities
+  inspection_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  inspector_name      TEXT,
+  inspector_id        TEXT,
+  sample_qty          NUMERIC(15,4) NOT NULL DEFAULT 0,
+  accepted_qty        NUMERIC(15,4) NOT NULL DEFAULT 0,
+  rejected_qty        NUMERIC(15,4) NOT NULL DEFAULT 0,
+
+  -- Parameter results — [{name, min_value, max_value, actual_value, uom, pass}]
+  parameters          JSONB NOT NULL DEFAULT '[]',
+
+  acceptance_criteria TEXT,
+  rejection_reason    TEXT,
+  corrective_action   TEXT,
+  remarks             TEXT,
+  report_url          TEXT,
+
+  created_by          TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_qi_status      ON quality_inspections (status);
+CREATE INDEX IF NOT EXISTS idx_qi_docstatus   ON quality_inspections (docstatus);
+CREATE INDEX IF NOT EXISTS idx_qi_item_id     ON quality_inspections (item_id);
+CREATE INDEX IF NOT EXISTS idx_qi_grn_id      ON quality_inspections (grn_id);
+CREATE INDEX IF NOT EXISTS idx_qi_grn_line_id ON quality_inspections (grn_line_id);
+CREATE INDEX IF NOT EXISTS idx_qi_date        ON quality_inspections (inspection_date);
+
+-- Back-link: grn_lines gets a quality_inspection_id for direct lookup
+ALTER TABLE grn_lines
+  ADD COLUMN IF NOT EXISTS quality_inspection_id TEXT REFERENCES quality_inspections(id);
+
+
+-- ── 17. TAX CONFIGURATION ────────────────────────────────────
+
+-- ── 17a. Tax categories (VAT groupings) ─────────────────────
+CREATE TABLE IF NOT EXISTS tax_categories (
+  id          TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  name        TEXT UNIQUE NOT NULL,
+  description TEXT,
+  is_default  BOOLEAN NOT NULL DEFAULT FALSE,
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO tax_categories (name, description, is_default)
+VALUES
+  ('Standard Rate',  'Standard rate VAT at the applicable national rate', TRUE),
+  ('Zero-rated',     'Taxable at 0% — input VAT claimable by registered suppliers', FALSE),
+  ('Exempt',         'Not subject to VAT — no input tax claimable', FALSE),
+  ('Reverse Charge', 'Buyer accounts for VAT — typically imported services', FALSE)
+ON CONFLICT (name) DO NOTHING;
+
+-- ── 17b. Tax templates (named multi-row tax schedules) ───────
+CREATE TABLE IF NOT EXISTS tax_templates (
+  id            TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  name          TEXT UNIQUE NOT NULL,
+  template_type TEXT NOT NULL DEFAULT 'Purchase',
+  -- Purchase | Sales | Both
+  is_default    BOOLEAN NOT NULL DEFAULT FALSE,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  description   TEXT,
+  company       TEXT,
+  created_by    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ── 17c. Tax template lines (rows within a template) ─────────
+CREATE TABLE IF NOT EXISTS tax_template_lines (
+  id                TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  template_id       TEXT NOT NULL REFERENCES tax_templates(id) ON DELETE CASCADE,
+  sort_order        INT NOT NULL DEFAULT 0,
+  charge_type       TEXT NOT NULL DEFAULT 'On Net Total',
+  -- On Net Total | On Previous Row Amount | Actual Amount
+  description       TEXT,
+  account_head      TEXT,     -- GL account code, e.g. 'VAT-INPUT', 'WITHHOLDING-TAX'
+  rate              NUMERIC(10,4) NOT NULL DEFAULT 0,    -- percentage
+  tax_amount        NUMERIC(15,4) NOT NULL DEFAULT 0,   -- used when charge_type = 'Actual Amount'
+  included_in_price BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ttl_template_id ON tax_template_lines (template_id);
+CREATE INDEX IF NOT EXISTS idx_tt_type         ON tax_templates (template_type);
+CREATE INDEX IF NOT EXISTS idx_tt_is_default   ON tax_templates (is_default) WHERE is_default = TRUE;
+
+-- ── 17d. Item-level tax template overrides ───────────────────
+CREATE TABLE IF NOT EXISTS item_tax_templates (
+  id              TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  item_id         TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  tax_category_id TEXT REFERENCES tax_categories(id),
+  tax_template_id TEXT REFERENCES tax_templates(id),
+  valid_from      DATE,
+  valid_to        DATE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (item_id, tax_category_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_itt_item_id     ON item_tax_templates (item_id);
+CREATE INDEX IF NOT EXISTS idx_itt_category_id ON item_tax_templates (tax_category_id);
+
+-- ── 17e. Seed: Zambia VAT 16% default purchase template ──────
+INSERT INTO tax_templates (name, template_type, is_default, description)
+VALUES
+  ('Zambia VAT 16%',       'Purchase', TRUE,  'Standard Zambian VAT at 16% on net total'),
+  ('Zero-rated Purchase',  'Purchase', FALSE, 'Zero-rated purchase — 0% VAT, input claimable'),
+  ('Exempt Purchase',      'Purchase', FALSE, 'VAT-exempt purchase — no input tax')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO tax_template_lines (template_id, sort_order, charge_type, description, account_head, rate)
+SELECT id, 1, 'On Net Total', 'VAT @ 16%', 'VAT-INPUT', 16
+FROM   tax_templates
+WHERE  name = 'Zambia VAT 16%'
+  AND  NOT EXISTS (
+    SELECT 1 FROM tax_template_lines
+    WHERE template_id = (SELECT id FROM tax_templates WHERE name = 'Zambia VAT 16%')
+  );
+
+-- Add tax_template_id to procurement documents for per-document tax override
+ALTER TABLE purchase_orders
+  ADD COLUMN IF NOT EXISTS tax_template_id TEXT REFERENCES tax_templates(id),
+  ADD COLUMN IF NOT EXISTS tax_amount      NUMERIC(15,4) DEFAULT 0;
+
+ALTER TABLE purchase_invoices
+  ADD COLUMN IF NOT EXISTS tax_template_id TEXT REFERENCES tax_templates(id);
+
+ALTER TABLE goods_received
+  ADD COLUMN IF NOT EXISTS tax_template_id TEXT REFERENCES tax_templates(id);
