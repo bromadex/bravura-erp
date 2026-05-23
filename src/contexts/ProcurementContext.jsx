@@ -250,67 +250,120 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
-  // Step 2: Storekeeper fulfills — issues items from stock, marks fulfilled
+  // Step 2: Storekeeper fulfills — issues items via SLE (single source of truth)
   const fulfillStoreRequisition = async (id, issuedBy, issuedById) => {
     const req = storeRequisitions.find(r => r.id === id)
     if (!req) throw new Error('Requisition not found')
     if (req.status !== 'approved') throw new Error('Only approved requisitions can be fulfilled')
 
-    const items    = typeof req.items === 'string' ? JSON.parse(req.items || '[]') : (req.items || [])
-    const issued   = []
+    const srItems   = typeof req.items === 'string' ? JSON.parse(req.items || '[]') : (req.items || [])
+    const issued    = []
     const notIssued = []
+    const voucherNo = req.sr_number || req.req_number || id
 
-    for (const it of items) {
-      const { data: invItem } = await supabase
-        .from('items')
-        .select('*')
-        .ilike('name', it.name)
-        .maybeSingle()
+    // Load active reservations for this SR
+    const { data: activeReservations } = await supabase
+      .from('stock_reservations')
+      .select('*')
+      .eq('voucher_id', id)
+      .in('status', ['Active', 'Partially Consumed'])
 
+    for (const it of srItems) {
+      // Resolve item — prefer item_id FK, fall back to name lookup
+      let invItem = null
+      if (it.item_id) {
+        const { data } = await supabase.from('items')
+          .select('id,name,category,default_warehouse_id')
+          .eq('id', it.item_id).maybeSingle()
+        invItem = data
+      }
+      if (!invItem) {
+        const { data } = await supabase.from('items')
+          .select('id,name,category,default_warehouse_id')
+          .ilike('name', it.name).maybeSingle()
+        invItem = data
+      }
       if (!invItem) {
         notIssued.push({ ...it, reason: 'Item not found in inventory' })
         continue
       }
 
-      const issueQty = Math.min(it.qty, invItem.balance)
+      const wh = it.warehouse_id || invItem.default_warehouse_id || 'wh_main_store'
+
+      // Read actual qty from bin (SLE-maintained)
+      const { data: bin } = await supabase
+        .from('bins')
+        .select('actual_qty, reserved_qty')
+        .eq('item_id', invItem.id)
+        .eq('warehouse_id', wh)
+        .maybeSingle()
+
+      const actualQty    = bin?.actual_qty || 0
+      const requestedQty = parseFloat(it.qty) || 0
+      // Can issue up to actual_qty; reservation covers this SR's allocation
+      const issueQty = Math.min(requestedQty, actualQty)
+
       if (issueQty <= 0) {
         notIssued.push({ ...it, reason: 'No stock available' })
         continue
       }
 
-      await supabase.from('items').update({
-        balance:   invItem.balance - issueQty,
-        total_out: (invItem.total_out || 0) + issueQty,
-      }).eq('id', invItem.id)
-
-      await supabase.from('transactions').insert([{
-        id:            generateId(),
-        type:          'OUT',
-        item_id:       invItem.id,
-        item_name:     invItem.name,
-        category:      invItem.category,
-        qty:           issueQty,
-        date:          new Date().toISOString().split('T')[0],
-        issued_to:     req.department,
-        authorized_by: req.approver_name || issuedBy,
-        notes:         `Store Requisition: ${req.sr_number || req.req_number} — Requested by ${req.requester_name}`,
-        user_name:     issuedBy,
-        created_at:    new Date().toISOString(),
+      // SLE is the single write — DB trigger updates bins.actual_qty
+      const sleId = generateId()
+      const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
+        id:               sleId,
+        item_id:          invItem.id,
+        warehouse_id:     wh,
+        posting_datetime: new Date().toISOString(),
+        voucher_type:     'StoreRequisition',
+        transaction_type: 'Issue',
+        voucher_no:       voucherNo,
+        actual_qty:       -issueQty,
+        created_by:       issuedBy || '',
       }])
+      if (sleErr) throw sleErr
 
-      issued.push({ ...it, issued_qty: issueQty })
+      // Consume matching reservation and release reserved_qty from bin
+      const reservation = activeReservations?.find(
+        r => r.item_id === invItem.id && r.warehouse_id === wh
+      )
+      if (reservation) {
+        const newConsumed = (reservation.consumed_qty || 0) + issueQty
+        const newStatus   = newConsumed >= (reservation.reserved_qty || 0)
+          ? 'Consumed' : 'Partially Consumed'
+        await supabase.from('stock_reservations').update({
+          consumed_qty: newConsumed,
+          status:       newStatus,
+          updated_at:   new Date().toISOString(),
+        }).eq('id', reservation.id)
+
+        // Release the consumed portion from bins.reserved_qty
+        await supabase.rpc('fn_increment_bin_reserved', {
+          p_item_id:      invItem.id,
+          p_warehouse_id: wh,
+          p_qty_delta:    -issueQty,
+        }).catch(() => null)
+      }
+
+      issued.push({ ...it, issued_qty: issueQty, item_id: invItem.id })
     }
 
     const newStatus = notIssued.length === 0 ? 'fulfilled' : 'partially_fulfilled'
     await supabase.from('store_requisitions').update({
-      status:        newStatus,
-      issued_by:     issuedBy,
-      issued_by_id:  issuedById,
-      issued_at:     new Date().toISOString(),
-      issued_items:  JSON.stringify(issued),
-      not_issued:    notIssued.length > 0 ? JSON.stringify(notIssued) : null,
-      updated_at:    new Date().toISOString(),
+      status:       newStatus,
+      docstatus:    notIssued.length === 0 ? 1 : 0,
+      issued_by:    issuedBy,
+      issued_by_id: issuedById,
+      issued_at:    new Date().toISOString(),
+      issued_items: JSON.stringify(issued),
+      not_issued:   notIssued.length > 0 ? JSON.stringify(notIssued) : null,
+      updated_at:   new Date().toISOString(),
     }).eq('id', id)
+
+    auditLog({
+      module: 'procurement', action: 'FULFILL', entityType: 'store_requisition',
+      entityId: id, entityName: voucherNo, userName: issuedBy || '',
+    })
 
     if (notIssued.length > 0) {
       toast(`Partially fulfilled — ${notIssued.length} item(s) could not be issued: ${notIssued.map(n => n.name).join(', ')}`, { icon: '⚠️', duration: 6000 })
@@ -448,52 +501,47 @@ export function ProcurementProvider({ children }) {
       }]).catch(() => null) // non-blocking — don't fail GRN if perf log fails
     }
 
-    // Auto-update inventory stock + write Stock Ledger Entries
+    // SLE is the single write for each line — DB trigger maintains bins
     for (const it of grn.items) {
-      const { data: existing } = await supabase.from('items').select('*').ilike('name', it.name).maybeSingle()
+      const { data: existing } = await supabase.from('items')
+        .select('id,cost,last_purchase_rate')
+        .ilike('name', it.name).maybeSingle()
       let itemId = existing?.id
+
       if (!existing) {
+        // Auto-create item — balance starts at 0, SLE will build it up
         itemId = generateId()
         await supabase.from('items').insert([{
           id: itemId, name: it.name, category: it.category,
-          unit: it.unit || 'pcs', balance: it.received, total_in: it.received,
-          total_out: 0, cost: it.unit_cost || 0, threshold: 5, notes: '',
+          unit: it.unit || 'pcs', balance: 0, total_in: 0, total_out: 0,
+          cost: it.unit_cost || 0, threshold: 5, notes: '',
           last_purchase_rate: it.unit_cost || 0,
         }])
-      } else {
+      } else if (it.unit_cost > 0) {
+        // Update price metadata only — not balance (SLE trigger does that)
         await supabase.from('items').update({
-          balance:             existing.balance + it.received,
-          total_in:            (existing.total_in || 0) + it.received,
-          cost:                it.unit_cost > 0 ? it.unit_cost : existing.cost,
-          last_purchase_rate:  it.unit_cost > 0 ? it.unit_cost : (existing.last_purchase_rate || existing.cost),
+          cost:               it.unit_cost,
+          last_purchase_rate: it.unit_cost,
         }).eq('id', existing.id)
       }
-      // Legacy transaction record
-      await supabase.from('transactions').insert([{
-        id: generateId(), type: 'GRN', item_name: it.name, category: it.category,
-        qty: it.received, date: grn.date,
-        delivered_by: grn.supplier_name || grn.driver || '',
-        received_by: grn.received_by || '',
-        notes: `GRN: ${grnNumber}`,
-        user_name: grn.received_by || '',
-        created_at: new Date().toISOString(),
-      }])
-      // ERPNext-style Stock Ledger Entry (triggers bin update via DB trigger)
+
+      // SLE insert — triggers fn_update_bin_from_sle which updates bins
       if (itemId) {
-        await supabase.from('stock_ledger_entries').insert([{
-          id:                generateId(),
-          item_id:           itemId,
-          warehouse_id:      it.warehouse_id || 'wh_main_store',
-          voucher_type:      'Purchase Receipt',
-          voucher_no:        grnNumber,
+        const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
+          id:               generateId(),
+          item_id:          itemId,
+          warehouse_id:     it.warehouse_id || 'wh_main_store',
+          voucher_type:     'PurchaseReceipt',
+          transaction_type: 'Receipt',
+          voucher_no:       grnNumber,
           voucher_detail_no: it.name,
-          actual_qty:        parseFloat(it.received) || 0,
-          incoming_rate:     parseFloat(it.unit_cost) || 0,
-          outgoing_rate:     0,
-          posting_date:      grn.date,
-          created_at:        new Date().toISOString(),
-          updated_at:        new Date().toISOString(),
-        }]).catch(() => null) // non-blocking if SLE table doesn't exist yet
+          actual_qty:       parseFloat(it.received) || 0,
+          incoming_rate:    parseFloat(it.unit_cost) || 0,
+          outgoing_rate:    0,
+          posting_datetime: new Date(grn.date || Date.now()).toISOString(),
+          created_by:       grn.received_by || 'system',
+        }])
+        if (sleErr) throw sleErr
       }
     }
 
