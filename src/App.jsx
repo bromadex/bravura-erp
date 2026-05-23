@@ -57,6 +57,8 @@ const WorkflowBuilder     = lazy(() => import('./components/workflow/WorkflowBui
 const WorkflowInbox       = lazy(() => import('./pages/Workflow/WorkflowInbox'))
 const WorkflowAssignments = lazy(() => import('./pages/Workflow/WorkflowAssignments'))
 const MasterData          = lazy(() => import('./pages/Settings/MasterData'))
+const GovernancePolicies  = lazy(() => import('./pages/Settings/GovernancePolicies'))
+const InventoryAuditLog   = lazy(() => import('./pages/Settings/AuditLog'))
 // Phase 10 — Cross-cutting engines
 const PushNotificationSettings = lazy(() => import('./pages/Settings/PushNotificationSettings'))
 const EmailLogs                = lazy(() => import('./pages/Settings/EmailLogs'))
@@ -814,6 +816,8 @@ function AppRoutes() {
           <Route path="workflow-assignments" element={<HRProvider><WorkflowAssignments /></HRProvider>} />
           <Route path="push-notifications"   element={<PushNotificationSettings />} />
           <Route path="email-logs"           element={<EmailLogs />}             />
+          <Route path="governance-policies"  element={<GovernancePolicies />}    />
+          <Route path="inventory-audit-log"  element={<InventoryAuditLog />}     />
         </Route>
 
         {/* ── REPORTS ──────────────────────────────────────── */}

@@ -481,6 +481,11 @@ const ALL_MODULES = {
         { id: 'push-notifications', label: 'Push Notifications', icon: 'notifications_active' },
         { id: 'email-logs',         label: 'Email Logs',         icon: 'mail'                 },
       ],
+    }, {
+      label: 'Governance', pages: [
+        { id: 'governance-policies', label: 'Governance Policies', icon: 'policy'           },
+        { id: 'inventory-audit-log', label: 'Ops Audit Log',       icon: 'manage_search'    },
+      ],
     }],
   },
 }
