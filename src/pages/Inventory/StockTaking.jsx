@@ -12,7 +12,8 @@ import { PageHeader, EmptyState, AlertBanner } from '../../components/ui'
 const today = new Date().toISOString().split('T')[0]
 
 export default function StockTaking() {
-  const { items, stockTakes, stockTake, loading, fetchAll } = useInventory()
+  const { items, bins, stockTakes, stockTake, loading, fetchAll } = useInventory()
+  const getBinQty = itemId => bins.filter(b => b.item_id === itemId).reduce((s, b) => s + (b.actual_qty || 0), 0)
   const { user } = useAuth()
   const canEdit = useCanEdit('inventory', 'stock-taking')
 
@@ -33,7 +34,7 @@ export default function StockTaking() {
   const setCount = (itemId, val) => setCounts(prev => ({ ...prev, [itemId]: val }))
 
   const itemsWithCounts = filteredItems.filter(i => counts[i.id] !== undefined && counts[i.id] !== '')
-  const totalVariance   = itemsWithCounts.reduce((s, i) => s + ((parseInt(counts[i.id]) || 0) - (i.balance || 0)), 0)
+  const totalVariance   = itemsWithCounts.reduce((s, i) => s + ((parseInt(counts[i.id]) || 0) - getBinQty(i.id)), 0)
 
   const handleSave = async () => {
     if (itemsWithCounts.length === 0) return toast.error('Enter counted quantities for at least one item')
@@ -126,15 +127,16 @@ export default function StockTaking() {
                 </thead>
                 <tbody>
                   {filteredItems.map(item => {
-                    const counted  = counts[item.id]
-                    const hasCount = counted !== undefined && counted !== ''
-                    const variance = hasCount ? (parseInt(counted) || 0) - (item.balance || 0) : null
+                    const counted   = counts[item.id]
+                    const hasCount  = counted !== undefined && counted !== ''
+                    const systemQty = getBinQty(item.id)
+                    const variance  = hasCount ? (parseInt(counted) || 0) - systemQty : null
                     return (
                       <tr key={item.id} style={{ background: hasCount ? (variance !== 0 ? 'rgba(251,191,36,.04)' : 'rgba(52,211,153,.04)') : 'transparent' }}>
                         <td style={{ fontWeight: 600 }}>{item.name}</td>
                         <td style={{ fontSize: 12 }}>{item.category}</td>
                         <td style={{ color: 'var(--text-dim)' }}>{item.unit || 'pcs'}</td>
-                        <td className="td-mono">{item.balance}</td>
+                        <td className="td-mono">{systemQty}</td>
                         <td>
                           <input
                             type="number" min="0"

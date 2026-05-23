@@ -213,18 +213,18 @@ export default function StockBalance() {
   const [editingItem,  setEditingItem]  = useState(null)
   const [viewItem,     setViewItem]     = useState(null)
 
-  // Bin-based helpers with fallback to items.balance
+  // Bin-based helpers — SLE/bins are the sole source of truth for stock quantities
   const getBalance = (item, whId = null) => {
     if (whId && whId !== 'ALL') return getBin(item.id, whId)?.actual_qty ?? 0
     const itemBins = bins.filter(b => b.item_id === item.id)
     if (itemBins.length > 0) return itemBins.reduce((s, b) => s + (b.actual_qty || 0), 0)
-    return item.balance ?? 0
+    return 0
   }
   const getProjected = (item, whId = null) => {
     if (whId && whId !== 'ALL') return getBin(item.id, whId)?.projected_qty ?? getBalance(item, whId)
     const itemBins = bins.filter(b => b.item_id === item.id)
     if (itemBins.length > 0) return itemBins.reduce((s, b) => s + (b.projected_qty || 0), 0)
-    return item.balance ?? 0
+    return 0
   }
   const getRate = (item, whId = null) => {
     const b = whId && whId !== 'ALL' ? getBin(item.id, whId) : bins.find(b => b.item_id === item.id)

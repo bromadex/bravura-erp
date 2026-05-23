@@ -83,23 +83,17 @@ export default function InventoryDashboard() {
     try {
       const now = new Date()
       const sixMonthsAgo = isoDate(addMonths(now, -6))
-      const threeMonthsAgo = isoDate(addMonths(now, -3))
 
-      const [itemsRes, binsRes, sleRes, txRes, batRes, resRes, rlRes] = await Promise.all([
+      const [itemsRes, binsRes, sleRes, batRes, resRes, rlRes] = await Promise.all([
         supabase.from('items').select(
-          'id, name, category, unit, cost, balance, threshold, safety_stock, lead_time_days, has_batch_no, has_serial_no'
+          'id, name, category, unit, cost, threshold, safety_stock, lead_time_days, has_batch_no, has_serial_no'
         ),
         supabase.from('bins').select('*, warehouses(name, code)'),
         supabase
           .from('stock_ledger_entries')
-          .select('item_id, warehouse_id, actual_qty, voucher_type, posting_datetime')
+          .select('item_id, warehouse_id, actual_qty, transaction_type, voucher_type, posting_datetime')
           .eq('is_cancelled', false)
           .gte('posting_datetime', sixMonthsAgo),
-        supabase
-          .from('transactions')
-          .select('type, qty, date, item_name, category, cost_center, department')
-          .gte('date', threeMonthsAgo)
-          .limit(2000),
         supabase
           .from('item_batches')
           .select('id, status, expiry_date, qty_available, batch_no, item_name')
