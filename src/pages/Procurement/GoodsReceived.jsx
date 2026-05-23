@@ -542,7 +542,7 @@ export default function GoodsReceived() {
                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
                   : <button className="btn btn-secondary" onClick={() => setGrnGLModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>}
                 <button className="btn btn-primary" onClick={() => {
-                  navigate(`/module/procurement/purchase-invoices?grn_id=${encodeURIComponent(viewGRN.id)}${viewGRN.po_id ? '&po_id=' + encodeURIComponent(viewGRN.po_id) : ''}`)
+                  navigate(`/module/procurement/invoices?grn_id=${encodeURIComponent(viewGRN.id)}${viewGRN.po_id ? '&po_id=' + encodeURIComponent(viewGRN.po_id) : ''}`)
                   setViewGRN(null)
                 }}><span className="material-icons">receipt</span> Create Invoice</button>
                 <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>

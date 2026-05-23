@@ -33,6 +33,8 @@ export function ProcurementProvider({ children }) {
   const [quotLines,            setQuotLines]            = useState([])
   const [stockTransfers,       setStockTransfers]       = useState([])
   const [landedCostVouchers,   setLandedCostVouchers]   = useState([])
+  const [paymentVouchers,      setPaymentVouchers]      = useState([])
+  const [pvLines,              setPvLines]              = useState([])
 
   const generateId = () => crypto.randomUUID()
 
@@ -42,7 +44,7 @@ export function ProcurementProvider({ children }) {
     setLoading(true)
     try {
       const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes,
-             polRes, grlRes, pilRes, rflRes, qllRes, lcvRes] = await Promise.all([
+             polRes, grlRes, pilRes, rflRes, qllRes, lcvRes, pvRes, pvlRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
@@ -58,6 +60,8 @@ export function ProcurementProvider({ children }) {
         safe(supabase.from('rfq_lines').select('*').order('created_at')),
         safe(supabase.from('quotation_lines').select('*').order('created_at')),
         safe(supabase.from('landed_cost_vouchers').select('*, landed_cost_lines(*)').order('created_at', { ascending: false })),
+        safe(supabase.from('payment_vouchers').select('*').order('payment_date', { ascending: false })),
+        safe(supabase.from('payment_voucher_lines').select('*').order('created_at')),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
@@ -74,6 +78,8 @@ export function ProcurementProvider({ children }) {
       if (rflRes.data) setRfqLines(rflRes.data)
       if (qllRes.data) setQuotLines(qllRes.data)
       if (lcvRes.data) setLandedCostVouchers(lcvRes.data)
+      if (pvRes.data)  setPaymentVouchers(pvRes.data)
+      if (pvlRes.data) setPvLines(pvlRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -741,6 +747,78 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Payment Vouchers (AP Engine) ─────────────────────────
+  const createPaymentVoucher = async (pvData, lines) => {
+    const id = generateId()
+    const { data: pvNumber } = await supabase.rpc('fn_next_series_number', { p_series_key: 'payment_vouchers' })
+    const { error } = await supabase.from('payment_vouchers').insert([{
+      id, pv_number: pvNumber || `PV-${Date.now()}`,
+      ...pvData, status: 'Draft', docstatus: 0,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    for (const line of lines) {
+      const { error: le } = await supabase.from('payment_voucher_lines').insert([{
+        id: generateId(), pv_id: id, ...line, created_at: new Date().toISOString(),
+      }])
+      if (le) throw le
+    }
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'payment_voucher', entityId: id, entityName: pvNumber })
+    await fetchAll()
+    return id
+  }
+
+  const postPaymentVoucher = async (pvId, postedBy) => {
+    const pv = paymentVouchers.find(p => p.id === pvId)
+    if (!pv) throw new Error('Payment voucher not found')
+    if (pv.status !== 'Draft') throw new Error(`Cannot post a ${pv.status} voucher`)
+    const { error } = await supabase.from('payment_vouchers').update({
+      status: 'Posted', docstatus: 1, posted_by: postedBy,
+      posted_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).eq('id', pvId)
+    if (error) throw error
+    const lines = pvLines.filter(l => l.pv_id === pvId)
+    for (const line of lines) {
+      const inv = purchaseInvoices.find(i => i.id === line.invoice_id)
+      if (!inv) continue
+      const newPaid   = (inv.paid_amount || 0) + (line.amount_paid || 0)
+      const newStatus = newPaid >= (inv.total_amount || 0) ? 'Paid' : 'Partially Paid'
+      await supabase.from('purchase_invoices').update({
+        paid_amount: newPaid, status: newStatus,
+        payment_method: pv.payment_method, payment_reference: pv.reference_no || pv.pv_number,
+        payment_date: pv.payment_date, updated_at: new Date().toISOString(),
+      }).eq('id', line.invoice_id)
+    }
+    auditLog({ module: 'procurement', action: 'POST', entityType: 'payment_voucher', entityId: pvId, entityName: pv.pv_number })
+    await fetchAll()
+  }
+
+  const cancelPaymentVoucher = async (pvId, reason, cancelledBy) => {
+    const pv = paymentVouchers.find(p => p.id === pvId)
+    if (!pv) throw new Error('Payment voucher not found')
+    if (pv.status === 'Cancelled') throw new Error('Already cancelled')
+    const { error } = await supabase.from('payment_vouchers').update({
+      status: 'Cancelled', docstatus: 2, cancelled_by: cancelledBy,
+      cancelled_at: new Date().toISOString(), cancellation_reason: reason,
+      updated_at: new Date().toISOString(),
+    }).eq('id', pvId)
+    if (error) throw error
+    if (pv.status === 'Posted') {
+      const lines = pvLines.filter(l => l.pv_id === pvId)
+      for (const line of lines) {
+        const inv = purchaseInvoices.find(i => i.id === line.invoice_id)
+        if (!inv) continue
+        const newPaid   = Math.max(0, (inv.paid_amount || 0) - (line.amount_paid || 0))
+        const newStatus = newPaid <= 0 ? 'Pending' : newPaid >= (inv.total_amount || 0) ? 'Paid' : 'Partially Paid'
+        await supabase.from('purchase_invoices').update({
+          paid_amount: newPaid, status: newStatus, updated_at: new Date().toISOString(),
+        }).eq('id', line.invoice_id)
+      }
+    }
+    auditLog({ module: 'procurement', action: 'CANCEL', entityType: 'payment_voucher', entityId: pvId, entityName: pv.pv_number })
+    await fetchAll()
+  }
+
   const recordPayment = async (id, { amount, method, reference, date }) => {
     const inv = purchaseInvoices.find(p => p.id === id)
     if (!inv) throw new Error('Invoice not found')
@@ -853,6 +931,7 @@ export function ProcurementProvider({ children }) {
       rfqs, rfqQuotations, purchaseInvoices, budgets, loading,
       poLines, grnLines, invoiceLines, rfqLines, quotLines,
       landedCostVouchers,
+      paymentVouchers, pvLines,
       getPoLines, getGrnLines, getInvoiceLines, getMatchStatus,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
@@ -865,6 +944,7 @@ export function ProcurementProvider({ children }) {
       createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
       createBudget, updateBudget, deleteBudget, checkBudget,
       createLCV, applyLCV, cancelLCV,
+      createPaymentVoucher, postPaymentVoucher, cancelPaymentVoucher,
       fetchAll,
     }}>
       {children}
