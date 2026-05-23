@@ -103,6 +103,11 @@ const ALL_MODULES = {
     label: 'Inventory', icon: 'inventory', color: '#2dd4bf',
     sections: [
       {
+        label: 'Overview', pages: [
+          { id: 'dashboard',         label: 'Dashboard',         icon: 'dashboard'     },
+        ],
+      },
+      {
         label: 'Stock Operations', pages: [
           { id: 'stock-balance',     label: 'Stock Balance',     icon: 'list_alt'      },
           { id: 'stock-in',          label: 'Stock In',          icon: 'add_circle'    },
@@ -117,6 +122,7 @@ const ALL_MODULES = {
         label: 'Reports', pages: [
           { id: 'stock-ageing',      label: 'Stock Ageing Report',    icon: 'hourglass_empty' },
           { id: 'forecast-reorder',  label: 'Forecast & Reorder',     icon: 'trending_up'     },
+          { id: 'dept-consumption',  label: 'Dept Consumption',       icon: 'groups'          },
         ],
       },
       {
