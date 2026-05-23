@@ -172,15 +172,16 @@ export default function BudgetVsActual() {
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true)
+    const safe = q => Promise.resolve(q).catch(() => ({ data: [], error: null }))
     try {
       const [budgetsRes, posRes, pisRes] = await Promise.all([
-        supabase.from('procurement_budgets').select('*'),
-        supabase.from('purchase_orders')
+        safe(supabase.from('procurement_budgets').select('*')),
+        safe(supabase.from('purchase_orders')
           .select('id, po_number, order_date, department, cost_center, total_amount, status')
-          .not('status', 'in', '("Cancelled","Draft")'),
-        supabase.from('purchase_invoices')
+          .in('status', ['Submitted', 'Approved', 'Partially Received', 'Received', 'Closed'])),
+        safe(supabase.from('purchase_invoices')
           .select('id, pi_number, invoice_date, po_id, total_amount, status')
-          .in('status', ['Posted', 'Partially Paid', 'Paid', 'Overdue']),
+          .in('status', ['Posted', 'Partially Paid', 'Paid', 'Overdue'])),
       ])
 
       if (budgetsRes.error) throw budgetsRes.error
