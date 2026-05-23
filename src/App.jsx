@@ -85,6 +85,7 @@ const StorageLocations   = lazy(() => import('./pages/Inventory/StorageLocations
 const MaterialRequests   = lazy(() => import('./pages/Inventory/MaterialRequests'))
 const Warehouses         = lazy(() => import('./pages/Inventory/Warehouses'))
 const BatchSerials       = lazy(() => import('./pages/Inventory/BatchSerials'))
+const StockAgeingReport  = lazy(() => import('./pages/Inventory/StockAgeingReport'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -100,6 +101,8 @@ const SupplierPerformance  = lazy(() => import('./pages/Procurement/SupplierPerf
 const ProcurementDashboard = lazy(() => import('./pages/Procurement/ProcurementDashboard'))
 const BudgetControl        = lazy(() => import('./pages/Procurement/BudgetControl'))
 const LandedCostVouchers   = lazy(() => import('./pages/Procurement/LandedCostVouchers'))
+const SupplierPriceLists   = lazy(() => import('./pages/Procurement/SupplierPriceLists'))
+const CostCentreReport     = lazy(() => import('./pages/Procurement/CostCentreReport'))
 
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
@@ -415,6 +418,7 @@ function AppRoutes() {
           <Route path="warehouses"              element={<Warehouses />} />
           <Route path="locations"               element={<StorageLocations />} />
           <Route path="batch-serials"           element={<BatchSerials />} />
+          <Route path="stock-ageing"            element={<StockAgeingReport />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -443,6 +447,8 @@ function AppRoutes() {
           <Route path="invoices"                element={<PurchaseInvoices />}      />
           <Route path="budget-control"          element={<BudgetControl />}         />
           <Route path="supplier-performance"    element={<SupplierPerformance />}   />
+          <Route path="supplier-price-lists"    element={<SupplierPriceLists />}    />
+          <Route path="cost-centre-report"      element={<CostCentreReport />}      />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
