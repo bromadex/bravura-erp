@@ -91,6 +91,7 @@ const ALL_MODULES = {
     }, {
       label: 'Controls & Analytics', pages: [
         { id: 'budget-control',        label: 'Budget Control',       icon: 'account_balance'},
+        { id: 'budget-vs-actual',      label: 'Budget vs Actual',     icon: 'balance'        },
         { id: 'supplier-price-lists',  label: 'Supplier Price Lists', icon: 'price_check'   },
         { id: 'supplier-performance',  label: 'Supplier Performance', icon: 'star_rate'      },
         { id: 'cost-centre-report',    label: 'Cost Centre Report',   icon: 'donut_large'    },
@@ -114,7 +115,8 @@ const ALL_MODULES = {
       },
       {
         label: 'Reports', pages: [
-          { id: 'stock-ageing',  label: 'Stock Ageing Report', icon: 'hourglass_empty' },
+          { id: 'stock-ageing',      label: 'Stock Ageing Report',    icon: 'hourglass_empty' },
+          { id: 'forecast-reorder',  label: 'Forecast & Reorder',     icon: 'trending_up'     },
         ],
       },
       {
