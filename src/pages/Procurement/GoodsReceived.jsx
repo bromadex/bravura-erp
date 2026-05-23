@@ -9,7 +9,8 @@
 // 5. Better view modal layout
 // 6. Stock impact summary on the new GRN form (live total value, items count)
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
@@ -21,6 +22,9 @@ export default function GoodsReceived() {
   const { goodsReceived, purchaseOrders, createGoodsReceived, loading, getGrnLines, invoiceLines, getMatchStatus } = useProcurement()
   const { user }   = useAuth()
   const canEdit    = useCanEdit('procurement', 'goods-received')
+  const navigate   = useNavigate()
+  const [searchParams] = useSearchParams()
+  const prefillPoRef   = useRef(searchParams.get('po_id'))
 
   const [modalOpen, setModalOpen]   = useState(false)
   const [viewGRN,   setViewGRN]     = useState(null)
@@ -40,6 +44,16 @@ export default function GoodsReceived() {
       .neq('status', 'Terminated').order('name')
       .then(({ data }) => { if (data) setEmployees(data) })
   }, [])
+
+  // Pre-fill GRN from PO via URL param ?po_id=XXX (replaces sessionStorage hack)
+  useEffect(() => {
+    const poId = prefillPoRef.current
+    if (poId && purchaseOrders.length > 0) {
+      handlePOSelect(poId)
+      setModalOpen(true)
+      prefillPoRef.current = null
+    }
+  }, [purchaseOrders.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     getChartOfAccounts().then(setGrnGLAccounts).catch(() => {})
@@ -527,6 +541,10 @@ export default function GoodsReceived() {
                 {grnGLPosted
                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--green)', background: 'rgba(52,211,153,.1)', border: '1px solid rgba(52,211,153,.3)', padding: '6px 12px', borderRadius: 8 }}><span className="material-icons" style={{ fontSize: 15 }}>account_balance</span> GL Posted</span>
                   : <button className="btn btn-secondary" onClick={() => setGrnGLModal(true)}><span className="material-icons">account_balance</span> Post to GL</button>}
+                <button className="btn btn-primary" onClick={() => {
+                  navigate(`/module/procurement/purchase-invoices?grn_id=${encodeURIComponent(viewGRN.id)}${viewGRN.po_id ? '&po_id=' + encodeURIComponent(viewGRN.po_id) : ''}`)
+                  setViewGRN(null)
+                }}><span className="material-icons">receipt</span> Create Invoice</button>
                 <button className="btn btn-secondary" onClick={() => setViewGRN(null)}>Close</button>
               </div>
             </div>

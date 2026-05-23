@@ -361,7 +361,7 @@ export default function MaterialRequests() {
             await handleSubmitMr(mr)
             setViewMr(prev => prev ? { ...prev, status: 'Submitted' } : null)
           }}
-          onNavigateToPO={() => navigate('/module/procurement/purchase-orders')}
+          onNavigateToPO={(mr) => navigate(`/module/procurement/purchase-orders?source_mr_id=${encodeURIComponent(mr.id)}&mr_number=${encodeURIComponent(mr.mr_number || '')}`)}
           defaultWarehouse={DEFAULT_WAREHOUSE}
           mrItems={mrItems}
         />
@@ -776,7 +776,7 @@ function ViewMRModal({ mr, lines, onClose, onStatusChange, onSubmit, onNavigateT
         )}
 
         {isSubmitted && (
-          <button type="button" className="btn btn-primary" onClick={onNavigateToPO} disabled={busy}>
+          <button type="button" className="btn btn-primary" onClick={() => onNavigateToPO(mr)} disabled={busy}>
             <span className="material-icons" style={{ fontSize: 16 }}>shopping_cart</span>
             Create Purchase Order
           </button>

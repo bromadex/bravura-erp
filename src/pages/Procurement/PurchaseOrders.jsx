@@ -6,8 +6,8 @@
 //    (uses sessionStorage to pass PO data to GoodsReceived).
 // 3. Added: view PO modal, status badges, total calculation, search, Excel export.
 
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -18,24 +18,41 @@ import * as XLSX from 'xlsx'
 const today = new Date().toISOString().split('T')[0]
 
 export default function PurchaseOrders() {
-  const { purchaseOrders, suppliers, createPurchaseOrder, updatePurchaseOrderStatus, loading } = useProcurement()
+  const { purchaseOrders, suppliers, createPurchaseOrder, updatePurchaseOrderStatus, loading, fetchAll } = useProcurement()
   const { user }    = useAuth()
   const canEdit     = useCanEdit('procurement', 'purchase-orders')
   const navigate    = useNavigate()
+  const [searchParams] = useSearchParams()
+  const prefillRef  = useRef(false)
 
   const [modalOpen,  setModalOpen]  = useState(false)
   const [viewPO,     setViewPO]     = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [mrBanner,   setMrBanner]   = useState('')
 
   const emptyForm = () => ({
     supplier_id:   '',
     supplier_name: '',
     order_date:    today,
     delivery_date: '',
+    source_mr_id:  '',
+    pr_id:         '',
     items: [{ name: '', category: '', ordered_qty: 1, unit: 'pcs', unit_cost: 0 }],
     notes: '',
   })
   const [form, setForm] = useState(emptyForm())
+
+  // Pre-fill from MR → PO URL params (?source_mr_id=XXX&mr_number=YYY)
+  useEffect(() => {
+    const sourceMrId = searchParams.get('source_mr_id')
+    const mrNumber   = searchParams.get('mr_number')
+    if (sourceMrId && !prefillRef.current) {
+      prefillRef.current = true
+      setForm(f => ({ ...f, source_mr_id: sourceMrId }))
+      setMrBanner(mrNumber ? `MR: ${mrNumber}` : `From MR ${sourceMrId.slice(-6)}`)
+      setModalOpen(true)
+    }
+  }, [searchParams])
 
   const addItem    = () => setForm(f => ({ ...f, items: [...f.items, { name: '', category: '', ordered_qty: 1, unit: 'pcs', unit_cost: 0 }] }))
   const removeItem = (idx) => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))
@@ -64,26 +81,23 @@ export default function PurchaseOrders() {
         created_by_id:   user?.id,
         created_by_name: user?.full_name || user?.username,
         status:          'draft',
-        rfq_id:          form.rfq_id          || null,
-        quotation_id:    form.quotation_id     || null,
-        budget_code:     form.budget_code      || '',
-        department:      form.department        || '',
+        rfq_id:          form.rfq_id       || null,
+        quotation_id:    form.quotation_id  || null,
+        budget_code:     form.budget_code   || '',
+        department:      form.department    || '',
+        source_mr_id:    form.source_mr_id  || null,
+        pr_id:           form.pr_id         || null,
       })
       toast.success('Purchase order created')
       setModalOpen(false)
+      setMrBanner('')
       setForm(emptyForm())
     } catch (err) { toast.error(err.message) }
   }
 
-  // Navigate to GRN page with PO data pre-loaded via sessionStorage
+  // Navigate to GRN page with PO pre-fill via URL param (replaces sessionStorage)
   const handleReceive = (po) => {
-    sessionStorage.setItem('grn_from_po', JSON.stringify({
-      po_id:         po.id,
-      po_number:     po.po_number,
-      supplier_name: po.supplier_name,
-      items:         typeof po.items === 'string' ? JSON.parse(po.items || '[]') : (po.items || []),
-    }))
-    navigate('/module/procurement/goods-received')
+    navigate(`/module/procurement/goods-received?po_id=${encodeURIComponent(po.id)}`)
     toast.success(`Opening GRN for ${po.po_number}`)
   }
 
@@ -251,6 +265,12 @@ export default function PurchaseOrders() {
         <div className="overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title">Create <span>Purchase Order</span></div>
+            {mrBanner && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginBottom: 12, background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 8, fontSize: 12, color: 'var(--blue)' }}>
+                <span className="material-icons" style={{ fontSize: 15 }}>link</span>
+                Converting from <strong>{mrBanner}</strong>
+              </div>
+            )}
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
