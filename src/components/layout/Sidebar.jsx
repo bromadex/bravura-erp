@@ -91,7 +91,9 @@ const ALL_MODULES = {
     }, {
       label: 'Controls & Analytics', pages: [
         { id: 'budget-control',        label: 'Budget Control',       icon: 'account_balance'},
+        { id: 'supplier-price-lists',  label: 'Supplier Price Lists', icon: 'price_check'   },
         { id: 'supplier-performance',  label: 'Supplier Performance', icon: 'star_rate'      },
+        { id: 'cost-centre-report',    label: 'Cost Centre Report',   icon: 'donut_large'    },
         { id: 'suppliers',             label: 'Suppliers',            icon: 'store'          },
       ],
     }],
@@ -111,11 +113,16 @@ const ALL_MODULES = {
         ],
       },
       {
+        label: 'Reports', pages: [
+          { id: 'stock-ageing',  label: 'Stock Ageing Report', icon: 'hourglass_empty' },
+        ],
+      },
+      {
         label: 'Configuration', pages: [
-          { id: 'categories', label: 'Categories',       icon: 'category'   },
-          { id: 'warehouses', label: 'Warehouses',       icon: 'warehouse'  },
-          { id: 'locations',    label: 'Storage Locations',icon: 'location_on'},
-          { id: 'batch-serials', label: 'Batch & Serials',  icon: 'qr_code_2'  },
+          { id: 'categories',    label: 'Categories',           icon: 'category'   },
+          { id: 'warehouses',    label: 'Warehouses',           icon: 'warehouse'  },
+          { id: 'locations',     label: 'Storage Locations',    icon: 'location_on'},
+          { id: 'batch-serials', label: 'Batch & Serials',      icon: 'qr_code_2'  },
         ],
       },
     ],
