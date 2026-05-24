@@ -17,7 +17,7 @@ function emptyForm() {
   return {
     supplier_id: '', supplier_name: '',
     start_date: today, end_date: '',
-    contract_amount: '', currency: 'ZMW',
+    contract_amount: '', currency: 'USD',
     item_id: '', item_name: '', unit: '', unit_rate: '', contracted_qty: '',
     department: '', description: '', terms: '', notes: '',
     status: 'Draft',
@@ -231,7 +231,7 @@ export default function BlanketOrders() {
       start_date:     bo.start_date     || today,
       end_date:       bo.end_date       || '',
       contract_amount: String(bo.contract_amount || ''),
-      currency:       bo.currency       || 'ZMW',
+      currency:       bo.currency       || 'USD',
       item_id:        bo.item_id        || '',
       item_name:      bo.item_name      || '',
       unit:           bo.unit           || '',
@@ -271,7 +271,7 @@ export default function BlanketOrders() {
           terms:          form.terms || null,
           notes:          form.notes || null,
           status:         form.status || 'Draft',
-          currency:       form.currency || 'ZMW',
+          currency:       form.currency || 'USD',
           docstatus:      form.status === 'Active' ? 1 : form.status === 'Cancelled' ? 2 : 0,
           updated_at:     new Date().toISOString(),
         }).eq('id', editBO.id)
@@ -301,7 +301,7 @@ export default function BlanketOrders() {
           terms:           form.terms || null,
           notes:           form.notes || null,
           status:          form.status || 'Draft',
-          currency:        form.currency || 'ZMW',
+          currency:        form.currency || 'USD',
           docstatus:       form.status === 'Active' ? 1 : 0,
           created_by:      '',
           created_at:      new Date().toISOString(),
@@ -669,9 +669,10 @@ export default function BlanketOrders() {
                 value={form.currency}
                 onChange={e => sf('currency', e.target.value)}
               >
-                <option value="ZMW">ZMW — Zambian Kwacha</option>
-                <option value="USD">USD — US Dollar</option>
+                <option value="USD">USD — US Dollar (base)</option>
                 <option value="ZAR">ZAR — South African Rand</option>
+                <option value="BWP">BWP — Botswana Pula</option>
+                <option value="ZiG">ZiG — Zimbabwe Gold</option>
                 <option value="EUR">EUR — Euro</option>
                 <option value="GBP">GBP — British Pound</option>
               </select>

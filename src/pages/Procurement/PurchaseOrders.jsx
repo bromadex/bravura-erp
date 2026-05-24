@@ -1,7 +1,7 @@
 // src/pages/Procurement/PurchaseOrders.jsx
 //
 // Phase 11 additions:
-//  • Currency selector — auto-fetches live rate from currency_rates; shows ZMW equivalent
+//  • Currency selector — auto-fetches live rate from currency_rates; shows USD equivalent
 //  • Tax template selector — live tax breakdown from tax_template_lines; grand total includes tax
 //
 // Earlier fixes preserved:
@@ -21,7 +21,7 @@ import * as XLSX from 'xlsx'
 const today = new Date().toISOString().split('T')[0]
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-const fmt   = (n, dp = 2) => Number(n || 0).toLocaleString('en-ZM', { minimumFractionDigits: dp, maximumFractionDigits: dp })
+const fmt   = (n, dp = 2) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
 const fmtCur = (n, code, dp = 2) => `${code} ${fmt(n, dp)}`
 
 export default function PurchaseOrders() {
@@ -53,7 +53,7 @@ export default function PurchaseOrders() {
         // deduplicate: keep first (most recent) per code
         const seen = new Set()
         const deduped = data.filter(r => { if (seen.has(r.currency_code)) return false; seen.add(r.currency_code); return true })
-        setCurrencyRates([{ currency_code: 'ZMW', currency_name: 'Zambian Kwacha', rate_to_base: 1 }, ...deduped.filter(r => r.currency_code !== 'ZMW')])
+        setCurrencyRates([{ currency_code: 'USD', currency_name: 'US Dollar (base)', rate_to_base: 1 }, ...deduped.filter(r => r.currency_code !== 'USD')])
       })
 
     // tax templates with their lines
@@ -75,7 +75,7 @@ export default function PurchaseOrders() {
     pr_id:           '',
     items:           [{ name: '', category: '', ordered_qty: 1, unit: 'pcs', unit_cost: 0 }],
     notes:           '',
-    currency:        'ZMW',
+    currency:        'USD',
     exchange_rate:   1,
     tax_template_id: '',
   })
@@ -106,8 +106,8 @@ export default function PurchaseOrders() {
 
   // ── currency handler ───────────────────────────────────────────────────────
   const handleCurrencyChange = async (code) => {
-    if (code === 'ZMW') {
-      setForm(f => ({ ...f, currency: 'ZMW', exchange_rate: 1 }))
+    if (code === 'USD') {
+      setForm(f => ({ ...f, currency: 'USD', exchange_rate: 1 }))
       return
     }
     const local = currencyRates.find(r => r.currency_code === code)
@@ -153,7 +153,7 @@ export default function PurchaseOrders() {
 
   const taxAmount  = computedTaxLines.reduce((s, l) => s + l.computed_amount, 0)
   const grandTotal = subtotal + taxAmount
-  const grandInZMW = grandTotal * (form.exchange_rate || 1)
+  const grandInUSD = grandTotal * (form.exchange_rate || 1)
 
   // ── approval thresholds ───────────────────────────────────────────────────
   const [poThresholds, setPoThresholds] = useState([])
@@ -227,7 +227,7 @@ export default function PurchaseOrders() {
   const exportXLSX = () => {
     const ws = XLSX.utils.json_to_sheet(filtered.map(po => ({
       'PO #': po.po_number, Supplier: po.supplier_name,
-      Currency: po.currency || 'ZMW',
+      Currency: po.currency || 'USD',
       'Order Date': po.order_date, 'Delivery Date': po.delivery_date,
       Items: (typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || []).length,
       Total: parseFloat(po.total_amount || 0).toFixed(2), Status: po.status
@@ -243,8 +243,8 @@ export default function PurchaseOrders() {
 
   const parseItems = (raw) => typeof raw === 'string' ? JSON.parse(raw || '[]') : (raw || [])
 
-  const currCode   = form.currency || 'ZMW'
-  const isForeign  = currCode !== 'ZMW'
+  const currCode   = form.currency || 'USD'
+  const isForeign  = currCode !== 'USD'
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -268,7 +268,7 @@ export default function PurchaseOrders() {
           <div className="kpi-label">Pending / Draft</div>
           <div className="kpi-val" style={{ color: draftPOs > 0 ? 'var(--yellow)' : 'var(--green)' }}>{draftPOs}</div>
         </div>
-        <div className="kpi-card"><div className="kpi-label">Total Value (ZMW)</div><div className="kpi-val" style={{ color: 'var(--teal)', fontSize: 20 }}>ZMW {fmt(totalVal, 0)}</div></div>
+        <div className="kpi-card"><div className="kpi-label">Total Value (USD)</div><div className="kpi-val" style={{ color: 'var(--teal)', fontSize: 20 }}>$ {fmt(totalVal, 0)}</div></div>
       </div>
 
       {/* Search */}
@@ -289,7 +289,7 @@ export default function PurchaseOrders() {
               : filtered.length === 0 ? <tr><td colSpan="8" className="empty-state">No purchase orders</td></tr>
               : filtered.map(po => {
                 const items = parseItems(po.items)
-                const poCur  = po.currency || 'ZMW'
+                const poCur  = po.currency || 'USD'
                 return (
                   <tr key={po.id} onClick={() => setViewPO(po)} style={{ cursor: 'pointer' }}
                     onMouseOver={e => e.currentTarget.style.background = 'var(--surface2)'}
@@ -300,8 +300,8 @@ export default function PurchaseOrders() {
                     <td style={{ whiteSpace: 'nowrap' }}>{po.delivery_date || '—'}</td>
                     <td>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '2px 6px',
-                        background: poCur !== 'ZMW' ? 'rgba(59,130,246,.12)' : 'var(--surface2)',
-                        color: poCur !== 'ZMW' ? 'var(--blue)' : 'var(--text-dim)',
+                        background: poCur !== 'USD' ? 'rgba(59,130,246,.12)' : 'var(--surface2)',
+                        color: poCur !== 'USD' ? 'var(--blue)' : 'var(--text-dim)',
                         borderRadius: 4, fontWeight: 700 }}>{poCur}</span>
                     </td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--teal)', fontWeight: 700 }}>
@@ -325,9 +325,10 @@ export default function PurchaseOrders() {
 
       {/* ═══════════════════════ VIEW PO MODAL ═══════════════════════════ */}
       {viewPO && (() => {
-        const poCur = viewPO.currency || 'ZMW'
+        const poCur = viewPO.currency || 'USD'
         const poRate = parseFloat(viewPO.exchange_rate || 1)
         const poTotal = parseFloat(viewPO.total_amount || 0)
+        const isForeignPO = poCur !== 'USD'
         return (
           <div className="overlay" onClick={() => setViewPO(null)}>
             <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -339,19 +340,19 @@ export default function PurchaseOrders() {
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Currency:</span>{' '}
                   <span style={{ fontFamily: 'var(--mono)', fontWeight: 700,
-                    color: poCur !== 'ZMW' ? 'var(--blue)' : 'var(--text-dim)' }}>{poCur}</span>
-                  {poCur !== 'ZMW' && (
+                    color: isForeignPO ? 'var(--blue)' : 'var(--text-dim)' }}>{poCur}</span>
+                  {isForeignPO && (
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 6 }}>
-                      @ {poRate} ZMW
+                      @ {poRate} USD/unit
                     </span>
                   )}
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-dim)' }}>Total:</span>{' '}
                   <strong style={{ color: 'var(--teal)' }}>{fmtCur(poTotal, poCur)}</strong>
-                  {poCur !== 'ZMW' && (
+                  {isForeignPO && (
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>
-                      ≈ ZMW {fmt(poTotal * poRate)}
+                      ≈ $ {fmt(poTotal * poRate)} USD
                     </span>
                   )}
                 </div>
@@ -460,7 +461,7 @@ export default function PurchaseOrders() {
                     <select className="form-control" value={form.currency}
                       onChange={e => handleCurrencyChange(e.target.value)}>
                       {currencyRates.length === 0
-                        ? <option value="ZMW">ZMW — Zambian Kwacha (base)</option>
+                        ? <option value="USD">USD — US Dollar (base)</option>
                         : currencyRates.map(r => (
                             <option key={r.currency_code} value={r.currency_code}>
                               {r.currency_code} — {r.currency_name}
@@ -471,7 +472,7 @@ export default function PurchaseOrders() {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      Exchange Rate (1 {currCode} = ? ZMW)
+                      Exchange Rate (1 {currCode} = ? USD)
                       {rateLoading && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>fetching…</span>}
                       {!rateLoading && isForeign && (
                         <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3,
@@ -631,7 +632,7 @@ export default function PurchaseOrders() {
                   </div>
                   {isForeign && (
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-                      ≈ ZMW {fmt(grandInZMW)} @ {form.exchange_rate} ZMW/{currCode}
+                      ≈ $ {fmt(grandInUSD)} USD @ {form.exchange_rate} USD/{currCode}
                     </div>
                   )}
                 </div>

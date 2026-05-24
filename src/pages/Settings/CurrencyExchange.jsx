@@ -1,5 +1,5 @@
 // src/pages/Settings/CurrencyExchange.jsx
-// Currency Exchange Rates manager. Base currency is ZMW (Zambian Kwacha).
+// Currency Exchange Rates manager. Base currency is USD (US Dollar) — Zimbabwe context.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -8,8 +8,9 @@ import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../.
 import { exportXLSX, fmtNum, dateTag } from '../../engine/reportingEngine'
 
 const CURRENCY_LIST = [
-  { code: 'USD', name: 'US Dollar' },
   { code: 'ZAR', name: 'South African Rand' },
+  { code: 'BWP', name: 'Botswana Pula' },
+  { code: 'ZiG', name: 'Zimbabwe Gold' },
   { code: 'EUR', name: 'Euro' },
   { code: 'GBP', name: 'British Pound' },
   { code: 'CNY', name: 'Chinese Yuan' },
@@ -40,7 +41,7 @@ function emptyForm() {
   }
 }
 
-const CONVERTER_CURRENCIES = ['ZMW', ...CURRENCY_LIST.map(c => c.code)]
+const CONVERTER_CURRENCIES = ['USD', ...CURRENCY_LIST.map(c => c.code)]
 
 export default function CurrencyExchange() {
   const [rates,            setRates]           = useState([])
@@ -50,7 +51,7 @@ export default function CurrencyExchange() {
   const [saving,           setSaving]          = useState(false)
   const [converterAmount,  setConverterAmount] = useState('')
   const [converterFrom,    setConverterFrom]   = useState('USD')
-  const [converterTo,      setConverterTo]     = useState('ZMW')
+  const [converterTo,      setConverterTo]     = useState('ZAR')
   const [form,             setForm]            = useState(emptyForm())
 
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -87,11 +88,11 @@ export default function CurrencyExchange() {
   const convertedAmount = useMemo(() => {
     const amt = Number(converterAmount) || 0
     if (!amt) return null
-    if (converterFrom === 'ZMW' && converterTo === 'ZMW') return amt
-    const fromRate = converterFrom === 'ZMW'
+    if (converterFrom === 'USD' && converterTo === 'USD') return amt
+    const fromRate = converterFrom === 'USD'
       ? 1
       : (latestRates.find(r => r.currency_code === converterFrom)?.rate_to_base || 1)
-    const toRate   = converterTo === 'ZMW'
+    const toRate   = converterTo === 'USD'
       ? 1
       : (latestRates.find(r => r.currency_code === converterTo)?.rate_to_base || 1)
     return (amt * fromRate) / toRate
@@ -100,8 +101,8 @@ export default function CurrencyExchange() {
   // ── KPI derived values ────────────────────────────────────────────────────────
 
   const activeCount   = latestRates.filter(r => r.is_active).length
-  const usdRate       = latestRates.find(r => r.currency_code === 'USD')
   const zarRate       = latestRates.find(r => r.currency_code === 'ZAR')
+  const bwpRate       = latestRates.find(r => r.currency_code === 'BWP')
   const lastUpdated   = rates.length
     ? rates.reduce((latest, r) => r.effective_date > latest ? r.effective_date : latest, rates[0].effective_date)
     : null
@@ -179,7 +180,7 @@ export default function CurrencyExchange() {
       latestRates.map(r => ({
         Currency:       r.currency_code,
         Name:           r.currency_name,
-        'Rate to ZMW':  r.rate_to_base,
+        'Rate to USD':  r.rate_to_base,
         Date:           r.effective_date,
         Source:         r.source,
       })),
@@ -201,7 +202,7 @@ export default function CurrencyExchange() {
     <div style={{ padding: '24px 28px', maxWidth: 1200, margin: '0 auto' }}>
       <PageHeader
         title="Currency Exchange Rates"
-        subtitle="Base currency: ZMW (Zambian Kwacha) — update rates regularly"
+        subtitle="Base currency: USD (US Dollar) — Zimbabwe | update rates regularly"
       >
         <button className="btn btn-secondary" onClick={handleExport}>
           <span className="material-icons">download</span> Export
@@ -221,18 +222,18 @@ export default function CurrencyExchange() {
           sub={`${latestRates.length} total configured`}
         />
         <KPICard
-          label="USD Rate"
-          value={usdRate ? `K ${Number(usdRate.rate_to_base).toFixed(2)} / USD` : '—'}
-          icon="attach_money"
+          label="ZAR Rate"
+          value={zarRate ? `$ ${Number(zarRate.rate_to_base).toFixed(4)} / ZAR` : '—'}
+          icon="payments"
           color="green"
-          sub={usdRate ? `as of ${usdRate.effective_date}` : 'Not configured'}
+          sub={zarRate ? `as of ${zarRate.effective_date}` : 'Not configured'}
         />
         <KPICard
-          label="ZAR Rate"
-          value={zarRate ? `K ${Number(zarRate.rate_to_base).toFixed(4)} / ZAR` : '—'}
-          icon="payments"
+          label="BWP Rate"
+          value={bwpRate ? `$ ${Number(bwpRate.rate_to_base).toFixed(4)} / BWP` : '—'}
+          icon="currency_exchange"
           color="blue"
-          sub={zarRate ? `as of ${zarRate.effective_date}` : 'Not configured'}
+          sub={bwpRate ? `as of ${bwpRate.effective_date}` : 'Not configured'}
         />
         <KPICard
           label="Last Updated"
@@ -248,7 +249,7 @@ export default function CurrencyExchange() {
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>Exchange Rates</div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Latest rate per currency — 1 FCY = X ZMW
+              Latest rate per currency — 1 FCY = X USD
             </div>
           </div>
         </div>
@@ -268,7 +269,7 @@ export default function CurrencyExchange() {
                 <tr>
                   <th>Currency</th>
                   <th>Name</th>
-                  <th style={{ textAlign: 'right' }}>Rate (1 FCY = X ZMW)</th>
+                  <th style={{ textAlign: 'right' }}>Rate (1 FCY = X USD)</th>
                   <th>Effective Date</th>
                   <th>Source</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
@@ -450,10 +451,10 @@ export default function CurrencyExchange() {
 
           <div className="form-group" style={{ margin: 0 }}>
             <label>
-              Rate to ZMW <span style={{ color: 'var(--red)' }}>*</span>
+              Rate to USD <span style={{ color: 'var(--red)' }}>*</span>
               {form.currency_code && (
                 <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 6 }}>
-                  (1 {form.currency_code || 'FCY'} = X ZMW)
+                  (1 {form.currency_code || 'FCY'} = X USD)
                 </span>
               )}
             </label>
