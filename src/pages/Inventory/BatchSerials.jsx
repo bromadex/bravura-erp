@@ -57,6 +57,10 @@ export default function BatchSerials() {
   const [batchModal,  setBatchModal]  = useState(null)   // batch row or null
   const [serialModal, setSerialModal] = useState(null)   // serial row or null
 
+  // Serial movement history (inline expand)
+  const [expandedSerial, setExpandedSerial] = useState(null)   // serial id or null
+  const [serialSLEs,     setSerialSLEs]     = useState({})     // keyed by serial id
+
   // ── Load data ─────────────────────────────────────────────
   const loadBatches = () =>
     supabase
@@ -151,6 +155,28 @@ export default function BatchSerials() {
     toast.success(`Serial ${serial.serial_no} updated to ${newStatus}`)
     await loadSerials()
     return true
+  }
+
+  // ── Serial movement history loader ───────────────────────
+  const loadSerialSLEs = async (serial) => {
+    if (serialSLEs[serial.id] !== undefined) return // already loaded
+    const { data, error } = await supabase
+      .from('stock_ledger_entries')
+      .select('id, posting_datetime, voucher_type, voucher_no, actual_qty, warehouse_id, warehouses(name)')
+      .eq('item_id', serial.item_id)
+      .eq('warehouse_id', serial.warehouse_id)
+      .order('posting_datetime', { ascending: true })
+    if (error) {
+      setSerialSLEs(prev => ({ ...prev, [serial.id]: [] }))
+    } else {
+      setSerialSLEs(prev => ({ ...prev, [serial.id]: data || [] }))
+    }
+  }
+
+  const handleSerialRowClick = (serial) => {
+    const isExpanding = expandedSerial !== serial.id
+    setExpandedSerial(isExpanding ? serial.id : null)
+    if (isExpanding) loadSerialSLEs(serial)
   }
 
   // ── Tab bar ───────────────────────────────────────────────
@@ -353,44 +379,104 @@ export default function BatchSerials() {
                     <tr><td colSpan="9"><EmptyState icon="qr_code_2" message="No serials found" /></td></tr>
                   ) : filteredSerials.map(s => {
                     const wColor = expiryColor(s.warranty_expiry)
+                    const isExpanded = expandedSerial === s.id
+                    const sles = serialSLEs[s.id]
                     return (
-                      <tr key={s.id}>
-                        <td>
-                          <span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontSize: 12 }}>
-                            {s.serial_no}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 600 }}>{s.item_name}</td>
-                        <td style={{ fontSize: 12 }}>{s.warehouses?.name || '—'}</td>
-                        <td>
-                          <span className={`badge ${STATUS_BADGE[s.status] || 'badge-gray'}`}>{s.status}</span>
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          {s.issued_to
-                            ? <span>{s.issued_to}{s.issued_to_department ? <span style={{ color: 'var(--text-dim)' }}> / {s.issued_to_department}</span> : null}</span>
-                            : '—'
-                          }
-                        </td>
-                        <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{s.issued_date || '—'}</td>
-                        <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: wColor, fontWeight: wColor !== 'var(--text)' ? 700 : 400 }}>
-                          {s.warranty_expiry || '—'}
-                        </td>
-                        <td style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>{s.asset_code || '—'}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setSerialModal(s)}
-                              title="View history & update">
-                              <span className="material-icons" style={{ fontSize: 14 }}>history</span>
-                            </button>
-                            {canEdit && (
-                              <button className="btn btn-secondary btn-sm" onClick={() => setSerialModal({ ...s, _updateMode: true })}
-                                title="Update status">
-                                <span className="material-icons" style={{ fontSize: 14 }}>edit</span>
+                      <>
+                        <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => handleSerialRowClick(s)}>
+                          <td>
+                            <span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', fontSize: 12 }}>
+                              {s.serial_no}
+                            </span>
+                            <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', marginLeft: 4, color: 'var(--text-dim)' }}>
+                              {isExpanded ? 'expand_less' : 'expand_more'}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{s.item_name}</td>
+                          <td style={{ fontSize: 12 }}>{s.warehouses?.name || '—'}</td>
+                          <td>
+                            <span className={`badge ${STATUS_BADGE[s.status] || 'badge-gray'}`}>{s.status}</span>
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            {s.issued_to
+                              ? <span>{s.issued_to}{s.issued_to_department ? <span style={{ color: 'var(--text-dim)' }}> / {s.issued_to_department}</span> : null}</span>
+                              : '—'
+                            }
+                          </td>
+                          <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{s.issued_date || '—'}</td>
+                          <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: wColor, fontWeight: wColor !== 'var(--text)' ? 700 : 400 }}>
+                            {s.warranty_expiry || '—'}
+                          </td>
+                          <td style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>{s.asset_code || '—'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setSerialModal(s)}
+                                title="View history & update">
+                                <span className="material-icons" style={{ fontSize: 14 }}>history</span>
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                              {canEdit && (
+                                <button className="btn btn-secondary btn-sm" onClick={() => setSerialModal({ ...s, _updateMode: true })}
+                                  title="Update status">
+                                  <span className="material-icons" style={{ fontSize: 14 }}>edit</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${s.id}-sle`}>
+                            <td colSpan="9" style={{ padding: 0 }}>
+                              <div style={{ margin: '0 8px 8px 8px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                <div style={{ padding: '8px 12px', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, textTransform: 'uppercase', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span className="material-icons" style={{ fontSize: 13 }}>receipt_long</span>
+                                  Movement History — Serial {s.serial_no}
+                                </div>
+                                {sles === undefined ? (
+                                  <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-dim)' }}>Loading…</div>
+                                ) : sles.length === 0 ? (
+                                  <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-dim)' }}>No movement history found.</div>
+                                ) : (
+                                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                    <thead>
+                                      <tr style={{ background: 'var(--surface3, var(--surface2))' }}>
+                                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11 }}>Date</th>
+                                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11 }}>Voucher Type</th>
+                                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11 }}>Reference</th>
+                                        <th style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11 }}>Qty</th>
+                                        <th style={{ padding: '6px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11 }}>Warehouse</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sles.map(e => (
+                                        <tr key={e.id} style={{ borderTop: '1px solid var(--border)' }}>
+                                          <td style={{ padding: '5px 12px', whiteSpace: 'nowrap', fontFamily: 'var(--mono)', fontSize: 11 }}>
+                                            {(e.posting_datetime || '').slice(0, 10)}
+                                          </td>
+                                          <td style={{ padding: '5px 12px' }}>
+                                            <span className={`badge ${e.voucher_type === 'GRN' || e.voucher_type === 'PurchaseReceipt' || e.voucher_type === 'StockIn' ? 'badge-green' : 'badge-blue'}`} style={{ fontSize: 10 }}>
+                                              {e.voucher_type || '—'}
+                                            </span>
+                                          </td>
+                                          <td style={{ padding: '5px 12px', fontFamily: 'var(--mono)', color: 'var(--gold)', fontSize: 11 }}>
+                                            {e.voucher_no || '—'}
+                                          </td>
+                                          <td style={{ padding: '5px 12px', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700,
+                                            color: e.actual_qty >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                                            {e.actual_qty >= 0 ? '+' : ''}{Number(e.actual_qty).toFixed(2)}
+                                          </td>
+                                          <td style={{ padding: '5px 12px', fontSize: 11 }}>
+                                            {e.warehouses?.name || '—'}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     )
                   })}
                 </tbody>

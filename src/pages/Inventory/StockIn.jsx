@@ -137,6 +137,14 @@ function StockInModal({ items, warehouses, getBin, onClose, onSave, recordBatch,
   const currentBin   = selectedItem ? getBin(selectedItem.id, form.warehouseId) : null
   const currentQty   = currentBin?.actual_qty ?? selectedItem?.balance ?? 0
 
+  const currentRate = currentBin?.valuation_rate ?? selectedItem?.cost ?? 0
+  const newQty      = parseFloat(form.quantity) || 0
+  const newRate     = parseFloat(form.unitCost) || currentRate
+
+  const newAVCO = (newQty > 0 && (currentQty + newQty) > 0)
+    ? ((currentQty * currentRate) + (newQty * newRate)) / (currentQty + newQty)
+    : currentRate
+
   const handleItemChange = (itemId) => {
     const item = items.find(i => i.id === itemId)
     setForm(f => ({
@@ -216,6 +224,23 @@ function StockInModal({ items, warehouses, getBin, onClose, onSave, recordBatch,
             <span>On Hand: <strong style={{ color: 'var(--green)' }}>{currentQty}</strong></span>
             <span>Projected: <strong style={{ color: 'var(--teal)' }}>{currentBin?.projected_qty ?? currentQty}</strong></span>
             <span>Valuation Rate: <strong>${(currentBin?.valuation_rate ?? selectedItem.cost ?? 0).toFixed(2)}</strong></span>
+          </div>
+        )}
+        {selectedItem && newQty > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, padding: '6px 10px',
+            background: 'var(--surface2)', borderRadius: 6, border: '1px solid var(--border)',
+            display: 'flex', justifyContent: 'space-between' }}>
+            <span>After this receipt:</span>
+            <span style={{ fontFamily: 'var(--mono)', fontWeight: 700,
+              color: newAVCO !== currentRate ? 'var(--gold)' : 'var(--text)' }}>
+              New AVCO: ${newAVCO.toFixed(4)}
+              {newAVCO !== currentRate && (
+                <span style={{ fontSize: 10, marginLeft: 6,
+                  color: newAVCO > currentRate ? 'var(--red)' : 'var(--green)' }}>
+                  ({newAVCO > currentRate ? '▲' : '▼'} ${Math.abs(newAVCO - currentRate).toFixed(4)})
+                </span>
+              )}
+            </span>
           </div>
         )}
         <div className="form-row">

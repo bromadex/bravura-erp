@@ -96,6 +96,7 @@ const InventoryDashboard    = lazy(() => import('./pages/Inventory/InventoryDash
 const DepartmentConsumption = lazy(() => import('./pages/Inventory/DepartmentConsumption'))
 const StockLedger           = lazy(() => import('./pages/Inventory/StockLedger'))
 const OpeningStock          = lazy(() => import('./pages/Inventory/OpeningStock'))
+const StockValuationReport  = lazy(() => import('./pages/Inventory/StockValuationReport'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -127,6 +128,7 @@ const PurchaseContracts    = lazy(() => import('./pages/Procurement/PurchaseCont
 // Phase 11 — Settings
 const TaxEngine            = lazy(() => import('./pages/Settings/TaxEngine'))
 const CurrencyExchange     = lazy(() => import('./pages/Settings/CurrencyExchange'))
+const InventoryGLConfig    = lazy(() => import('./pages/Settings/InventoryGLConfig'))
 
 // Phase 11 — Inventory
 const PutawayRules         = lazy(() => import('./pages/Inventory/PutawayRules'))
@@ -468,6 +470,7 @@ function AppRoutes() {
           <Route path="uom-conversion"          element={<UOMConversion />} />
           <Route path="stock-ledger"            element={<StockLedger />} />
           <Route path="opening-stock"           element={<OpeningStock />} />
+          <Route path="stock-valuation"         element={<StockValuationReport />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -878,6 +881,7 @@ function AppRoutes() {
           <Route path="workflow-rules"        element={<WorkflowRules />}         />
           <Route path="tax-engine"            element={<TaxEngine />}             />
           <Route path="currency-exchange"     element={<CurrencyExchange />}      />
+          <Route path="inventory-gl-config"   element={<InventoryGLConfig />}     />
         </Route>
 
         {/* ── REPORTS ──────────────────────────────────────── */}
