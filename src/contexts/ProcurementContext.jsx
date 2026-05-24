@@ -360,6 +360,41 @@ export function ProcurementProvider({ children }) {
       issued.push({ ...it, issued_qty: issueQty, item_id: invItem.id })
     }
 
+    // Post GL: DR Department Expense / CR Inventory (stock_issue event)
+    try {
+      const { data: glCfg } = await supabase
+        .from('inventory_gl_config').select('*')
+        .eq('event_type', 'stock_issue').eq('is_active', true).maybeSingle()
+      if (glCfg?.debit_account_code && glCfg?.credit_account_code) {
+        // Compute total value issued using bin valuation rates
+        let totalIssuedValue = 0
+        for (const it of issued) {
+          const { data: bin } = await supabase
+            .from('bins').select('valuation_rate')
+            .eq('item_id', it.item_id).eq('warehouse_id', it.warehouse_id || 'wh_main_store')
+            .maybeSingle()
+          const rate = parseFloat(bin?.valuation_rate || 0)
+          totalIssuedValue += (it.issued_qty || 0) * rate
+        }
+        if (totalIssuedValue > 0) {
+          const srRef = req.sr_number || req.req_number || id
+          await postToGL({
+            sourceModule: 'procurement',
+            sourceType: 'store_requisition',
+            sourceId: id,
+            entryDate: new Date().toISOString().split('T')[0],
+            description: `SR Fulfillment: ${srRef} — ${issued.length} item(s) issued to ${req.department || 'Department'}`,
+            reference: `SR-${srRef}`,
+            postedBy: issuedBy || 'System',
+            lines: [
+              { account_code: glCfg.debit_account_code,  debit: totalIssuedValue, credit: 0,                description: `Dept Expense: ${req.department || srRef}` },
+              { account_code: glCfg.credit_account_code, debit: 0,                credit: totalIssuedValue, description: `Inventory: SR ${srRef}` },
+            ],
+          }).catch(() => null)
+        }
+      }
+    } catch (_) { /* GL not configured — skip */ }
+
     const newStatus = notIssued.length === 0 ? 'fulfilled' : 'partially_fulfilled'
     await supabase.from('store_requisitions').update({
       status:       newStatus,
@@ -967,6 +1002,28 @@ export function ProcurementProvider({ children }) {
     // Call DB function to update valuation
     const { error } = await supabase.rpc('fn_apply_landed_costs', { p_lcv_id: id })
     if (error) throw error
+    // Write valuation-adjustment SLEs (actual_qty = 0, documents cost uplift)
+    try {
+      const lcvRef = `LCV-${id.slice(-6).toUpperCase()}`
+      for (const alloc of allocations) {
+        if (!alloc.item_id || !alloc.qty_received || alloc.qty_received <= 0) continue
+        const costUplift = alloc.new_valuation_rate - (alloc.unit_rate || 0)
+        if (Math.abs(costUplift) < 0.0001) continue
+        await supabase.from('stock_ledger_entries').insert([{
+          id:               crypto.randomUUID(),
+          item_id:          alloc.item_id,
+          warehouse_id:     alloc.warehouse_id || 'wh_main_store',
+          posting_datetime: new Date().toISOString(),
+          voucher_type:     'LandedCostVoucher',
+          transaction_type: 'Revaluation',
+          voucher_no:       lcvRef,
+          actual_qty:       0,
+          incoming_rate:    alloc.new_valuation_rate,
+          valuation_rate:   alloc.new_valuation_rate,
+          created_by:       'System',
+        }]).catch(() => null) // non-blocking — audit only
+      }
+    } catch (_) { /* non-critical */ }
     await fetchAll()
   }
 

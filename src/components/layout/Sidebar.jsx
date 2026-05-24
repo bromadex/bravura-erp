@@ -122,11 +122,13 @@ const ALL_MODULES = {
           { id: 'stock-reservations', label: 'Stock Reservations', icon: 'lock_clock'         },
           { id: 'stock-out',          label: 'Stock Out',          icon: 'remove_circle'      },
           { id: 'stock-taking',       label: 'Stock Taking',       icon: 'fact_check'         },
+          { id: 'opening-stock',      label: 'Opening Stock',      icon: 'inventory_2'        },
           { id: 'transactions',       label: 'Transactions',       icon: 'swap_horiz'         },
         ],
       },
       {
         label: 'Reports', pages: [
+          { id: 'stock-ledger',     label: 'Stock Ledger',        icon: 'receipt_long'    },
           { id: 'stock-ageing',     label: 'Stock Ageing Report', icon: 'hourglass_empty' },
           { id: 'forecast-reorder', label: 'Forecast & Reorder',  icon: 'trending_up'     },
           { id: 'dept-consumption', label: 'Dept Consumption',    icon: 'groups'          },
