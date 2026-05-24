@@ -35,6 +35,8 @@ export function ProcurementProvider({ children }) {
   const [landedCostVouchers,   setLandedCostVouchers]   = useState([])
   const [paymentVouchers,      setPaymentVouchers]      = useState([])
   const [pvLines,              setPvLines]              = useState([])
+  const [purchaseReturns,      setPurchaseReturns]      = useState([])
+  const [returnLines,          setReturnLines]          = useState([])
 
   const generateId = () => crypto.randomUUID()
 
@@ -44,7 +46,7 @@ export function ProcurementProvider({ children }) {
     setLoading(true)
     try {
       const [supRes, srRes, prRes, poRes, grRes, rfqRes, quotRes, piRes, budRes,
-             polRes, grlRes, pilRes, rflRes, qllRes, lcvRes, pvRes, pvlRes] = await Promise.all([
+             polRes, grlRes, pilRes, rflRes, qllRes, lcvRes, pvRes, pvlRes, pretRes, pretlRes] = await Promise.all([
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('store_requisitions').select('*').order('created_at', { ascending: false }),
         supabase.from('purchase_requisitions').select('*').order('created_at', { ascending: false }),
@@ -62,6 +64,8 @@ export function ProcurementProvider({ children }) {
         safe(supabase.from('landed_cost_vouchers').select('*, landed_cost_lines(*)').order('created_at', { ascending: false })),
         safe(supabase.from('payment_vouchers').select('*').order('payment_date', { ascending: false })),
         safe(supabase.from('payment_voucher_lines').select('*').order('created_at')),
+        safe(supabase.from('purchase_returns').select('*').order('return_date', { ascending: false })),
+        safe(supabase.from('purchase_return_lines').select('*').order('created_at')),
       ])
       if (supRes.data) setSuppliers(supRes.data)
       if (srRes.data)  setStoreRequisitions(srRes.data)
@@ -78,8 +82,10 @@ export function ProcurementProvider({ children }) {
       if (rflRes.data) setRfqLines(rflRes.data)
       if (qllRes.data) setQuotLines(qllRes.data)
       if (lcvRes.data) setLandedCostVouchers(lcvRes.data)
-      if (pvRes.data)  setPaymentVouchers(pvRes.data)
-      if (pvlRes.data) setPvLines(pvlRes.data)
+      if (pvRes.data)    setPaymentVouchers(pvRes.data)
+      if (pvlRes.data)   setPvLines(pvlRes.data)
+      if (pretRes.data)  setPurchaseReturns(pretRes.data)
+      if (pretlRes.data) setReturnLines(pretlRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load procurement data')
@@ -925,6 +931,107 @@ export function ProcurementProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Purchase Returns ─────────────────────────────────────
+  const createPurchaseReturn = async (returnData, lines) => {
+    const id = generateId()
+    const { data: prNumber } = await supabase.rpc('fn_next_series_number', { p_series_key: 'purchase_returns' })
+    const { error } = await supabase.from('purchase_returns').insert([{
+      id, pr_number: prNumber || `PRET-${Date.now()}`,
+      ...returnData, status: 'Draft', docstatus: 0,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    for (const line of lines) {
+      const { error: le } = await supabase.from('purchase_return_lines').insert([{
+        id: generateId(), purchase_return_id: id, ...line,
+        created_at: new Date().toISOString(),
+      }])
+      if (le) throw le
+    }
+    auditLog({ module: 'procurement', action: 'CREATE', entityType: 'purchase_return', entityId: id, entityName: prNumber })
+    await fetchAll()
+    return id
+  }
+
+  const submitPurchaseReturn = async (returnId, submittedBy) => {
+    const ret = purchaseReturns.find(r => r.id === returnId)
+    if (!ret) throw new Error('Purchase return not found')
+    if (ret.status !== 'Draft') throw new Error(`Cannot submit a ${ret.status} return`)
+    const { error } = await supabase.from('purchase_returns').update({
+      status: 'Submitted', docstatus: 1,
+      submitted_by: submittedBy, submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', returnId)
+    if (error) throw error
+    // Create negative SLE for each return line (stock leaves warehouse)
+    const lines = returnLines.filter(l => l.purchase_return_id === returnId)
+    for (const line of lines) {
+      if (!line.item_id || !(line.qty_returned > 0)) continue
+      const { error: sleErr } = await supabase.from('stock_ledger_entries').insert([{
+        id: generateId(),
+        item_id:          line.item_id,
+        warehouse_id:     line.warehouse_id,
+        posting_datetime: new Date(ret.return_date + 'T12:00:00').toISOString(),
+        voucher_type:     'PurchaseReturn',
+        transaction_type: 'Issue',
+        voucher_no:       ret.pr_number,
+        actual_qty:       -Number(line.qty_returned),
+        outgoing_rate:    Number(line.unit_rate || 0),
+        created_by:       submittedBy || '',
+      }])
+      if (sleErr) throw sleErr
+    }
+    auditLog({ module: 'procurement', action: 'SUBMIT', entityType: 'purchase_return', entityId: returnId, entityName: ret.pr_number })
+    await fetchAll()
+  }
+
+  const dispatchPurchaseReturn = async (returnId, creditNoteNo) => {
+    const ret = purchaseReturns.find(r => r.id === returnId)
+    if (!ret) throw new Error('Purchase return not found')
+    if (ret.status !== 'Submitted') throw new Error('Only Submitted returns can be dispatched')
+    const { error } = await supabase.from('purchase_returns').update({
+      status: 'Dispatched',
+      credit_note_no: creditNoteNo || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', returnId)
+    if (error) throw error
+    auditLog({ module: 'procurement', action: 'DISPATCH', entityType: 'purchase_return', entityId: returnId, entityName: ret.pr_number })
+    await fetchAll()
+  }
+
+  const cancelPurchaseReturn = async (returnId, reason, cancelledBy) => {
+    const ret = purchaseReturns.find(r => r.id === returnId)
+    if (!ret) throw new Error('Purchase return not found')
+    if (ret.status === 'Cancelled') throw new Error('Already cancelled')
+    const { error } = await supabase.from('purchase_returns').update({
+      status: 'Cancelled', docstatus: 2,
+      cancelled_by: cancelledBy, cancelled_at: new Date().toISOString(),
+      cancel_reason: reason, updated_at: new Date().toISOString(),
+    }).eq('id', returnId)
+    if (error) throw error
+    // If stock was already moved (Submitted or Dispatched), reverse the SLEs
+    if (['Submitted', 'Dispatched'].includes(ret.status)) {
+      const lines = returnLines.filter(l => l.purchase_return_id === returnId)
+      for (const line of lines) {
+        if (!line.item_id || !(line.qty_returned > 0)) continue
+        await supabase.from('stock_ledger_entries').insert([{
+          id: generateId(),
+          item_id:          line.item_id,
+          warehouse_id:     line.warehouse_id,
+          posting_datetime: new Date().toISOString(),
+          voucher_type:     'PurchaseReturnCancel',
+          transaction_type: 'Receipt',
+          voucher_no:       ret.pr_number + '-CANCEL',
+          actual_qty:       Number(line.qty_returned),
+          incoming_rate:    Number(line.unit_rate || 0),
+          created_by:       cancelledBy || '',
+        }])
+      }
+    }
+    auditLog({ module: 'procurement', action: 'CANCEL', entityType: 'purchase_return', entityId: returnId, entityName: ret.pr_number })
+    await fetchAll()
+  }
+
   return (
     <ProcurementContext.Provider value={{
       suppliers, storeRequisitions, purchaseRequisitions, purchaseOrders, goodsReceived,
@@ -932,6 +1039,7 @@ export function ProcurementProvider({ children }) {
       poLines, grnLines, invoiceLines, rfqLines, quotLines,
       landedCostVouchers,
       paymentVouchers, pvLines,
+      purchaseReturns, returnLines,
       getPoLines, getGrnLines, getInvoiceLines, getMatchStatus,
       addSupplier, updateSupplier, deleteSupplier,
       createStoreRequisition, updateStoreRequisition,
@@ -945,6 +1053,7 @@ export function ProcurementProvider({ children }) {
       createBudget, updateBudget, deleteBudget, checkBudget,
       createLCV, applyLCV, cancelLCV,
       createPaymentVoucher, postPaymentVoucher, cancelPaymentVoucher,
+      createPurchaseReturn, submitPurchaseReturn, dispatchPurchaseReturn, cancelPurchaseReturn,
       fetchAll,
     }}>
       {children}
