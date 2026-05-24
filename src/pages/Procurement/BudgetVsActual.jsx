@@ -172,7 +172,17 @@ export default function BudgetVsActual() {
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true)
-    const safe = q => Promise.resolve(q).catch(() => ({ data: [], error: null }))
+    // safe: swallow both thrown exceptions AND Supabase { error } responses
+    // (e.g. table not yet migrated → returns empty array instead of crashing)
+    const safe = async (q) => {
+      try {
+        const res = await q
+        if (res.error) return { data: [], error: null }
+        return res
+      } catch {
+        return { data: [], error: null }
+      }
+    }
     try {
       const [budgetsRes, posRes, pisRes] = await Promise.all([
         safe(supabase.from('procurement_budgets').select('*')),
@@ -183,10 +193,6 @@ export default function BudgetVsActual() {
           .select('id, pi_number, invoice_date, po_id, total_amount, status')
           .in('status', ['Posted', 'Partially Paid', 'Paid', 'Overdue'])),
       ])
-
-      if (budgetsRes.error) throw budgetsRes.error
-      if (posRes.error)     throw posRes.error
-      if (pisRes.error)     throw pisRes.error
 
       setBudgets(budgetsRes.data || [])
       setPos(posRes.data || [])
