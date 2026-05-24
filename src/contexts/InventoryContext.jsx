@@ -116,6 +116,14 @@ export function InventoryProvider({ children }) {
       safety_stock:         item.safety_stock || 0,
       min_order_qty:        item.min_order_qty || 0,
       default_warehouse_id: item.default_warehouse_id || DEFAULT_WAREHOUSE,
+      // Phase 1 item master extensions
+      item_code:              item.item_code             || null,
+      subcategory:            item.subcategory           || null,
+      purchase_uom:           item.purchase_uom          || item.unit || 'pcs',
+      stock_uom:              item.stock_uom             || item.unit || 'pcs',
+      uom_conversion_factor:  item.uom_conversion_factor ? parseFloat(item.uom_conversion_factor) : 1,
+      standard_cost:          item.standard_cost         ? parseFloat(item.standard_cost) : 0,
+      preferred_supplier_id:  item.preferred_supplier_id || null,
     }]).select().single()
     if (error) throw error
 
@@ -126,11 +134,12 @@ export function InventoryProvider({ children }) {
         item_id:         id,
         warehouse_id:    item.default_warehouse_id || DEFAULT_WAREHOUSE,
         posting_datetime: new Date().toISOString(),
-        voucher_type:    'OpeningStock',
-        voucher_no:      `OPEN-${id.slice(-6).toUpperCase()}`,
-        actual_qty:      openQty,
-        incoming_rate:   item.cost || 0,
-        created_by:      'system',
+        voucher_type:     'OpeningStock',
+        transaction_type: 'Opening',
+        voucher_no:       `OPEN-${id.slice(-6).toUpperCase()}`,
+        actual_qty:       openQty,
+        incoming_rate:    item.cost || 0,
+        created_by:       'system',
       }])
     }
 

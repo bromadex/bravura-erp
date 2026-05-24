@@ -1,7 +1,8 @@
 // src/pages/Inventory/StockBalance.jsx
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
+import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
@@ -17,27 +18,42 @@ function getStatus(balance, threshold) {
 }
 
 // ── Item Add/Edit Modal ──────────────────────────────────────────────────
+const UOM_LIST = ['pcs','kg','g','L','mL','m','cm','bags','boxes','rolls','pairs','sets','drums','tons','sheets','litres','metres']
+
 function ItemModal({ item, categories, warehouses, onClose, onSave }) {
   const { addItem, updateItem } = useInventory()
   const isEdit = !!item
 
   const [form, setForm] = useState({
-    name:               item?.name               || '',
-    category:           item?.category           || (categories[0] || ''),
-    unit:               item?.unit               || 'pcs',
-    cost:               item?.cost               || 0,
-    threshold:          item?.threshold          || 5,
-    openingStock:       item?.balance            || 0,
-    notes:              item?.notes              || '',
-    default_warehouse_id: item?.default_warehouse_id || 'wh_main_store',
-    valuation_method:   item?.valuation_method   || 'Moving Average',
-    lead_time_days:     item?.lead_time_days     || '',
-    safety_stock:       item?.safety_stock       || '',
-    min_order_qty:      item?.min_order_qty      || '',
+    name:                  item?.name                  || '',
+    item_code:             item?.item_code             || '',
+    category:              item?.category              || (categories[0] || ''),
+    subcategory:           item?.subcategory           || '',
+    unit:                  item?.unit                  || 'pcs',
+    purchase_uom:          item?.purchase_uom          || item?.unit || 'pcs',
+    stock_uom:             item?.stock_uom             || item?.unit || 'pcs',
+    uom_conversion_factor: item?.uom_conversion_factor || 1,
+    cost:                  item?.cost                  || 0,
+    standard_cost:         item?.standard_cost         || 0,
+    threshold:             item?.threshold             || 5,
+    openingStock:          0,
+    notes:                 item?.notes                 || '',
+    default_warehouse_id:  item?.default_warehouse_id  || 'wh_main_store',
+    valuation_method:      item?.valuation_method      || 'Moving Average',
+    lead_time_days:        item?.lead_time_days        || '',
+    safety_stock:          item?.safety_stock          || '',
+    min_order_qty:         item?.min_order_qty         || '',
+    preferred_supplier_id: item?.preferred_supplier_id || '',
   })
   const [newCategory, setNewCategory] = useState('')
   const [addingCat,   setAddingCat]   = useState(false)
   const [saving,      setSaving]      = useState(false)
+  const [suppliers,   setSuppliers]   = useState([])
+
+  useEffect(() => {
+    supabase.from('suppliers').select('id, name').order('name')
+      .then(({ data }) => { if (data) setSuppliers(data) })
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -46,17 +62,24 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
     setSaving(true)
     try {
       const payload = {
-        name:                 form.name,
-        category:             form.category,
-        unit:                 form.unit,
-        cost:                 parseFloat(form.cost) || 0,
-        threshold:            parseInt(form.threshold) || 5,
-        notes:                form.notes,
-        default_warehouse_id: form.default_warehouse_id,
-        valuation_method:     form.valuation_method,
-        lead_time_days:       form.lead_time_days ? parseInt(form.lead_time_days) : null,
-        safety_stock:         form.safety_stock   ? parseFloat(form.safety_stock) : null,
-        min_order_qty:        form.min_order_qty  ? parseFloat(form.min_order_qty) : null,
+        name:                  form.name.trim(),
+        item_code:             form.item_code.trim() || null,
+        category:              form.category,
+        subcategory:           form.subcategory.trim() || null,
+        unit:                  form.unit,
+        purchase_uom:          form.purchase_uom,
+        stock_uom:             form.stock_uom,
+        uom_conversion_factor: parseFloat(form.uom_conversion_factor) || 1,
+        cost:                  parseFloat(form.cost) || 0,
+        standard_cost:         parseFloat(form.standard_cost) || 0,
+        threshold:             parseInt(form.threshold) || 5,
+        notes:                 form.notes,
+        default_warehouse_id:  form.default_warehouse_id,
+        valuation_method:      form.valuation_method,
+        lead_time_days:        form.lead_time_days ? parseInt(form.lead_time_days) : null,
+        safety_stock:          form.safety_stock   ? parseFloat(form.safety_stock) : null,
+        min_order_qty:         form.min_order_qty  ? parseFloat(form.min_order_qty) : null,
+        preferred_supplier_id: form.preferred_supplier_id || null,
       }
       if (isEdit) {
         await updateItem(item.id, payload)
@@ -72,13 +95,26 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
 
   const allCats = [...new Set([...categories.filter(c => c !== 'ALL'), form.category].filter(Boolean))]
 
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
   return (
     <ModalDialog open onClose={onClose} title={`${isEdit ? 'Edit' : 'Add New'} Inventory Item`} size="lg">
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Item Name *</label>
-          <input className="form-control" required placeholder="e.g. Portland Cement, Safety Boots"
-            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+
+        {/* ── Identity ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-dim)', marginBottom: 8 }}>Identity</div>
+        <div className="form-row">
+          <div className="form-group" style={{ flex: 2 }}>
+            <label>Item Name *</label>
+            <input className="form-control" required placeholder="e.g. Portland Cement, Safety Boots"
+              value={form.name} onChange={e => sf('name', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Item Code (SKU)</label>
+            <input className="form-control" placeholder="e.g. CEM-001"
+              value={form.item_code} onChange={e => sf('item_code', e.target.value.toUpperCase())}
+              style={{ fontFamily: 'var(--mono)' }} />
+          </div>
         </div>
 
         <div className="form-row">
@@ -88,17 +124,15 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
               <div className="btn-group-sm">
                 <input className="form-control" placeholder="New category name" autoFocus
                   value={newCategory} onChange={e => setNewCategory(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } } }} />
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newCategory.trim()) { sf('category', newCategory.trim()); setAddingCat(false); setNewCategory('') } } }} />
                 <button type="button" className="btn btn-primary btn-sm"
-                  onClick={() => { if (newCategory.trim()) { setForm({ ...form, category: newCategory.trim() }); setAddingCat(false); setNewCategory('') } }}>
-                  OK
-                </button>
+                  onClick={() => { if (newCategory.trim()) { sf('category', newCategory.trim()); setAddingCat(false); setNewCategory('') } }}>OK</button>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAddingCat(false)}>×</button>
               </div>
             ) : (
               <div className="btn-group-sm">
                 <select className="form-control" required value={form.category}
-                  onChange={e => setForm({ ...form, category: e.target.value })} style={{ flex: 1 }}>
+                  onChange={e => sf('category', e.target.value)} style={{ flex: 1 }}>
                   <option value="">Select category</option>
                   {allCats.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -109,32 +143,62 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
               </div>
             )}
           </div>
-
           <div className="form-group">
-            <label>Unit of Measure</label>
-            <select className="form-control" value={form.unit}
-              onChange={e => setForm({ ...form, unit: e.target.value })}>
-              {['pcs','kg','g','L','mL','m','cm','bags','boxes','rolls','pairs','sets','drums','tons'].map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
+            <label>Sub-Category</label>
+            <input className="form-control" placeholder="e.g. Structural, PPE"
+              value={form.subcategory} onChange={e => sf('subcategory', e.target.value)} />
+          </div>
+        </div>
+
+        {/* ── Units of Measure ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-dim)', margin: '12px 0 8px' }}>Units of Measure</div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Stock UOM</label>
+            <select className="form-control" value={form.stock_uom} onChange={e => sf('stock_uom', e.target.value)}>
+              {UOM_LIST.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <small style={{ fontSize: 10, color: 'var(--text-dim)' }}>UOM for stock transactions</small>
+          </div>
+          <div className="form-group">
+            <label>Purchase UOM</label>
+            <select className="form-control" value={form.purchase_uom} onChange={e => sf('purchase_uom', e.target.value)}>
+              {UOM_LIST.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <small style={{ fontSize: 10, color: 'var(--text-dim)' }}>UOM on supplier invoices</small>
+          </div>
+          <div className="form-group">
+            <label>Conversion Factor</label>
+            <input type="number" min="0.000001" step="any" className="form-control"
+              value={form.uom_conversion_factor} onChange={e => sf('uom_conversion_factor', e.target.value)}
+              style={{ fontFamily: 'var(--mono)' }} />
+            <small style={{ fontSize: 10, color: 'var(--text-dim)' }}>Stock UOM per purchase UOM</small>
+          </div>
+          <div className="form-group">
+            <label>Display Unit</label>
+            <select className="form-control" value={form.unit} onChange={e => sf('unit', e.target.value)}>
+              {UOM_LIST.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
 
+        {/* ── Costing & Warehouse ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-dim)', margin: '12px 0 8px' }}>Costing & Warehouse</div>
         <div className="form-row">
           <div className="form-group">
-            <label>Default Warehouse</label>
-            <select className="form-control" value={form.default_warehouse_id}
-              onChange={e => setForm({ ...form, default_warehouse_id: e.target.value })}>
-              {(warehouses.length ? warehouses : [{ id: 'wh_main_store', name: 'Main Store' }]).map(w => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
+            <label>Unit Cost ($/unit)</label>
+            <input type="number" min="0" step="0.01" className="form-control"
+              value={form.cost} onChange={e => sf('cost', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Standard Cost ($/unit)</label>
+            <input type="number" min="0" step="0.01" className="form-control" placeholder="0.00"
+              value={form.standard_cost} onChange={e => sf('standard_cost', e.target.value)} />
+            <small style={{ fontSize: 10, color: 'var(--text-dim)' }}>Budget/standard for variance analysis</small>
           </div>
           <div className="form-group">
             <label>Valuation Method</label>
-            <select className="form-control" value={form.valuation_method}
-              onChange={e => setForm({ ...form, valuation_method: e.target.value })}>
+            <select className="form-control" value={form.valuation_method} onChange={e => sf('valuation_method', e.target.value)}>
               <option value="Moving Average">Moving Average</option>
               <option value="FIFO">FIFO</option>
             </select>
@@ -143,32 +207,45 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Unit Cost ($/unit)</label>
-            <input type="number" min="0" step="0.01" className="form-control"
-              value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} />
+            <label>Default Warehouse</label>
+            <select className="form-control" value={form.default_warehouse_id} onChange={e => sf('default_warehouse_id', e.target.value)}>
+              {(warehouses.length ? warehouses : [{ id: 'wh_main_store', name: 'Main Store' }]).map(w => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
-            <label>Reorder Level (alert threshold)</label>
-            <input type="number" min="0" className="form-control"
-              value={form.threshold} onChange={e => setForm({ ...form, threshold: e.target.value })} />
+            <label>Preferred Supplier</label>
+            <select className="form-control" value={form.preferred_supplier_id} onChange={e => sf('preferred_supplier_id', e.target.value)}>
+              <option value="">— None —</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
           </div>
         </div>
 
+        {/* ── Reorder Planning ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-dim)', margin: '12px 0 8px' }}>Reorder Planning</div>
         <div className="form-row">
+          <div className="form-group">
+            <label>Reorder Level</label>
+            <input type="number" min="0" className="form-control"
+              value={form.threshold} onChange={e => sf('threshold', e.target.value)} />
+            <small style={{ fontSize: 10, color: 'var(--text-dim)' }}>Alert threshold</small>
+          </div>
           <div className="form-group">
             <label>Safety Stock</label>
             <input type="number" min="0" step="0.01" className="form-control" placeholder="0"
-              value={form.safety_stock} onChange={e => setForm({ ...form, safety_stock: e.target.value })} />
+              value={form.safety_stock} onChange={e => sf('safety_stock', e.target.value)} />
           </div>
           <div className="form-group">
             <label>Min Order Qty</label>
             <input type="number" min="0" step="0.01" className="form-control" placeholder="0"
-              value={form.min_order_qty} onChange={e => setForm({ ...form, min_order_qty: e.target.value })} />
+              value={form.min_order_qty} onChange={e => sf('min_order_qty', e.target.value)} />
           </div>
           <div className="form-group">
             <label>Lead Time (days)</label>
             <input type="number" min="0" className="form-control" placeholder="0"
-              value={form.lead_time_days} onChange={e => setForm({ ...form, lead_time_days: e.target.value })} />
+              value={form.lead_time_days} onChange={e => sf('lead_time_days', e.target.value)} />
           </div>
         </div>
 
@@ -176,15 +253,15 @@ function ItemModal({ item, categories, warehouses, onClose, onSave }) {
           <div className="form-group">
             <label>Opening Stock Quantity</label>
             <input type="number" min="0" className="form-control"
-              value={form.openingStock} onChange={e => setForm({ ...form, openingStock: e.target.value })} />
-            <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Starting balance (will create an opening Stock Ledger Entry)</small>
+              value={form.openingStock} onChange={e => sf('openingStock', e.target.value)} />
+            <small style={{ fontSize: 11, color: 'var(--text-dim)' }}>Starting balance (creates an Opening Stock Ledger Entry)</small>
           </div>
         )}
 
         <div className="form-group">
           <label>Notes / Description</label>
           <textarea className="form-control" rows="2" placeholder="Storage location, specifications, etc."
-            value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            value={form.notes} onChange={e => sf('notes', e.target.value)} />
         </div>
 
         <ModalActions>
@@ -235,7 +312,10 @@ export default function StockBalance() {
 
   const filtered = items.filter(item => {
     if (catFilter !== 'ALL' && item.category !== catFilter) return false
-    if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!item.name.toLowerCase().includes(q) && !(item.item_code || '').toLowerCase().includes(q) && !(item.subcategory || '').toLowerCase().includes(q)) return false
+    }
     if (whFilter !== 'ALL' && !getBin(item.id, whFilter)) return false
     const bal = getBalance(item, effectiveWh)
     const s = getStatus(bal, item.threshold).label
@@ -393,9 +473,13 @@ export default function StockBalance() {
                     <td>{idx + 1}</td>
                     <td>
                       <div style={{ fontWeight: 700 }}>{item.name}</div>
+                      {item.item_code && <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{item.item_code}</div>}
                       {item.notes && <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.notes}</div>}
                     </td>
-                    <td><span className="badge badge-blue" style={{ fontSize: 9 }}>{item.category}</span></td>
+                    <td>
+                      <span className="badge badge-blue" style={{ fontSize: 9 }}>{item.category}</span>
+                      {item.subcategory && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{item.subcategory}</div>}
+                    </td>
                     <td style={{ color: 'var(--text-dim)' }}>{item.unit || 'pcs'}</td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--green)' }}>{item.total_in || 0}</td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>{item.total_out || 0}</td>
