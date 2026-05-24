@@ -134,6 +134,7 @@ const ALL_MODULES = {
       {
         label: 'Reports', pages: [
           { id: 'stock-ledger',     label: 'Stock Ledger',        icon: 'receipt_long'    },
+          { id: 'stock-valuation',  label: 'Stock Valuation',     icon: 'account_balance_wallet' },
           { id: 'stock-ageing',     label: 'Stock Ageing Report', icon: 'hourglass_empty' },
           { id: 'forecast-reorder', label: 'Forecast & Reorder',  icon: 'trending_up'     },
           { id: 'dept-consumption', label: 'Dept Consumption',    icon: 'groups'          },
@@ -516,6 +517,7 @@ const ALL_MODULES = {
         { id: 'numbering-series',    label: 'Numbering Series',    icon: 'format_list_numbered' },
         { id: 'tax-engine',          label: 'Tax Engine',          icon: 'receipt_long'         },
         { id: 'currency-exchange',   label: 'Currency Exchange',   icon: 'currency_exchange'    },
+        { id: 'inventory-gl-config', label: 'Inventory GL Config', icon: 'account_tree'         },
       ],
     }],
   },
