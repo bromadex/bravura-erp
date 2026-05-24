@@ -187,12 +187,12 @@ function WarehouseCard({ wh, stats, parentName, onEdit, onDelete, onToggleActive
 
 function WarehouseModal({ open, editing, warehouses, onClose, onSave }) {
   const [form,   setForm]   = useState(() => editing ? {
-    code:        editing.code        ?? '',
-    name:        editing.name        ?? '',
-    type:        editing.type        ?? 'stores',
-    description: editing.description ?? '',
-    is_group:    editing.is_group    ?? false,
-    parent_id:   editing.parent_id   ?? '',
+    code:        editing.code              ?? '',
+    name:        editing.name              ?? '',
+    type:        editing.warehouse_type    ?? editing.type ?? 'stores',
+    description: editing.description      ?? '',
+    is_group:    editing.is_group          ?? false,
+    parent_id:   editing.parent_warehouse_id ?? editing.parent_id ?? '',
   } : { ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
 
@@ -208,12 +208,14 @@ function WarehouseModal({ open, editing, warehouses, onClose, onSave }) {
     setSaving(true)
     try {
       await onSave({
-        code:        form.code.trim().toUpperCase(),
-        name:        form.name.trim(),
-        type:        form.type,
-        description: form.description.trim(),
-        is_group:    form.is_group,
-        parent_id:   form.parent_id || null,
+        code:               form.code.trim().toUpperCase(),
+        name:               form.name.trim(),
+        type:               form.type,
+        warehouse_type:     form.type,           // Phase 1 canonical column
+        description:        form.description.trim(),
+        is_group:           form.is_group,
+        parent_id:          form.parent_id || null,
+        parent_warehouse_id: form.parent_id || null, // Phase 1 canonical FK
       })
       onClose()
     } catch (err) {
