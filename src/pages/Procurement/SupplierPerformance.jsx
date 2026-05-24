@@ -412,7 +412,7 @@ export default function SupplierPerformance() {
                     <tr key={`${sc.supplier.id}-expand`}>
                       <td colSpan="9" style={{ padding: 0, background: 'var(--surface)' }}>
                         <div style={{ padding: 16 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: supplierMetrics[sc.supplier.id] ? 16 : 0 }}>
                             {/* PO delivery detail */}
                             <div>
                               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -464,6 +464,56 @@ export default function SupplierPerformance() {
                               })}
                             </div>
                           </div>
+
+                          {/* GRN-Derived Metrics */}
+                          {supplierMetrics[sc.supplier.id] && (
+                            <div style={{
+                              marginTop: 0,
+                              padding: '10px 14px',
+                              background: 'var(--surface2)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 24,
+                              flexWrap: 'wrap',
+                              fontSize: 12,
+                            }}>
+                              <span style={{ fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 11 }}>
+                                GRN Derived
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>🚚</span>
+                                <span style={{ color: 'var(--text-dim)' }}>Avg Lead:</span>
+                                <strong style={{ color: 'var(--text)' }}>
+                                  {supplierMetrics[sc.supplier.id].avgLeadDays != null
+                                    ? `${supplierMetrics[sc.supplier.id].avgLeadDays} days`
+                                    : '—'}
+                                </strong>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>📦</span>
+                                <span style={{ color: 'var(--text-dim)' }}>GRN Rejection:</span>
+                                <strong style={{
+                                  color: supplierMetrics[sc.supplier.id].rejectionPct == null ? 'var(--text)'
+                                    : Number(supplierMetrics[sc.supplier.id].rejectionPct) > 5 ? 'var(--red)'
+                                    : Number(supplierMetrics[sc.supplier.id].rejectionPct) > 2 ? 'var(--yellow)'
+                                    : 'var(--green)',
+                                }}>
+                                  {supplierMetrics[sc.supplier.id].rejectionPct != null
+                                    ? `${supplierMetrics[sc.supplier.id].rejectionPct}%`
+                                    : '—'}
+                                </strong>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>📅</span>
+                                <span style={{ color: 'var(--text-dim)' }}>Last GRN:</span>
+                                <strong style={{ color: 'var(--text)' }}>
+                                  {supplierMetrics[sc.supplier.id].lastGrnDate || '—'}
+                                </strong>
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
