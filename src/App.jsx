@@ -114,6 +114,8 @@ const PurchaseReturns      = lazy(() => import('./pages/Procurement/PurchaseRetu
 const SupplierPriceLists   = lazy(() => import('./pages/Procurement/SupplierPriceLists'))
 const CostCentreReport     = lazy(() => import('./pages/Procurement/CostCentreReport'))
 const BudgetVsActual       = lazy(() => import('./pages/Procurement/BudgetVsActual'))
+const QualityInspection    = lazy(() => import('./pages/Procurement/QualityInspection'))
+const SupplierStatement    = lazy(() => import('./pages/Procurement/SupplierStatement'))
 
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
@@ -466,6 +468,8 @@ function AppRoutes() {
           <Route path="supplier-price-lists"    element={<SupplierPriceLists />}    />
           <Route path="cost-centre-report"      element={<CostCentreReport />}      />
           <Route path="budget-vs-actual"        element={<BudgetVsActual />}        />
+          <Route path="quality-inspection"      element={<QualityInspection />}     />
+          <Route path="supplier-statement"      element={<SupplierStatement />}     />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
