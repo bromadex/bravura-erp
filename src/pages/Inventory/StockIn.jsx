@@ -1,7 +1,7 @@
 // src/pages/Inventory/StockIn.jsx
 // Modern rewrite: KPIs, search, date filter, Excel export
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useInventory } from '../../contexts/InventoryContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
@@ -11,7 +11,7 @@ import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions } from '../.
 const today = new Date().toISOString().split('T')[0]
 
 export default function StockIn() {
-  const { items, transactions, warehouses, stockIn: doStockIn, getBin, loading, recordBatch, registerSerial } = useInventory()
+  const { items, stockLedger, warehouses, stockIn: doStockIn, getBin, loading, recordBatch, registerSerial } = useInventory()
   const canEdit = useCanEdit('inventory', 'stock-in')
 
   const [showModal, setShowModal] = useState(false)
@@ -19,7 +19,27 @@ export default function StockIn() {
   const [dateFrom,  setDateFrom]  = useState('')
   const [dateTo,    setDateTo]    = useState('')
 
-  const stockInTx = transactions.filter(t => t.type === 'IN' || t.type === 'GRN')
+  // Map SLEs (positive actual_qty = receipts) to display format
+  const stockInTx = useMemo(() =>
+    stockLedger
+      .filter(s => s.actual_qty > 0)
+      .map(s => {
+        const item = items.find(i => i.id === s.item_id)
+        return {
+          id:           s.id,
+          date:         (s.posting_datetime || '').slice(0, 10),
+          type:         s.voucher_type || 'Receipt',
+          item_name:    item?.name || s.item_id,
+          category:     item?.category || '',
+          qty:          s.actual_qty,
+          delivered_by: s.incoming_rate != null ? `Rate: ${Number(s.incoming_rate).toFixed(2)}` : '—',
+          received_by:  s.created_by || '—',
+          notes:        s.voucher_no || '',
+        }
+      }),
+    [stockLedger, items]
+  )
+
   const filtered  = stockInTx.filter(tx => {
     if (dateFrom && tx.date < dateFrom) return false
     if (dateTo   && tx.date > dateTo)   return false
@@ -87,7 +107,7 @@ export default function StockIn() {
               : filtered.map((tx, idx) => (
                 <tr key={tx.id}>
                   <td style={{ whiteSpace: 'nowrap' }}>{tx.date}</td>
-                  <td><span className={`badge ${tx.type === 'GRN' ? 'badge-purple' : 'badge-green'}`}>{tx.type}</span></td>
+                  <td><span className={`badge ${tx.type === 'PurchaseReceipt' ? 'badge-purple' : tx.type === 'StockIn' ? 'badge-green' : 'badge-teal'}`}>{tx.type}</span></td>
                   <td style={{ fontWeight: 600 }}>{tx.item_name}</td>
                   <td style={{ fontSize: 12 }}>{tx.category}</td>
                   <td className="td-mono" style={{ color: 'var(--green)' }}>+{tx.qty}</td>

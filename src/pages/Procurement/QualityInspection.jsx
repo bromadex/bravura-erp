@@ -130,14 +130,76 @@ export default function QualityInspection() {
     return map
   }, [goodsReceived])
 
+  // ── Stock adjustment for rejected qty ───────────────────────
+  const postQIStockAdjustment = async (qi) => {
+    if (!qi.grn_id || !qi.rejected_qty || Number(qi.rejected_qty) <= 0) return
+    if (qi.stock_posted) return  // already done
+
+    // Fetch GRN to get warehouse
+    const { data: grn } = await supabase.from('goods_received')
+      .select('warehouse_id').eq('id', qi.grn_id).maybeSingle()
+    const fromWh = grn?.warehouse_id || 'wh_main_store'
+
+    // Find rejected warehouse (type = 'rejected')
+    const { data: rejWh } = await supabase.from('warehouses')
+      .select('id').eq('type', 'rejected').eq('is_active', true).limit(1).maybeSingle()
+    const toWh = rejWh?.id || null
+    if (!toWh) return  // no rejected warehouse configured — skip silently
+
+    // Find item_id from GRN lines matching item_name
+    const { data: grnLines } = await supabase.from('grn_lines')
+      .select('item_id, item_name').eq('grn_id', qi.grn_id).limit(50)
+    const matchLine = grnLines?.find(l =>
+      l.item_name?.toLowerCase() === qi.item_name?.toLowerCase()
+    )
+    if (!matchLine?.item_id) return
+
+    const rejQty = Number(qi.rejected_qty)
+    const voucherNo = qi.qi_number || `QI-${qi.id.slice(-6)}`
+
+    // Issue SLE from receiving warehouse
+    await supabase.from('stock_ledger_entries').insert([{
+      id: crypto.randomUUID(),
+      item_id: matchLine.item_id,
+      warehouse_id: fromWh,
+      posting_datetime: new Date().toISOString(),
+      voucher_type: 'QualityInspection',
+      transaction_type: 'Issue',
+      voucher_no: voucherNo,
+      actual_qty: -rejQty,
+      created_by: 'QI System',
+      is_cancelled: false,
+    }])
+
+    // Receipt SLE to rejected warehouse
+    await supabase.from('stock_ledger_entries').insert([{
+      id: crypto.randomUUID(),
+      item_id: matchLine.item_id,
+      warehouse_id: toWh,
+      posting_datetime: new Date().toISOString(),
+      voucher_type: 'QualityInspection',
+      transaction_type: 'Receipt',
+      voucher_no: voucherNo,
+      actual_qty: rejQty,
+      created_by: 'QI System',
+      is_cancelled: false,
+    }])
+
+    // Mark QI as stock_posted
+    await supabase.from('quality_inspections')
+      .update({ stock_posted: true, updated_at: new Date().toISOString() })
+      .eq('id', qi.id)
+  }
+
   // ── Create ───────────────────────────────────────────────────
   const handleCreate = async (e) => {
     e.preventDefault()
     setSaving(true)
     try {
+      const newQiId = crypto.randomUUID()
       const qiNumber = `QI-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`
       const { error } = await supabase.from('quality_inspections').insert([{
-        id: crypto.randomUUID(),
+        id: newQiId,
         qi_number: qiNumber,
         ...form,
         sample_qty:   Number(form.sample_qty)   || 0,
@@ -151,6 +213,16 @@ export default function QualityInspection() {
       }])
       if (error) throw error
       toast.success(`Quality inspection ${qiNumber} created`)
+      if (form.status !== 'Pending' && Number(form.rejected_qty) > 0) {
+        await postQIStockAdjustment({
+          id: newQiId,
+          grn_id: form.grn_id,
+          rejected_qty: form.rejected_qty,
+          item_name: form.item_name,
+          qi_number: qiNumber,
+          stock_posted: false,
+        }).catch(() => null)  // non-blocking
+      }
       setCreateModal(false)
       setForm(emptyForm())
       loadData()
@@ -397,12 +469,13 @@ export default function QualityInspection() {
                 ['Inspection Date', viewQI.inspection_date || '—'],
                 ['Batch No',      viewQI.batch_no || '—'],
                 ['Acceptance Criteria', viewQI.acceptance_criteria || '—'],
+                ['Stock Posted',  viewQI.stock_posted ? 'Yes' : 'No'],
               ].map(([label, val]) => (
                 <div key={label} style={{ background: 'var(--surface2)', borderRadius: 6, padding: '8px 12px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 3 }}>
                     {label}
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{val}</div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: label === 'Stock Posted' ? (viewQI.stock_posted ? 'var(--green)' : 'var(--text-dim)') : undefined }}>{val}</div>
                 </div>
               ))}
             </div>
@@ -504,6 +577,24 @@ export default function QualityInspection() {
             )}
 
             <ModalActions>
+              {viewQI.rejected_qty > 0 && !viewQI.stock_posted && viewQI.status !== 'Pending' && (
+                <button className="btn btn-secondary" onClick={async () => {
+                  try {
+                    await postQIStockAdjustment(viewQI)
+                    toast.success('Rejected stock moved to rejected warehouse')
+                    setViewQI(null)
+                    loadData()
+                  } catch (err) { toast.error(err.message) }
+                }}>
+                  <span className="material-icons" style={{ fontSize: 15 }}>move_to_inbox</span>
+                  Post Rejected Stock
+                </button>
+              )}
+              {viewQI.stock_posted && (
+                <span style={{ fontSize: 11, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span className="material-icons" style={{ fontSize: 14 }}>check_circle</span> Stock adjusted
+                </span>
+              )}
               <button className="btn btn-secondary" onClick={() => setViewQI(null)}>Close</button>
             </ModalActions>
           </ModalDialog>

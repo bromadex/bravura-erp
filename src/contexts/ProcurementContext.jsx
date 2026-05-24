@@ -743,6 +743,29 @@ export function ProcurementProvider({ children }) {
       }]).catch(() => null)
     }
 
+    // Non-blocking GL: DR GRIR Clearing / CR Accounts Payable
+    try {
+      const { data: glCfg } = await supabase
+        .from('inventory_gl_config').select('*')
+        .eq('event_type', 'purchase_invoice').eq('is_active', true).maybeSingle()
+      if (glCfg?.debit_account_code && glCfg?.credit_account_code) {
+        const totalVal = parseFloat(piData.total_amount || 0)
+        if (totalVal > 0) {
+          await postToGL({
+            sourceModule: 'procurement', sourceType: 'purchase_invoice', sourceId: id,
+            entryDate: piData.invoice_date || new Date().toISOString().split('T')[0],
+            description: `Purchase Invoice ${piNumber} — ${piData.supplier_name || ''}`,
+            reference: `PI-${id}`,
+            postedBy: piData.created_by_name || 'System',
+            lines: [
+              { account_code: glCfg.debit_account_code,  debit: totalVal, credit: 0,        description: `GRIR Clearing: ${piNumber}` },
+              { account_code: glCfg.credit_account_code, debit: 0,        credit: totalVal, description: `AP: ${piData.supplier_name || ''}` },
+            ],
+          }).catch(() => null)
+        }
+      }
+    } catch (_) { /* GL not configured — skip silently */ }
+
     await fetchAll(); return id
   }
 
@@ -796,6 +819,30 @@ export function ProcurementProvider({ children }) {
       }).eq('id', line.invoice_id)
     }
     auditLog({ module: 'procurement', action: 'POST', entityType: 'payment_voucher', entityId: pvId, entityName: pv.pv_number })
+
+    // Non-blocking GL: DR Accounts Payable / CR Bank/Cash
+    try {
+      const { data: glCfg } = await supabase
+        .from('inventory_gl_config').select('*')
+        .eq('event_type', 'payment_voucher').eq('is_active', true).maybeSingle()
+      if (glCfg?.debit_account_code && glCfg?.credit_account_code) {
+        const totalAmt = pv.total_amount || lines.reduce((s, l) => s + (l.amount_paid || 0), 0)
+        if (totalAmt > 0) {
+          await postToGL({
+            sourceModule: 'procurement', sourceType: 'payment_voucher', sourceId: pvId,
+            entryDate: pv.payment_date || new Date().toISOString().split('T')[0],
+            description: `Payment ${pv.pv_number} — ${pv.supplier_name || ''} via ${pv.payment_method || 'Bank'}`,
+            reference: `PV-${pvId}`,
+            postedBy: postedBy || 'System',
+            lines: [
+              { account_code: glCfg.debit_account_code,  debit: totalAmt, credit: 0,         description: `AP Cleared: ${pv.pv_number}` },
+              { account_code: glCfg.credit_account_code, debit: 0,        credit: totalAmt,  description: `${pv.payment_method || 'Bank'}: ${pv.pv_number}` },
+            ],
+          }).catch(() => null)
+        }
+      }
+    } catch (_) { /* GL not configured — skip silently */ }
+
     await fetchAll()
   }
 
