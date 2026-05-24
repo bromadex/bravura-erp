@@ -35,6 +35,7 @@ const HR_PAGE_SECTION = {
   'tax-years': 'Payroll & Compensation', 'tax-exemptions': 'Payroll & Compensation',
   'additional-salary': 'Payroll & Compensation', 'salary-arrears': 'Payroll & Compensation',
   'salary-withholdings': 'Payroll & Compensation', 'payroll-corrections': 'Payroll & Compensation',
+  'zimra-returns': 'Payroll & Compensation',
   'employee-incentives': 'Payroll & Compensation', 'retention-bonuses': 'Payroll & Compensation',
   'component-accounts': 'Payroll & Compensation',
   // Recruitment
@@ -96,6 +97,7 @@ const ALL_MODULES = {
         { id: 'budget-vs-actual',      label: 'Budget vs Actual',     icon: 'balance'        },
         { id: 'supplier-price-lists',  label: 'Supplier Price Lists', icon: 'price_check'   },
         { id: 'supplier-performance',  label: 'Supplier Performance', icon: 'star_rate'      },
+        { id: 'ap-aging',              label: 'AP Aging',             icon: 'hourglass_bottom'},
         { id: 'quality-inspection',    label: 'Quality Inspections',  icon: 'verified'       },
         { id: 'supplier-statement',    label: 'Supplier Statement',   icon: 'account_balance_wallet' },
         { id: 'blanket-orders',        label: 'Blanket Orders',       icon: 'handshake'      },
@@ -297,6 +299,7 @@ const ALL_MODULES = {
           { id: 'salary-arrears',      label: 'Salary Arrears',       icon: 'history'                },
           { id: 'salary-withholdings', label: 'Salary Withholdings',  icon: 'block'                  },
           { id: 'payroll-corrections', label: 'Payroll Corrections',  icon: 'build_circle'           },
+          { id: 'zimra-returns',       label: 'ZIMRA P6 Returns',     icon: 'assignment_turned_in'   },
           { id: 'employee-incentives', label: 'Employee Incentives',  icon: 'emoji_events'           },
           { id: 'retention-bonuses',   label: 'Retention Bonuses',    icon: 'card_giftcard'          },
           { id: 'component-accounts',  label: 'Component GL Accounts',icon: 'account_tree'           },

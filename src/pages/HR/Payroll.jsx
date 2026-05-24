@@ -18,10 +18,26 @@ import { exportXLSX } from '../../engine/reportingEngine'
 import { postToGL, hasGLEntry, getChartOfAccounts } from '../../engine/accountingEngine'
 import { PageHeader, KPICard, StatusBadge, EmptyState, TabNav } from '../../components/ui'
 
-// Zimbabwe PAYE brackets 2024/2025 (rough progressive estimate)
-const calcPAYE = (gross, rate) => {
-  // Use the employee-stored rate if HR has entered it, otherwise fall back to 25%
-  return gross * ((rate ?? 25) / 100)
+// ZIMRA Progressive PAYE — uses income_tax_slabs for active tax year
+// Falls back to flat rate if no slabs available (graceful degradation)
+const calcPAYEProgressive = (gross, slabs, flatRatePct) => {
+  // If slabs available, compute progressive tax
+  if (slabs && slabs.length > 0) {
+    let tax = 0
+    let remaining = Math.max(0, gross)
+    for (const slab of slabs) {
+      if (remaining <= 0) break
+      const from = slab.slab_from ?? 0
+      const to   = slab.slab_to   ?? Infinity
+      if (gross <= from) break  // not yet in this bracket
+      const taxable = Math.min(remaining, to - from)
+      tax += (taxable * (slab.rate_pct / 100)) + (slab.fixed_amount || 0)
+      remaining -= taxable
+    }
+    return Math.max(0, tax)
+  }
+  // Fallback: flat rate from employee record
+  return gross * ((flatRatePct ?? 25) / 100)
 }
 
 export default function Payroll() {
@@ -34,6 +50,7 @@ export default function Payroll() {
   const [selectedPeriod, setSelectedPeriod] = useState(null)
   const [records,        setRecords]        = useState([])
   const [publicHolidays, setPublicHolidays] = useState([])
+  const [taxSlabs,       setTaxSlabs]       = useState([])
   const [loading,        setLoading]        = useState(false)
   const [generating,     setGenerating]     = useState(false)
   const [saving,         setSaving]         = useState(false)
@@ -61,6 +78,30 @@ export default function Payroll() {
       if (ppRes.data?.length) setSelectedPeriod(ppRes.data[0])
     }
     load()
+  }, [])
+
+  // Load active tax year + ZIMRA progressive PAYE slabs on mount
+  useEffect(() => {
+    const loadTaxSlabs = async () => {
+      const { data: yearData } = await supabase
+        .from('tax_years')
+        .select('id, year_label')
+        .or('is_default.eq.true,status.eq.Active')
+        .order('is_default', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (yearData?.id) {
+        const { data: slabData } = await supabase
+          .from('income_tax_slabs')
+          .select('slab_from, slab_to, rate_pct, fixed_amount, applies_to')
+          .eq('tax_year_id', yearData.id)
+          .eq('applies_to', 'monthly')
+          .order('slab_from', { ascending: true })
+        setTaxSlabs(slabData || [])
+      }
+    }
+    loadTaxSlabs()
   }, [])
 
   useEffect(() => {
@@ -130,8 +171,11 @@ export default function Payroll() {
         const grossPay         = regularPay + overtimePay + saturdayPay + publicHolidayPay + allowances
 
         // ✅ Auto-calc deductions from employee compensation settings
-        const payeAmt    = calcPAYE(grossPay, emp.paye_rate)
-        const nssaAmt    = grossPay * ((emp.nssa_rate  ?? 4.5) / 100)
+        const payeAmt    = calcPAYEProgressive(grossPay, taxSlabs, emp.paye_rate)
+        // NSSA: 3% of gross, statutory cap: max insurable earnings = $600/month → max $18
+        const NSSA_EE_CEILING = 600   // USD insurable earnings ceiling (employee)
+        const nssaInsurable   = Math.min(grossPay, NSSA_EE_CEILING)
+        const nssaAmt         = nssaInsurable * ((emp.nssa_rate ?? 3) / 100)
         const aidsAmt    = payeAmt  * ((emp.aids_levy_rate ?? 3) / 100)
         const medicalAmt = emp.medical_aid        || 0
         const otherAmt   = emp.other_deductions   || 0
@@ -300,6 +344,7 @@ export default function Payroll() {
       ${canSeeAmounts ? `<div class="row bold"><span>GROSS PAY</span><span class="total">$${(record.gross_pay||0).toFixed(2)}</span></div>` : ''}
       <div class="section">Deductions</div>
       ${canSeeAmounts ? `<div class="row"><span>PAYE</span><span>$${(record.paye||0).toFixed(2)}</span></div>` : ''}
+      ${taxSlabs.length > 0 ? `<div class="row note"><span>PAYE method</span><span>ZIMRA progressive</span></div>` : ''}
       ${canSeeAmounts ? `<div class="row"><span>NSSA (Employee)</span><span>$${(record.nssa||0).toFixed(2)}</span></div>` : ''}
       ${canSeeAmounts ? `<div class="row"><span>Aids Levy</span><span>$${(record.aids_levy||0).toFixed(2)}</span></div>` : ''}
       ${record.other_deductions > 0 ? `<div class="row"><span>Other Deductions</span><span>${canSeeAmounts ? `$${(record.other_deductions||0).toFixed(2)}` : '—'}</span></div>` : ''}

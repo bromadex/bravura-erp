@@ -119,6 +119,7 @@ const BudgetVsActual       = lazy(() => import('./pages/Procurement/BudgetVsActu
 const QualityInspection    = lazy(() => import('./pages/Procurement/QualityInspection'))
 const SupplierStatement    = lazy(() => import('./pages/Procurement/SupplierStatement'))
 const BlanketOrders        = lazy(() => import('./pages/Procurement/BlanketOrders'))
+const APAging              = lazy(() => import('./pages/Procurement/APAging'))
 
 // Phase 11 — Settings
 const TaxEngine            = lazy(() => import('./pages/Settings/TaxEngine'))
@@ -245,6 +246,7 @@ const AdditionalSalary       = lazy(() => import('./pages/HR/AdditionalSalary'))
 const SalaryArrears          = lazy(() => import('./pages/HR/SalaryArrears'))
 const SalaryWithholdings     = lazy(() => import('./pages/HR/SalaryWithholdings'))
 const PayrollCorrections     = lazy(() => import('./pages/HR/PayrollCorrections'))
+const ZIMRAReturns           = lazy(() => import('./pages/HR/ZIMRAReturns'))
 const EmployeeIncentives     = lazy(() => import('./pages/HR/EmployeeIncentives'))
 const RetentionBonuses       = lazy(() => import('./pages/HR/RetentionBonuses'))
 const SalaryComponentAccounts = lazy(() => import('./pages/HR/SalaryComponentAccounts'))
@@ -500,6 +502,7 @@ function AppRoutes() {
           <Route path="procurement-tracker"     element={<ProcurementTracker />}    />
           <Route path="supplier-statement"      element={<SupplierStatement />}     />
           <Route path="blanket-orders"          element={<BlanketOrders />}         />
+          <Route path="ap-aging"                element={<APAging />}               />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
@@ -660,6 +663,7 @@ function AppRoutes() {
             <Route path="salary-arrears"          element={<SalaryArrears />} />
             <Route path="salary-withholdings"     element={<SalaryWithholdings />} />
             <Route path="payroll-corrections"     element={<PayrollCorrections />} />
+            <Route path="zimra-returns"           element={<ZIMRAReturns />} />
             <Route path="employee-incentives"     element={<EmployeeIncentives />} />
             <Route path="retention-bonuses"       element={<RetentionBonuses />} />
             <Route path="component-accounts"      element={<SalaryComponentAccounts />} />
