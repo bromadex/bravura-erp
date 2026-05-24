@@ -59,6 +59,9 @@ const WorkflowAssignments = lazy(() => import('./pages/Workflow/WorkflowAssignme
 const MasterData          = lazy(() => import('./pages/Settings/MasterData'))
 const GovernancePolicies  = lazy(() => import('./pages/Settings/GovernancePolicies'))
 const InventoryAuditLog   = lazy(() => import('./pages/Settings/AuditLog'))
+const NumberingSeries     = lazy(() => import('./pages/Settings/NumberingSeries'))
+const ApprovalThresholds  = lazy(() => import('./pages/Settings/ApprovalThresholds'))
+const WorkflowRules       = lazy(() => import('./pages/Settings/WorkflowRules'))
 // Phase 10 — Cross-cutting engines
 const PushNotificationSettings = lazy(() => import('./pages/Settings/PushNotificationSettings'))
 const EmailLogs                = lazy(() => import('./pages/Settings/EmailLogs'))
@@ -826,6 +829,9 @@ function AppRoutes() {
           <Route path="email-logs"           element={<EmailLogs />}             />
           <Route path="governance-policies"  element={<GovernancePolicies />}    />
           <Route path="inventory-audit-log"  element={<InventoryAuditLog />}     />
+          <Route path="numbering-series"     element={<NumberingSeries />}       />
+          <Route path="approval-thresholds"  element={<ApprovalThresholds />}    />
+          <Route path="workflow-rules"        element={<WorkflowRules />}         />
         </Route>
 
         {/* ── REPORTS ──────────────────────────────────────── */}

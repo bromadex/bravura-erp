@@ -6,7 +6,7 @@
 //    (uses sessionStorage to pass PO data to GoodsReceived).
 // 3. Added: view PO modal, status badges, total calculation, search, Excel export.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProcurement } from '../../contexts/ProcurementContext'
@@ -63,6 +63,23 @@ export default function PurchaseOrders() {
   }
 
   const totalAmount = form.items.reduce((s, it) => s + ((it.ordered_qty || 0) * (it.unit_cost || 0)), 0)
+
+  // Approval threshold wiring
+  const [poThresholds, setPoThresholds] = useState([])
+  useEffect(() => {
+    supabase.from('approval_thresholds')
+      .select('*').eq('document_type', 'purchase_order').eq('is_active', true)
+      .order('min_amount')
+      .then(({ data }) => { if (data) setPoThresholds(data) })
+  }, [])
+
+  const approvalTier = useMemo(() => {
+    if (!poThresholds.length || totalAmount <= 0) return null
+    const match = [...poThresholds]
+      .sort((a, b) => b.min_amount - a.min_amount)
+      .find(t => totalAmount >= t.min_amount && (t.max_amount == null || totalAmount < t.max_amount))
+    return match || null
+  }, [poThresholds, totalAmount])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -349,7 +366,7 @@ export default function PurchaseOrders() {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>
                   <span className="material-icons">add</span> Add Item
                 </button>
@@ -357,6 +374,21 @@ export default function PurchaseOrders() {
                   Total: ${totalAmount.toFixed(2)}
                 </div>
               </div>
+              {approvalTier && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '8px 12px',
+                  background: 'rgba(251,191,36,.06)', border: '1px solid rgba(251,191,36,.25)', borderRadius: 8 }}>
+                  <span className="material-icons" style={{ fontSize: 16, color: 'var(--gold)' }}>policy</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Approval required:</span>
+                  <strong style={{ fontSize: 12, color: 'var(--gold)' }}>{approvalTier.approver_label}</strong>
+                  {approvalTier.requires_two && (
+                    <span style={{ fontSize: 11, color: 'var(--gold)', background: 'rgba(251,191,36,.15)',
+                      padding: '1px 6px', borderRadius: 4 }}>2 approvers</span>
+                  )}
+                  {approvalTier.notes && (
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>— {approvalTier.notes}</span>
+                  )}
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Notes / Special Instructions</label>
