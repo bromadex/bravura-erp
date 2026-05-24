@@ -15,7 +15,7 @@ import {
   ModalActions,
 } from '../../components/ui'
 
-const CURRENCIES = ['USD', 'ZAR', 'ZMW', 'BWP']
+const CURRENCIES = ['USD', 'ZAR', 'BWP', 'ZiG']
 
 const BLANK_FORM = {
   supplier_id:    '',

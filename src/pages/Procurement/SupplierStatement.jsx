@@ -344,19 +344,19 @@ export default function SupplierStatement() {
           }}>
             <KPICard
               label="Total Invoiced"
-              value={`K ${fmtNum(kpis.totalInvoiced)}`}
+              value={`$ ${fmtNum(kpis.totalInvoiced)}`}
               icon="receipt"
               color="purple"
             />
             <KPICard
               label="Total Paid"
-              value={`K ${fmtNum(kpis.totalPaid)}`}
+              value={`$ ${fmtNum(kpis.totalPaid)}`}
               icon="payments"
               color="green"
             />
             <KPICard
               label="Outstanding Balance"
-              value={`K ${fmtNum(Math.abs(kpis.outstandingBalance))}`}
+              value={`$ ${fmtNum(Math.abs(kpis.outstandingBalance))}`}
               sub={kpis.outstandingBalance > 0 ? 'We owe supplier' : kpis.outstandingBalance < 0 ? 'Supplier owes us' : 'Settled'}
               icon="account_balance_wallet"
               color={kpis.outstandingBalance > 0 ? 'red' : kpis.outstandingBalance < 0 ? 'green' : ''}

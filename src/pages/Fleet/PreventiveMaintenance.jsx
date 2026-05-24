@@ -68,7 +68,7 @@ function fmt(dateStr) {
 
 function fmtCurrency(val) {
   if (val == null || val === '') return '—'
-  return `K ${Number(val).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `$ ${Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function scheduleStatus(s) {

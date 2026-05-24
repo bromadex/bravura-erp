@@ -1,5 +1,5 @@
 // src/pages/Settings/TaxEngine.jsx
-// Tax Templates manager for procurement (Zambia context, VAT 16%).
+// Tax Templates manager for procurement (Zimbabwe context — ZIMRA VAT 15%).
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -408,7 +408,7 @@ export default function TaxEngine() {
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--gold)' }}>
                                 {line.charge_type === 'Actual Amount'
-                                  ? <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: 11 }}>K {line.tax_amount ?? '—'}</span>
+                                  ? <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: 11 }}>$ {line.tax_amount ?? '—'}</span>
                                   : `${line.rate ?? '—'}%`
                                 }
                               </td>
@@ -459,7 +459,7 @@ export default function TaxEngine() {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                     <div className="form-group" style={{ margin: 0, flex: '0 0 240px' }}>
-                      <label style={{ fontSize: 12 }}>Test Amount (K)</label>
+                      <label style={{ fontSize: 12 }}>Test Amount (USD)</label>
                       <input
                         type="number"
                         className="form-control"
@@ -479,7 +479,7 @@ export default function TaxEngine() {
                             <th>Description</th>
                             <th>Charge Type</th>
                             <th style={{ textAlign: 'right' }}>Rate %</th>
-                            <th style={{ textAlign: 'right' }}>Amount (K)</th>
+                            <th style={{ textAlign: 'right' }}>Amount (USD)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -488,7 +488,7 @@ export default function TaxEngine() {
                             <td style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</td>
                             <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>—</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700 }}>
-                              {netAmount.toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                           {breakdown.map(b => (
@@ -499,20 +499,20 @@ export default function TaxEngine() {
                                 {b.charge_type === 'Actual Amount' ? '—' : `${b.rate}%`}
                               </td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--yellow)' }}>
-                                {b.computed.toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {b.computed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           ))}
                           <tr style={{ borderTop: '2px solid var(--border2)', background: 'color-mix(in srgb, var(--gold) 6%, transparent)' }}>
                             <td colSpan={3} style={{ fontWeight: 700, textAlign: 'right', paddingRight: 12 }}>Total Tax</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--yellow)' }}>
-                              {totalTax.toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {totalTax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                           <tr style={{ background: 'color-mix(in srgb, var(--green) 8%, transparent)' }}>
                             <td colSpan={3} style={{ fontWeight: 700, textAlign: 'right', paddingRight: 12 }}>Grand Total (incl. Tax)</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 15, color: 'var(--green)' }}>
-                              {grandTotal.toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                         </tbody>
@@ -545,7 +545,7 @@ export default function TaxEngine() {
               className="form-control"
               value={form.name}
               onChange={e => sf('name', e.target.value)}
-              placeholder="e.g. Standard VAT 16%"
+              placeholder="e.g. ZIMRA Standard VAT 15%"
             />
           </div>
 
@@ -622,7 +622,7 @@ export default function TaxEngine() {
               className="form-control"
               value={lineForm.description}
               onChange={e => slf('description', e.target.value)}
-              placeholder="e.g. VAT 16%, WHT 15%"
+              placeholder="e.g. ZIMRA VAT 15%, WHT 10%"
             />
           </div>
 
@@ -657,7 +657,7 @@ export default function TaxEngine() {
 
           {lineForm.charge_type === 'Actual Amount' && (
             <div className="form-group" style={{ margin: 0 }}>
-              <label>Fixed Tax Amount (K)</label>
+              <label>Fixed Tax Amount (USD)</label>
               <input
                 type="number"
                 min={0}

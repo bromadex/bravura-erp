@@ -24,7 +24,7 @@ function fmtDate(d) {
 
 function fmtAmt(n) {
   if (!n && n !== 0) return '—'
-  return Number(n).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // ── stage dot component ───────────────────────────────────────────────────────
