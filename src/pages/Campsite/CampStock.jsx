@@ -6,6 +6,8 @@ import { useCanEdit } from '../../hooks/usePermission'
 import { ModalDialog, ModalActions } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { supabase } from '../../lib/supabase'
+import { generateTxnCode } from '../../utils/txnCode'
 
 const TODAY = new Date().toISOString().split('T')[0]
 const CATS  = ['Food', 'PPE', 'Consumables', 'General']
@@ -25,6 +27,16 @@ export default function CampStock() {
   const [siForm, setSiForm] = useState({ item_id: '', qty: 1, date: TODAY, supplier: '', reference: '', unit_cost: 0, notes: '' })
   const [soForm, setSoForm] = useState({ item_id: '', qty: 1, date: TODAY, issued_to: '', authorized_by: '', notes: '' })
   const [itemForm, setItemForm] = useState({ name: '', category: 'General', unit: 'pcs', reorder_level: 0, unit_cost: 0, notes: '' })
+
+  // ── Store Requisition (Request from Store / Procurement) ─────────────────────
+  const [srModal,  setSrModal]  = useState(false)
+  const [srItem,   setSrItem]   = useState(null)      // the camp item triggering the request
+  const [srSaving, setSrSaving] = useState(false)
+  const [srForm,   setSrForm]   = useState({
+    qty_required: '',
+    required_date: '',
+    notes: '',
+  })
 
   const todayHC = headcounts.find(h => h.date === TODAY)?.count || 0
 
@@ -71,6 +83,63 @@ export default function CampStock() {
       else             { await addItem(itemForm);                     toast.success('Added')   }
       setItemModal(false); setEditingItem(null)
     } catch (err) { toast.error(err.message) }
+  }
+
+  // ── Open SR modal pre-filled with a camp item ────────────────────────────────
+  const openSrModal = (item) => {
+    setSrItem(item)
+    setSrForm({
+      qty_required: Math.max((item.reorder_level || 0) - (item.balance || 0), 1),
+      required_date: '',
+      notes: `Camp stock replenishment for: ${item.name}. Current balance: ${item.balance} ${item.unit}. Reorder level: ${item.reorder_level} ${item.unit}.`,
+    })
+    setSrModal(true)
+  }
+
+  const handleStoreRequisition = async (e) => {
+    e.preventDefault()
+    if (!srItem || !srForm.qty_required || Number(srForm.qty_required) <= 0) {
+      return toast.error('Enter required quantity')
+    }
+    setSrSaving(true)
+    try {
+      const srNumber = await generateTxnCode('SR')
+      const id = crypto.randomUUID()
+      const itemsPayload = [{
+        item_id:       null,   // camp item — no main inventory id
+        name:          srItem.name,
+        category:      srItem.category || 'General',
+        qty:           Number(srForm.qty_required),
+        unit:          srItem.unit || 'pcs',
+        notes:         `Camp stock replenishment request`,
+        is_returnable: false,
+      }]
+      const { error } = await supabase.from('store_requisitions').insert([{
+        id,
+        req_number:     srNumber,
+        sr_number:      srNumber,
+        docstatus:      0,           // Draft
+        status:         'draft',
+        date:           TODAY,
+        department:     'Campsite',
+        priority:       'normal',
+        requester_name: byName || 'Camp Manager',
+        items:          itemsPayload,
+        required_date:  srForm.required_date || null,
+        notes:          srForm.notes || null,
+        created_by:     byName || '',
+        created_at:     new Date().toISOString(),
+        updated_at:     new Date().toISOString(),
+      }])
+      if (error) throw error
+      toast.success(`Store requisition ${srNumber} created as Draft — go to Procurement → Store Requisitions to submit.`)
+      setSrModal(false)
+      setSrItem(null)
+    } catch (err) {
+      toast.error(err.message || 'Failed to create store requisition')
+    } finally {
+      setSrSaving(false)
+    }
   }
 
   const handleExport = () => {
@@ -145,14 +214,14 @@ export default function CampStock() {
                 <th>Reorder</th>
                 <th>Status</th>
                 <th>Used 30d</th>
-                {canEdit && <th>Actions</th>}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canEdit ? 7 : 6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-dim)' }}>Loading…</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--text-dim)' }}>Loading…</td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={canEdit ? 7 : 6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-dim)' }}>No items found</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--text-dim)' }}>No items found</td></tr>
               ) : filteredItems.map(i => {
                 const isLow = i.balance <= (i.reorder_level || 0) && i.reorder_level > 0
                 const isOut = i.balance <= 0
@@ -168,9 +237,25 @@ export default function CampStock() {
                       <span style={{ padding: '2px 8px', borderRadius: 20, background: b.bg, border: `1px solid ${b.border}`, color: b.color, fontSize: 11, fontWeight: 700 }}>{b.label}</span>
                     </td>
                     <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{used > 0 ? used : '—'}</td>
-                    {canEdit && (
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {/* Request from Store — shown for low/out items */}
+                        {(isLow || isOut) && (
+                          <button
+                            className="btn btn-sm"
+                            title="Request from Store (raise Store Requisition)"
+                            onClick={() => openSrModal(i)}
+                            style={{
+                              background: 'rgba(10,132,255,.12)', color: 'var(--blue)',
+                              border: '1px solid rgba(10,132,255,.3)', fontSize: 11, padding: '3px 8px',
+                              display: 'flex', alignItems: 'center', gap: 4,
+                            }}
+                          >
+                            <span className="material-icons" style={{ fontSize: 13 }}>shopping_cart</span>
+                            Request
+                          </button>
+                        )}
+                        {canEdit && <>
                           <button className="btn btn-secondary btn-sm"
                             onClick={() => { setEditingItem(i); setItemForm({ name: i.name, category: i.category, unit: i.unit, reorder_level: i.reorder_level, unit_cost: i.unit_cost, notes: i.notes || '' }); setItemModal(true) }}>
                             <span className="material-icons" style={{ fontSize: 13 }}>edit</span>
@@ -179,9 +264,9 @@ export default function CampStock() {
                             onClick={async () => { if (!window.confirm(`Delete "${i.name}"?`)) return; await deleteItem(i.id); toast.success('Deleted') }}>
                             <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
                           </button>
-                        </div>
-                      </td>
-                    )}
+                        </>}
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
@@ -273,6 +358,83 @@ export default function CampStock() {
             <button type="submit" className="btn btn-primary">Stock In</button>
           </ModalActions>
         </form>
+      </ModalDialog>
+
+      {/* ── Store Requisition modal ── */}
+      <ModalDialog
+        open={srModal}
+        onClose={() => { setSrModal(false); setSrItem(null) }}
+        title="Request from Store"
+      >
+        {srItem && (
+          <form onSubmit={handleStoreRequisition} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Item info strip */}
+            <div style={{
+              padding: '10px 14px', borderRadius: 8,
+              background: 'var(--surface2)', border: '1px solid var(--border)',
+              fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{srItem.name}</div>
+              <div style={{ display: 'flex', gap: 16, color: 'var(--text-dim)', fontSize: 12 }}>
+                <span>Category: <strong style={{ color: 'var(--text)' }}>{srItem.category}</strong></span>
+                <span>Balance: <strong style={{ color: srItem.balance <= 0 ? 'var(--red)' : 'var(--yellow)', fontFamily: 'var(--mono)' }}>{srItem.balance} {srItem.unit}</strong></span>
+                <span>Reorder: <strong style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>{srItem.reorder_level} {srItem.unit}</strong></span>
+              </div>
+            </div>
+
+            {/* Callout */}
+            <div style={{
+              padding: '8px 12px', borderRadius: 6, fontSize: 12,
+              background: 'rgba(10,132,255,.08)', border: '1px solid rgba(10,132,255,.25)',
+              color: 'var(--blue)', display: 'flex', alignItems: 'flex-start', gap: 8,
+            }}>
+              <span className="material-icons" style={{ fontSize: 15, marginTop: 1 }}>info</span>
+              <span>A Store Requisition (SR) will be created as a <strong>Draft</strong> in Procurement. Submit it there for HOD approval to trigger a purchase.</span>
+            </div>
+
+            <div style={grid2}>
+              <div className="form-group">
+                <label className="form-label">Qty Required *</label>
+                <input
+                  type="number" min="0.01" step="0.01" required
+                  className="form-control"
+                  value={srForm.qty_required}
+                  onChange={e => setSrForm(f => ({ ...f, qty_required: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Required By Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={srForm.required_date}
+                  onChange={e => setSrForm(f => ({ ...f, required_date: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Notes</label>
+              <textarea
+                className="form-control"
+                rows={3}
+                value={srForm.notes}
+                onChange={e => setSrForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Additional details for the store manager…"
+              />
+            </div>
+
+            <ModalActions>
+              <button type="button" className="btn btn-secondary" onClick={() => { setSrModal(false); setSrItem(null) }}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={srSaving}>
+                <span className="material-icons" style={{ fontSize: 15, marginRight: 4 }}>shopping_cart</span>
+                {srSaving ? 'Creating…' : 'Create Store Requisition'}
+              </button>
+            </ModalActions>
+          </form>
+        )}
       </ModalDialog>
 
       {/* ── Issue Out modal ── */}

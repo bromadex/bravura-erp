@@ -604,7 +604,7 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
-  const closeWorkOrder = async (id, { actual_cost, completion_notes, actual_end_date, odometer_at_service, hour_meter_at_service }) => {
+  const closeWorkOrder = async (id, { actual_cost, completion_notes, actual_end_date, odometer_at_service, hour_meter_at_service, parts_used }) => {
     const wo = workOrders.find(x => x.id === id)
     const updates = {
       status: 'closed', actual_cost: actual_cost || null,
@@ -613,6 +613,17 @@ export function FleetProvider({ children }) {
     }
     if (odometer_at_service)   updates.odometer_at_service   = odometer_at_service
     if (hour_meter_at_service) updates.hour_meter_at_service = hour_meter_at_service
+    // Persist parts_used JSONB (strip UI-only fields like id/search state)
+    if (Array.isArray(parts_used) && parts_used.length > 0) {
+      updates.parts_used = parts_used.map(p => ({
+        part_name:  p.part_name,
+        qty:        Number(p.qty) || 0,
+        unit_cost:  Number(p.unit_cost) || 0,
+        item_id:    p.item_id || null,
+        item_code:  p.item_code || null,
+        warehouse_id: p.warehouse_id || null,
+      }))
+    }
     const { error } = await supabase.from('maintenance_work_orders').update(updates).eq('id', id)
     if (error) throw error
     if (wo?.schedule_id) {

@@ -1,11 +1,14 @@
 // src/pages/Fleet/PreventiveMaintenance.jsx
 // World-standard Preventive Maintenance page for mining-site fleet ERP.
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useFleet } from '../../contexts/FleetContext'
+import { supabase } from '../../lib/supabase'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { TabNav } from '../../components/ui/TabNav'
+
+const DEFAULT_WAREHOUSE = 'wh_main_store'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -569,7 +572,17 @@ function WorkOrderModal({ open, onClose, prefill, allAssets }) {
 
 // ─── Close WO Modal ───────────────────────────────────────────────────────────
 
-const BLANK_PART = () => ({ id: crypto.randomUUID(), part_name: '', qty: '', unit_cost: '' })
+const BLANK_PART = () => ({
+  id: crypto.randomUUID(),
+  part_name: '',
+  qty: '',
+  unit_cost: '',
+  item_id: null,
+  item_code: null,
+  warehouse_id: null,
+  _search: '',
+  _suggestions: [],
+})
 
 function CloseWOModal({ open, onClose, wo }) {
   const { closeWorkOrder } = useFleet()
@@ -579,29 +592,78 @@ function CloseWOModal({ open, onClose, wo }) {
     odometer_at_service: '',
     hour_meter_at_service: '',
   })
-  const [parts, setParts] = useState([BLANK_PART()])
-  const [saving, setSaving] = useState(false)
+  const [parts, setParts]         = useState([BLANK_PART()])
+  const [saving, setSaving]       = useState(false)
+  const [invItems, setInvItems]   = useState([])  // inventory catalogue
+  const searchDebounce            = useRef({})
 
+  // ── Load inventory items once on open ──────────────────────────────────────
   useEffect(() => {
     if (!open) return
     setForm({
-      actual_end_date:      today(),
-      completion_notes:     wo?.completion_notes     || '',
-      odometer_at_service:  wo?.odometer_at_service  != null ? wo.odometer_at_service : '',
-      hour_meter_at_service:wo?.hour_meter_at_service!= null ? wo.hour_meter_at_service : '',
+      actual_end_date:       today(),
+      completion_notes:      wo?.completion_notes      || '',
+      odometer_at_service:   wo?.odometer_at_service   != null ? wo.odometer_at_service  : '',
+      hour_meter_at_service: wo?.hour_meter_at_service != null ? wo.hour_meter_at_service : '',
     })
     setParts([BLANK_PART()])
+
+    // Fetch inventory items for parts autocomplete
+    supabase
+      .from('items')
+      .select('id, name, item_code, unit, cost, default_warehouse_id')
+      .order('name')
+      .then(({ data }) => { if (data) setInvItems(data) })
   }, [open, wo])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const updatePart = (id, key, val) => setParts(ps => ps.map(p => p.id === id ? { ...p, [key]: val } : p))
+  const updatePart = (id, key, val) =>
+    setParts(ps => ps.map(p => p.id === id ? { ...p, [key]: val } : p))
   const removePart = (id) => setParts(ps => ps.filter(p => p.id !== id))
-  const addPart = () => setParts(ps => [...ps, BLANK_PART()])
+  const addPart    = ()   => setParts(ps => [...ps, BLANK_PART()])
+
+  // ── Item search autocomplete ───────────────────────────────────────────────
+  const handleSearchChange = (partId, q) => {
+    updatePart(partId, '_search', q)
+    updatePart(partId, '_suggestions',
+      q.length < 2
+        ? []
+        : invItems.filter(i =>
+            i.name.toLowerCase().includes(q.toLowerCase()) ||
+            (i.item_code && i.item_code.toLowerCase().includes(q.toLowerCase()))
+          ).slice(0, 8)
+    )
+  }
+
+  const selectInventoryItem = (partId, item) => {
+    setParts(ps => ps.map(p =>
+      p.id === partId
+        ? {
+            ...p,
+            item_id:     item.id,
+            item_code:   item.item_code || null,
+            part_name:   item.name,
+            unit_cost:   p.unit_cost || String(item.cost || ''),
+            warehouse_id: item.default_warehouse_id || DEFAULT_WAREHOUSE,
+            _search:     item.name,
+            _suggestions: [],
+          }
+        : p
+    ))
+  }
+
+  const clearItemLink = (partId) => {
+    setParts(ps => ps.map(p =>
+      p.id === partId
+        ? { ...p, item_id: null, item_code: null, warehouse_id: null, _search: '', _suggestions: [] }
+        : p
+    ))
+  }
 
   const partsTotal = parts.reduce((s, p) => {
     const qty = Number(p.qty) || 0
-    const uc = Number(p.unit_cost) || 0
+    const uc  = Number(p.unit_cost) || 0
     return s + qty * uc
   }, 0)
 
@@ -615,26 +677,46 @@ function CloseWOModal({ open, onClose, wo }) {
     e.preventDefault()
     if (!form.actual_end_date) return toast.error('Completion date required')
     setSaving(true)
+
     const validParts = parts.filter(p => p.part_name.trim())
-    const partsPayload = validParts.map(p => ({
-      part_name: p.part_name.trim(),
-      qty: Number(p.qty) || 0,
-      unit_cost: Number(p.unit_cost) || 0,
-    }))
+
     try {
+      // 1. Close the work order (saves parts_used JSONB + all cost fields)
       await closeWorkOrder(wo.id, {
-        actual_cost:          totalCost || null,
-        completion_notes:     form.completion_notes || null,
-        actual_end_date:      form.actual_end_date,
-        odometer_at_service:  form.odometer_at_service  !== '' ? Number(form.odometer_at_service)  : undefined,
-        hour_meter_at_service:form.hour_meter_at_service!== '' ? Number(form.hour_meter_at_service): undefined,
+        actual_cost:           totalCost || null,
+        completion_notes:      form.completion_notes || null,
+        actual_end_date:       form.actual_end_date,
+        odometer_at_service:   form.odometer_at_service   !== '' ? Number(form.odometer_at_service)   : undefined,
+        hour_meter_at_service: form.hour_meter_at_service !== '' ? Number(form.hour_meter_at_service) : undefined,
+        parts_used:            validParts,
       })
-      // Persist parts back via updateWorkOrder is called inside closeWorkOrder only for cost fields.
-      // We do a separate update for parts_used if there are any.
-      if (partsPayload.length > 0) {
-        const { updateWorkOrder } = wo // won't exist — use context via ref
+
+      // 2. Create Issue SLEs for parts linked to inventory items
+      const inventoryParts = validParts.filter(p => p.item_id && Number(p.qty) > 0)
+      if (inventoryParts.length > 0) {
+        const sles = inventoryParts.map(p => ({
+          id:               crypto.randomUUID(),
+          item_id:          p.item_id,
+          warehouse_id:     p.warehouse_id || DEFAULT_WAREHOUSE,
+          posting_datetime: new Date(form.actual_end_date + 'T12:00:00').toISOString(),
+          voucher_type:     'MaintenanceWorkOrder',
+          transaction_type: 'Issue',
+          voucher_no:       wo.wo_number || `WO-${wo.id.slice(0, 8)}`,
+          actual_qty:       -Number(p.qty),
+          outgoing_rate:    Number(p.unit_cost) || 0,
+          created_by:       'fleet-maintenance',
+        }))
+        const { error: sleErr } = await supabase.from('stock_ledger_entries').insert(sles)
+        if (sleErr) {
+          console.warn('SLE creation failed (stock may not have been deducted):', sleErr.message)
+          toast('Work order closed. Note: inventory stock deduction failed — check stock manually.', { icon: '⚠️' })
+        } else {
+          toast.success(`Work order closed. ${inventoryParts.length} inventory item${inventoryParts.length !== 1 ? 's' : ''} deducted from stock.`)
+        }
+      } else {
+        toast.success('Work order closed')
       }
-      toast.success('Work order closed')
+
       onClose()
     } catch (err) {
       toast.error(err?.message || 'Failed to close work order')
@@ -682,26 +764,90 @@ function CloseWOModal({ open, onClose, wo }) {
           </div>
 
           <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            <table>
+            <table style={{ width: '100%' }}>
               <thead>
                 <tr>
-                  <th>PART NAME</th>
-                  <th style={{ width: 80 }}>QTY</th>
+                  <th style={{ width: '28%' }}>INVENTORY ITEM</th>
+                  <th>PART / DESCRIPTION</th>
+                  <th style={{ width: 70 }}>QTY</th>
                   <th style={{ width: 110 }}>UNIT COST (K)</th>
-                  <th style={{ width: 100 }}>LINE TOTAL</th>
-                  <th style={{ width: 40 }}></th>
+                  <th style={{ width: 95 }}>LINE TOTAL</th>
+                  <th style={{ width: 36 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {parts.map(p => (
                   <tr key={p.id}>
+                    {/* ── Inventory item search ── */}
+                    <td style={{ position: 'relative', minWidth: 180 }}>
+                      {p.item_id ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '5px 8px', background: 'rgba(48,209,88,.08)',
+                          border: '1px solid var(--green)', borderRadius: 6, fontSize: 11,
+                        }}>
+                          <span className="material-icons" style={{ fontSize: 13, color: 'var(--green)' }}>inventory_2</span>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.item_code && <span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)', marginRight: 4 }}>{p.item_code}</span>}
+                            {p.part_name}
+                          </span>
+                          <button type="button" onClick={() => clearItemLink(p.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', padding: 0 }}>
+                            <span className="material-icons" style={{ fontSize: 13 }}>link_off</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            className="form-control"
+                            value={p._search}
+                            onChange={e => handleSearchChange(p.id, e.target.value)}
+                            placeholder="Search inventory…"
+                            style={{ padding: '5px 8px', fontSize: 11 }}
+                            autoComplete="off"
+                          />
+                          {p._suggestions.length > 0 && (
+                            <div style={{
+                              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+                              background: 'var(--surface)', border: '1px solid var(--border)',
+                              borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,.3)',
+                              maxHeight: 180, overflowY: 'auto',
+                            }}>
+                              {p._suggestions.map(item => (
+                                <div
+                                  key={item.id}
+                                  onMouseDown={() => selectInventoryItem(p.id, item)}
+                                  style={{
+                                    padding: '7px 10px', cursor: 'pointer', fontSize: 12,
+                                    borderBottom: '1px solid var(--border)',
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                  {item.item_code && (
+                                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--gold)', marginRight: 6 }}>
+                                      {item.item_code}
+                                    </span>
+                                  )}
+                                  <span>{item.name}</span>
+                                  <span style={{ float: 'right', color: 'var(--text-dim)', fontSize: 11 }}>
+                                    K{Number(item.cost || 0).toFixed(2)} / {item.unit || 'pcs'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    {/* ── Free-text description ── */}
                     <td>
                       <input
                         className="form-control"
                         value={p.part_name}
                         onChange={e => updatePart(p.id, 'part_name', e.target.value)}
-                        placeholder="Part description"
-                        style={{ padding: '6px 10px', fontSize: 12 }}
+                        placeholder={p.item_id ? 'Override name…' : 'Or type part name'}
+                        style={{ padding: '5px 8px', fontSize: 12 }}
                       />
                     </td>
                     <td>
@@ -710,7 +856,7 @@ function CloseWOModal({ open, onClose, wo }) {
                         type="number" min="0" step="0.01"
                         value={p.qty}
                         onChange={e => updatePart(p.id, 'qty', e.target.value)}
-                        style={{ padding: '6px 10px', fontSize: 12 }}
+                        style={{ padding: '5px 8px', fontSize: 12 }}
                       />
                     </td>
                     <td>
@@ -719,7 +865,7 @@ function CloseWOModal({ open, onClose, wo }) {
                         type="number" min="0" step="0.01"
                         value={p.unit_cost}
                         onChange={e => updatePart(p.id, 'unit_cost', e.target.value)}
-                        style={{ padding: '6px 10px', fontSize: 12 }}
+                        style={{ padding: '5px 8px', fontSize: 12 }}
                       />
                     </td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
@@ -730,7 +876,7 @@ function CloseWOModal({ open, onClose, wo }) {
                         type="button"
                         className="btn btn-danger btn-sm"
                         onClick={() => removePart(p.id)}
-                        style={{ padding: '4px 8px' }}
+                        style={{ padding: '4px 6px' }}
                       >
                         <span className="material-icons" style={{ fontSize: 13 }}>delete</span>
                       </button>
@@ -762,6 +908,20 @@ function CloseWOModal({ open, onClose, wo }) {
           <label>COMPLETION NOTES</label>
           <textarea className="form-control" rows={3} value={form.completion_notes} onChange={e => set('completion_notes', e.target.value)} placeholder="Work carried out, findings, follow-up actions…" />
         </div>
+
+        {/* Inventory deduction notice */}
+        {parts.filter(p => p.item_id && Number(p.qty) > 0).length > 0 && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 8, marginBottom: 14,
+            background: 'rgba(48,209,88,.08)', border: '1px solid var(--green)',
+            fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span className="material-icons" style={{ fontSize: 16 }}>inventory_2</span>
+            <span>
+              {parts.filter(p => p.item_id && Number(p.qty) > 0).length} inventory item{parts.filter(p => p.item_id && Number(p.qty) > 0).length !== 1 ? 's' : ''} will be deducted from stock when this work order is closed.
+            </span>
+          </div>
+        )}
 
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
@@ -858,7 +1018,22 @@ function WODetailPanel({ wo, onClose, assetLabel, onClose_WO, onStart, onCancel 
               <tbody>
                 {partsUsed.map((p, i) => (
                   <tr key={i}>
-                    <td style={{ fontSize: 12 }}>{p.part_name}</td>
+                    <td style={{ fontSize: 12 }}>
+                      {p.item_id && (
+                        <span title="Deducted from inventory" style={{
+                          display: 'inline-flex', alignItems: 'center', marginRight: 4,
+                          color: 'var(--green)',
+                        }}>
+                          <span className="material-icons" style={{ fontSize: 11 }}>inventory_2</span>
+                        </span>
+                      )}
+                      {p.item_code && (
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--gold)', marginRight: 4 }}>
+                          {p.item_code}
+                        </span>
+                      )}
+                      {p.part_name}
+                    </td>
                     <td style={{ fontSize: 12 }}>{p.qty}</td>
                     <td style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>K {Number(p.unit_cost).toFixed(2)}</td>
                     <td style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>K {(Number(p.qty) * Number(p.unit_cost)).toFixed(2)}</td>
