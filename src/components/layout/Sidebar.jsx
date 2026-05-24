@@ -96,6 +96,8 @@ const ALL_MODULES = {
         { id: 'budget-vs-actual',      label: 'Budget vs Actual',     icon: 'balance'        },
         { id: 'supplier-price-lists',  label: 'Supplier Price Lists', icon: 'price_check'   },
         { id: 'supplier-performance',  label: 'Supplier Performance', icon: 'star_rate'      },
+        { id: 'quality-inspection',    label: 'Quality Inspections',  icon: 'verified'       },
+        { id: 'supplier-statement',    label: 'Supplier Statement',   icon: 'account_balance_wallet' },
         { id: 'cost-centre-report',    label: 'Cost Centre Report',   icon: 'donut_large'    },
         { id: 'suppliers',             label: 'Suppliers',            icon: 'store'          },
       ],
