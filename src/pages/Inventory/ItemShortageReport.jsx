@@ -66,7 +66,7 @@ export default function ItemShortageReport() {
       ] = await Promise.all([
         supabase.from('items').select('id, name, unit, category, item_code'),
         supabase.from('bins').select('item_id, warehouse_id, actual_qty, reserved_qty'),
-        supabase.from('item_reorder_levels').select('id, item_id, warehouse_id, reorder_level, reorder_qty, lead_time_days'),
+        supabase.from('item_reorder_levels').select('id, item_id, warehouse_id, reorder_level, reorder_qty, material_request_type'),
         supabase.from('warehouses').select('id, name'),
       ])
       if (iErr) throw iErr
@@ -142,7 +142,7 @@ export default function ItemShortageReport() {
         warehouseName:  warehouseMap[rl.warehouse_id] || rl.warehouse_id,
         reorderLevel:   reorderLvl,
         reorderQty:     Number(rl.reorder_qty || 0),
-        leadTimeDays:   rl.lead_time_days != null ? rl.lead_time_days : '—',
+        mrType:         rl.material_request_type || 'Purchase',
         actualQty,
         shortfall,
         urgency,
@@ -227,7 +227,7 @@ export default function ItemShortageReport() {
         'Reorder Level': r.reorderLevel,
         'On Hand':       r.actualQty,
         Shortfall:       r.shortfall,
-        'Lead Time (d)': r.leadTimeDays,
+        'MR Type':       r.mrType,
         Urgency:         r.urgency,
       })),
       `ItemShortageReport_${dateTag()}`,
@@ -338,7 +338,7 @@ export default function ItemShortageReport() {
                 <th style={{ textAlign: 'right' }}>Reorder Level</th>
                 <th style={{ textAlign: 'right' }}>On Hand</th>
                 <th style={{ textAlign: 'right' }}>Shortfall</th>
-                <th style={{ textAlign: 'right' }}>Lead Time</th>
+                <th>MR Type</th>
                 <th>Urgency</th>
                 <th>Action</th>
               </tr>
@@ -392,8 +392,8 @@ export default function ItemShortageReport() {
                     <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: r.shortfall > 0 ? 'var(--red)' : 'var(--text-dim)', fontWeight: r.shortfall > 0 ? 700 : 400 }}>
                       {r.shortfall > 0 ? fmtNum(r.shortfall) : '—'}
                     </td>
-                    <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-mid)' }}>
-                      {r.leadTimeDays !== '—' ? `${r.leadTimeDays}d` : '—'}
+                    <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                      {r.mrType}
                     </td>
                     <td><UrgencyBadge tier={r.urgency} /></td>
                     <td>
