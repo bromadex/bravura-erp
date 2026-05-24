@@ -91,29 +91,52 @@ export default function DepartmentConsumption() {
     try {
       const [txRes, srRes] = await Promise.all([
         supabase
-          .from('transactions')
-          .select('id, type, qty, date, item_name, category, department, cost_center, project, notes')
-          .eq('type', 'OUT')
-          .gte('date', dateFrom)
-          .order('date', { ascending: false })
+          .from('stock_ledger_entries')
+          .select('id, item_id, actual_qty, posting_datetime, voucher_type, voucher_no, transaction_type, created_by, items(name, category)')
+          .eq('transaction_type', 'Issue')
+          .eq('is_cancelled', false)
+          .gte('posting_datetime', dateFrom + 'T00:00:00')
+          .lte('posting_datetime', dateTo + 'T23:59:59')
+          .order('posting_datetime', { ascending: false })
           .limit(3000),
         supabase
           .from('store_requisitions')
-          .select('id, sr_number, department, status, issued_items, issued_at, req_number')
+          .select('id, sr_number, department, status, issued_items, issued_at, req_number, cost_center')
           .in('status', ['fulfilled', 'partially_fulfilled'])
           .gte('issued_at', dateFrom)
           .order('issued_at', { ascending: false }),
       ])
       if (txRes.error) throw txRes.error
       if (srRes.error) throw srRes.error
-      setTransactions(txRes.data || [])
+
+      const srDeptMap = {}
+      for (const sr of srRes.data || []) {
+        const key = sr.sr_number || sr.req_number
+        if (key) srDeptMap[key] = { department: sr.department || '', cost_center: sr.cost_center || '' }
+      }
+
+      const mapped = (txRes.data || []).map(s => {
+        const sr = srDeptMap[s.voucher_no] || {}
+        return {
+          id:          s.id,
+          type:        'OUT',
+          qty:         Math.abs(s.actual_qty || 0),
+          date:        (s.posting_datetime || '').slice(0, 10),
+          item_name:   s.items?.name || s.item_id,
+          category:    s.items?.category || '',
+          department:  sr.department || '',
+          cost_center: sr.cost_center || '',
+          notes:       s.voucher_no || '',
+        }
+      })
+      setTransactions(mapped)
       setRequisitions(srRes.data || [])
     } catch (err) {
       toast.error('Failed to load data: ' + err.message)
     } finally {
       setLoading(false)
     }
-  }, [dateFrom])
+  }, [dateFrom, dateTo])
 
   useEffect(() => { fetchData() }, [fetchData])
 

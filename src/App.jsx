@@ -125,6 +125,16 @@ const CurrencyExchange     = lazy(() => import('./pages/Settings/CurrencyExchang
 // Phase 11 — Inventory
 const PutawayRules         = lazy(() => import('./pages/Inventory/PutawayRules'))
 
+// Phase 12 / 13 — Inventory completeness
+const StockReservations    = lazy(() => import('./pages/Inventory/StockReservations'))
+const ItemShortageReport   = lazy(() => import('./pages/Inventory/ItemShortageReport'))
+const BatchExpiryReport    = lazy(() => import('./pages/Inventory/BatchExpiryReport'))
+const ItemVariants         = lazy(() => import('./pages/Inventory/ItemVariants'))
+const UOMConversion        = lazy(() => import('./pages/Inventory/UOMConversion'))
+
+// Phase 13 — Procurement Tracker
+const ProcurementTracker   = lazy(() => import('./pages/Procurement/ProcurementTracker'))
+
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
 const FuelIssuance       = lazy(() => import('./pages/Fuel/FuelIssuance'))
@@ -444,6 +454,11 @@ function AppRoutes() {
           <Route path="forecast-reorder"        element={<ForecastReorder />} />
           <Route path="dept-consumption"        element={<DepartmentConsumption />} />
           <Route path="putaway-rules"           element={<PutawayRules />} />
+          <Route path="stock-reservations"      element={<StockReservations />} />
+          <Route path="item-shortage"           element={<ItemShortageReport />} />
+          <Route path="batch-expiry"            element={<BatchExpiryReport />} />
+          <Route path="item-variants"           element={<ItemVariants />} />
+          <Route path="uom-conversion"          element={<UOMConversion />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -478,6 +493,7 @@ function AppRoutes() {
           <Route path="cost-centre-report"      element={<CostCentreReport />}      />
           <Route path="budget-vs-actual"        element={<BudgetVsActual />}        />
           <Route path="quality-inspection"      element={<QualityInspection />}     />
+          <Route path="procurement-tracker"     element={<ProcurementTracker />}    />
           <Route path="supplier-statement"      element={<SupplierStatement />}     />
           <Route path="blanket-orders"          element={<BlanketOrders />}         />
         </Route>
