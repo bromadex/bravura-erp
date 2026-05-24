@@ -112,7 +112,7 @@ ALTER TABLE purchase_orders
   ADD COLUMN IF NOT EXISTS blanket_order_id TEXT REFERENCES blanket_orders(id);
 
 -- Numbering series entry for blanket orders
-INSERT INTO numbering_series (series_key, prefix, padding, label)
+INSERT INTO numbering_series (series_key, prefix, padding, description)
 VALUES ('blanket_orders', 'BO-', 4, 'Blanket Orders')
 ON CONFLICT (series_key) DO NOTHING;
 
