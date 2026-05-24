@@ -107,6 +107,7 @@ const ProcurementDashboard = lazy(() => import('./pages/Procurement/ProcurementD
 const BudgetControl        = lazy(() => import('./pages/Procurement/BudgetControl'))
 const LandedCostVouchers   = lazy(() => import('./pages/Procurement/LandedCostVouchers'))
 const PaymentVouchers      = lazy(() => import('./pages/Procurement/PaymentVouchers'))
+const PurchaseReturns      = lazy(() => import('./pages/Procurement/PurchaseReturns'))
 const SupplierPriceLists   = lazy(() => import('./pages/Procurement/SupplierPriceLists'))
 const CostCentreReport     = lazy(() => import('./pages/Procurement/CostCentreReport'))
 const BudgetVsActual       = lazy(() => import('./pages/Procurement/BudgetVsActual'))
@@ -456,6 +457,7 @@ function AppRoutes() {
           <Route path="landed-costs"            element={<LandedCostVouchers />}    />
           <Route path="invoices"                element={<PurchaseInvoices />}      />
           <Route path="payment-vouchers"        element={<PaymentVouchers />}       />
+          <Route path="purchase-returns"        element={<PurchaseReturns />}       />
           <Route path="budget-control"          element={<BudgetControl />}         />
           <Route path="supplier-performance"    element={<SupplierPerformance />}   />
           <Route path="supplier-price-lists"    element={<SupplierPriceLists />}    />
