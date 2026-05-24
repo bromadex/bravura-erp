@@ -4,7 +4,7 @@
 // Section A: per-supplier composite score computed from POs, GRNs and performance_log
 // Section B: raw event log with manual log entry modal
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { PageHeader, ModalDialog, ModalActions, StatusBadge } from '../../components/ui'
 import toast from 'react-hot-toast'
@@ -53,9 +53,10 @@ const today = new Date().toISOString().split('T')[0]
 export default function SupplierPerformance() {
   const { suppliers, purchaseOrders, goodsReceived } = useProcurement()
 
-  const [perfLog,     setPerfLog]     = useState([])
-  const [logLoading,  setLogLoading]  = useState(true)
-  const [expandedRow, setExpandedRow] = useState(null)   // supplier_id
+  const [perfLog,        setPerfLog]        = useState([])
+  const [logLoading,     setLogLoading]     = useState(true)
+  const [expandedRow,    setExpandedRow]    = useState(null)   // supplier_id
+  const [supplierMetrics, setSupplierMetrics] = useState({})   // keyed by supplier_id
 
   // Log entry modal
   const [logModal,   setLogModal]    = useState(false)
@@ -96,6 +97,82 @@ export default function SupplierPerformance() {
     ).catch(() => ({ data: [] }))
     setPerfLog(data || [])
   }
+
+  // ── GRN-derived metrics ────────────────────────────────────────────────────
+  const loadGRNMetrics = useCallback(async (supplierIds) => {
+    if (!supplierIds || supplierIds.length === 0) return
+
+    try {
+      // 1. Fetch GRNs for these suppliers, joined with PO order_date for lead time
+      const { data: grns } = await supabase
+        .from('goods_received')
+        .select('id, supplier_id, actual_delivery_date, po_id, purchase_orders(order_date)')
+        .in('supplier_id', supplierIds)
+        .not('actual_delivery_date', 'is', null)
+      const grnList = grns || []
+
+      // 2. Fetch GRN lines for rejection rate
+      const grnIds = grnList.map(g => g.id)
+      let grnLines = []
+      if (grnIds.length > 0) {
+        const { data: linesData } = await supabase
+          .from('grn_lines')
+          .select('grn_id, qty_received, qty_rejected')
+          .in('grn_id', grnIds)
+        grnLines = linesData || []
+      }
+
+      // 3. Compute per-supplier metrics
+      const metrics = {}
+      for (const sid of supplierIds) {
+        const sGrns = grnList.filter(g => g.supplier_id === sid)
+        if (sGrns.length === 0) continue
+
+        // Avg lead time
+        const leadDays = sGrns
+          .filter(g => g.actual_delivery_date && g.purchase_orders?.order_date)
+          .map(g => {
+            const delivered = new Date(g.actual_delivery_date)
+            const ordered   = new Date(g.purchase_orders.order_date)
+            return Math.max(0, Math.floor((delivered - ordered) / (1000 * 60 * 60 * 24)))
+          })
+        const avgLeadDays = leadDays.length > 0
+          ? (leadDays.reduce((a, b) => a + b, 0) / leadDays.length).toFixed(1)
+          : null
+
+        // Last GRN date
+        const sortedDates = sGrns
+          .map(g => g.actual_delivery_date)
+          .filter(Boolean)
+          .sort()
+          .reverse()
+        const lastGrnDate = sortedDates[0] || null
+
+        // GRN rejection rate
+        const sGrnIds = sGrns.map(g => g.id)
+        const sLines  = grnLines.filter(l => sGrnIds.includes(l.grn_id))
+        const totalReceived = sLines.reduce((s, l) => s + Number(l.qty_received || 0), 0)
+        const totalRejected = sLines.reduce((s, l) => s + Number(l.qty_rejected || 0), 0)
+        const rejectionPct  = totalReceived > 0
+          ? ((totalRejected / totalReceived) * 100).toFixed(1)
+          : null
+
+        metrics[sid] = { avgLeadDays, rejectionPct, lastGrnDate }
+      }
+      setSupplierMetrics(metrics)
+    } catch (_err) {
+      // silently fail — GRN metrics are supplementary
+    }
+  }, [])
+
+  // ── Load GRN metrics once suppliers with POs are known ────────────────────
+  useEffect(() => {
+    const suppliersWithPOs = suppliers.filter(s =>
+      purchaseOrders.some(po => po.supplier_id === s.id || po.supplier_name === s.name)
+    )
+    const ids = suppliersWithPOs.map(s => s.id).filter(Boolean)
+    if (ids.length > 0) loadGRNMetrics(ids)
+  }, [suppliers, purchaseOrders, loadGRNMetrics])
 
   // ── Scorecard computation ──────────────────────────────────
   const scorecards = useMemo(() => {
@@ -335,7 +412,7 @@ export default function SupplierPerformance() {
                     <tr key={`${sc.supplier.id}-expand`}>
                       <td colSpan="9" style={{ padding: 0, background: 'var(--surface)' }}>
                         <div style={{ padding: 16 }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: supplierMetrics[sc.supplier.id] ? 16 : 0 }}>
                             {/* PO delivery detail */}
                             <div>
                               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -387,6 +464,56 @@ export default function SupplierPerformance() {
                               })}
                             </div>
                           </div>
+
+                          {/* GRN-Derived Metrics */}
+                          {supplierMetrics[sc.supplier.id] && (
+                            <div style={{
+                              marginTop: 0,
+                              padding: '10px 14px',
+                              background: 'var(--surface2)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 24,
+                              flexWrap: 'wrap',
+                              fontSize: 12,
+                            }}>
+                              <span style={{ fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontSize: 11 }}>
+                                GRN Derived
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>🚚</span>
+                                <span style={{ color: 'var(--text-dim)' }}>Avg Lead:</span>
+                                <strong style={{ color: 'var(--text)' }}>
+                                  {supplierMetrics[sc.supplier.id].avgLeadDays != null
+                                    ? `${supplierMetrics[sc.supplier.id].avgLeadDays} days`
+                                    : '—'}
+                                </strong>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>📦</span>
+                                <span style={{ color: 'var(--text-dim)' }}>GRN Rejection:</span>
+                                <strong style={{
+                                  color: supplierMetrics[sc.supplier.id].rejectionPct == null ? 'var(--text)'
+                                    : Number(supplierMetrics[sc.supplier.id].rejectionPct) > 5 ? 'var(--red)'
+                                    : Number(supplierMetrics[sc.supplier.id].rejectionPct) > 2 ? 'var(--yellow)'
+                                    : 'var(--green)',
+                                }}>
+                                  {supplierMetrics[sc.supplier.id].rejectionPct != null
+                                    ? `${supplierMetrics[sc.supplier.id].rejectionPct}%`
+                                    : '—'}
+                                </strong>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span>📅</span>
+                                <span style={{ color: 'var(--text-dim)' }}>Last GRN:</span>
+                                <strong style={{ color: 'var(--text)' }}>
+                                  {supplierMetrics[sc.supplier.id].lastGrnDate || '—'}
+                                </strong>
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>

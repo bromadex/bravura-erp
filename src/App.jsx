@@ -120,6 +120,9 @@ const QualityInspection    = lazy(() => import('./pages/Procurement/QualityInspe
 const SupplierStatement    = lazy(() => import('./pages/Procurement/SupplierStatement'))
 const BlanketOrders        = lazy(() => import('./pages/Procurement/BlanketOrders'))
 const APAging              = lazy(() => import('./pages/Procurement/APAging'))
+const GRIRReconciliation   = lazy(() => import('./pages/Procurement/GRIRReconciliation'))
+const SpendAnalytics       = lazy(() => import('./pages/Procurement/SpendAnalytics'))
+const PurchaseContracts    = lazy(() => import('./pages/Procurement/PurchaseContracts'))
 
 // Phase 11 — Settings
 const TaxEngine            = lazy(() => import('./pages/Settings/TaxEngine'))
@@ -503,6 +506,9 @@ function AppRoutes() {
           <Route path="supplier-statement"      element={<SupplierStatement />}     />
           <Route path="blanket-orders"          element={<BlanketOrders />}         />
           <Route path="ap-aging"                element={<APAging />}               />
+          <Route path="grir"                    element={<GRIRReconciliation />}    />
+          <Route path="spend-analytics"         element={<SpendAnalytics />}        />
+          <Route path="purchase-contracts"      element={<PurchaseContracts />}     />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
