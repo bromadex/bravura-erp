@@ -483,6 +483,8 @@ const ALL_MODULES = {
       label: 'Workflow', pages: [
         { id: 'workflows',            label: 'Workflow Builder',     icon: 'account_tree' },
         { id: 'workflow-assignments', label: 'Workflow Assignments', icon: 'route'        },
+        { id: 'workflow-rules',       label: 'Workflow Rules',       icon: 'rule'         },
+        { id: 'approval-thresholds',  label: 'Approval Thresholds',  icon: 'policy'       },
       ],
     }, {
       label: 'Communications', pages: [
@@ -493,6 +495,7 @@ const ALL_MODULES = {
       label: 'Governance', pages: [
         { id: 'governance-policies', label: 'Governance Policies', icon: 'policy'           },
         { id: 'inventory-audit-log', label: 'Ops Audit Log',       icon: 'manage_search'    },
+        { id: 'numbering-series',    label: 'Numbering Series',    icon: 'format_list_numbered' },
       ],
     }],
   },
