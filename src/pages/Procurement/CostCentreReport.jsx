@@ -369,30 +369,79 @@ export default function CostCentreReport() {
   // Load data once on mount
   useEffect(() => {
     setLoading(true)
-    Promise.all([
-      supabase
-        .from('transactions')
-        .select('id, date, department, cost_center, project, qty, cost, item_name, category, notes')
-        .eq('type', 'OUT')
-        .order('date', { ascending: false })
-        .limit(2000),
-      supabase
-        .from('purchase_order_lines')
-        .select('qty, unit_price, purchase_orders(order_date, department, cost_center, project)')
-        .limit(2000),
-      supabase
-        .from('purchase_invoice_lines')
-        .select('qty, unit_price, purchase_invoices(invoice_date, status, supplier_name, department, cost_center, project)')
-        .limit(2000),
-    ]).then(([{ data: tData }, { data: pData }, { data: iData }]) => {
-      setTransactions(tData  || [])
-      setPoLines(pData       || [])
-      setInvoiceLines(iData  || [])
-      setLoading(false)
-    }).catch(err => {
-      toast.error('Failed to load data: ' + err.message)
-      setLoading(false)
-    })
+
+    async function loadAll() {
+      try {
+        // ── Stock issues from stock_ledger_entries ──────────────────────────
+        const { data: sles, error: sleErr } = await supabase
+          .from('stock_ledger_entries')
+          .select('*, items(name, category)')
+          .lt('actual_qty', 0)
+          .order('posting_datetime', { ascending: false })
+          .limit(3000)
+
+        if (sleErr) throw sleErr
+
+        // Collect StoreRequisition voucher_nos for SR dimension lookup
+        const srNos = [...new Set(
+          (sles || [])
+            .filter(s => s.voucher_type === 'StoreRequisition')
+            .map(s => s.voucher_no)
+            .filter(Boolean)
+        )]
+
+        let srMap = {}
+        if (srNos.length) {
+          const { data: srs } = await supabase
+            .from('store_requisitions')
+            .select('sr_number, req_number, department, cost_center, project')
+            .in('sr_number', srNos)
+          if (srs) srs.forEach(sr => { if (sr.sr_number) srMap[sr.sr_number] = sr })
+
+          const { data: srs2 } = await supabase
+            .from('store_requisitions')
+            .select('sr_number, req_number, department, cost_center, project')
+            .in('req_number', srNos)
+          if (srs2) srs2.forEach(sr => { if (sr.req_number) srMap[sr.req_number] = sr })
+        }
+
+        const mappedTx = (sles || []).map(s => {
+          const sr = srMap[s.voucher_no] || {}
+          return {
+            date:        (s.posting_datetime || '').slice(0, 10),
+            qty:         Math.abs(s.actual_qty),
+            cost:        s.outgoing_rate || 0,
+            department:  sr.department  || '',
+            cost_center: sr.cost_center || '',
+            project:     sr.project     || '',
+            item_name:   s.items?.name  || '',
+            category:    s.items?.category || '',
+          }
+        })
+
+        // ── PO lines and Invoice lines (unchanged) ──────────────────────────
+        const [{ data: pData }, { data: iData }] = await Promise.all([
+          supabase
+            .from('purchase_order_lines')
+            .select('qty, unit_price, purchase_orders(order_date, department, cost_center, project)')
+            .limit(2000),
+          supabase
+            .from('purchase_invoice_lines')
+            .select('qty, unit_price, purchase_invoices(invoice_date, status, supplier_name, department, cost_center, project)')
+            .limit(2000),
+        ])
+
+        setTransactions(mappedTx)
+        setPoLines(pData      || [])
+        setInvoiceLines(iData || [])
+      } catch (err) {
+        toast.error('Failed to load data: ' + err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAll()
   }, [])
 
   const handlePreset = useCallback((id) => {

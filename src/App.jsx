@@ -94,6 +94,8 @@ const StockAgeingReport     = lazy(() => import('./pages/Inventory/StockAgeingRe
 const ForecastReorder       = lazy(() => import('./pages/Inventory/ForecastReorder'))
 const InventoryDashboard    = lazy(() => import('./pages/Inventory/InventoryDashboard'))
 const DepartmentConsumption = lazy(() => import('./pages/Inventory/DepartmentConsumption'))
+const StockLedger           = lazy(() => import('./pages/Inventory/StockLedger'))
+const OpeningStock          = lazy(() => import('./pages/Inventory/OpeningStock'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -459,6 +461,8 @@ function AppRoutes() {
           <Route path="batch-expiry"            element={<BatchExpiryReport />} />
           <Route path="item-variants"           element={<ItemVariants />} />
           <Route path="uom-conversion"          element={<UOMConversion />} />
+          <Route path="stock-ledger"            element={<StockLedger />} />
+          <Route path="opening-stock"           element={<OpeningStock />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
