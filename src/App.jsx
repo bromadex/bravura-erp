@@ -116,6 +116,14 @@ const CostCentreReport     = lazy(() => import('./pages/Procurement/CostCentreRe
 const BudgetVsActual       = lazy(() => import('./pages/Procurement/BudgetVsActual'))
 const QualityInspection    = lazy(() => import('./pages/Procurement/QualityInspection'))
 const SupplierStatement    = lazy(() => import('./pages/Procurement/SupplierStatement'))
+const BlanketOrders        = lazy(() => import('./pages/Procurement/BlanketOrders'))
+
+// Phase 11 — Settings
+const TaxEngine            = lazy(() => import('./pages/Settings/TaxEngine'))
+const CurrencyExchange     = lazy(() => import('./pages/Settings/CurrencyExchange'))
+
+// Phase 11 — Inventory
+const PutawayRules         = lazy(() => import('./pages/Inventory/PutawayRules'))
 
 // Fuel
 const FuelTanks          = lazy(() => import('./pages/Fuel/FuelTanks'))
@@ -435,6 +443,7 @@ function AppRoutes() {
           <Route path="stock-ageing"            element={<StockAgeingReport />} />
           <Route path="forecast-reorder"        element={<ForecastReorder />} />
           <Route path="dept-consumption"        element={<DepartmentConsumption />} />
+          <Route path="putaway-rules"           element={<PutawayRules />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
@@ -470,6 +479,7 @@ function AppRoutes() {
           <Route path="budget-vs-actual"        element={<BudgetVsActual />}        />
           <Route path="quality-inspection"      element={<QualityInspection />}     />
           <Route path="supplier-statement"      element={<SupplierStatement />}     />
+          <Route path="blanket-orders"          element={<BlanketOrders />}         />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
@@ -836,6 +846,8 @@ function AppRoutes() {
           <Route path="numbering-series"     element={<NumberingSeries />}       />
           <Route path="approval-thresholds"  element={<ApprovalThresholds />}    />
           <Route path="workflow-rules"        element={<WorkflowRules />}         />
+          <Route path="tax-engine"            element={<TaxEngine />}             />
+          <Route path="currency-exchange"     element={<CurrencyExchange />}      />
         </Route>
 
         {/* ── REPORTS ──────────────────────────────────────── */}
