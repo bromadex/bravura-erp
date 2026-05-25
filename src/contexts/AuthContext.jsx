@@ -81,10 +81,13 @@ export function AuthProvider({ children }) {
       merged.forEach(p => { cache[`${p.module_name}|${p.page_name || ''}`] = { can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete, can_approve: p.can_approve } })
 
       // Load action permissions (3-tier: designation → role → user)
+      // Note: Supabase query builder is thenable but not a full Promise — wrap
+      // each query in Promise.resolve() before calling .catch() on it.
+      const safeQ = (q) => Promise.resolve(q).catch(() => ({ data: [] }))
       const [roleActRes, userActRes, desigActRes] = await Promise.all([
-        supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'role').eq('scope_id', userData.role_id).catch(() => ({ data: [] })),
-        supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'user').eq('scope_id', userId).catch(() => ({ data: [] })),
-        designationId ? supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'designation').eq('scope_id', designationId).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        safeQ(supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'role').eq('scope_id', userData.role_id)),
+        safeQ(supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'user').eq('scope_id', userId)),
+        designationId ? safeQ(supabase.from('action_permissions').select('action_key,granted').eq('scope_type', 'designation').eq('scope_id', designationId)) : Promise.resolve({ data: [] }),
       ])
 
       const actionMap = {}
