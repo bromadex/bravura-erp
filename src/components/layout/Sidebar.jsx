@@ -476,14 +476,23 @@ const ALL_MODULES = {
   },
   projects: {
     label: 'Projects', icon: 'folder_open', color: '#f59e0b',
-    sections: [{
-      label: 'Petty Cash', pages: [
-        { id: 'petty-cash-dashboard',      label: 'PC Dashboard',      icon: 'dashboard'         },
-        { id: 'petty-cash-funds',          label: 'Funds & Top-ups',   icon: 'account_balance_wallet' },
-        { id: 'petty-cash-expenses',       label: 'Expenses',          icon: 'receipt_long'      },
-        { id: 'petty-cash-reconciliation', label: 'Reconciliation',    icon: 'balance'           },
-      ],
-    }],
+    sections: [
+      {
+        label: 'Job Costing', pages: [
+          { id: 'jobs',                label: 'Jobs Register',       icon: 'work'              },
+          { id: 'job-cost-sheet',      label: 'Job Cost Sheet',      icon: 'receipt_long'      },
+          { id: 'job-costing-report',  label: 'Job Costing Report',  icon: 'assessment'        },
+        ],
+      },
+      {
+        label: 'Petty Cash', pages: [
+          { id: 'petty-cash-dashboard',      label: 'PC Dashboard',      icon: 'dashboard'         },
+          { id: 'petty-cash-funds',          label: 'Funds & Top-ups',   icon: 'account_balance_wallet' },
+          { id: 'petty-cash-expenses',       label: 'Expenses',          icon: 'receipt_long'      },
+          { id: 'petty-cash-reconciliation', label: 'Reconciliation',    icon: 'balance'           },
+        ],
+      },
+    ],
   },
   reports: {
     label: 'Reports', icon: 'bar_chart', color: '#38bdf8',
