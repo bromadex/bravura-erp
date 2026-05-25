@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { usePermission } from '../../contexts/PermissionContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 
 // Maps HR page IDs to their consolidated section label
 const HR_PAGE_SECTION = {
@@ -549,6 +551,45 @@ export default function Sidebar({ module }) {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { canView } = usePermission()
+  const { user } = useAuth()
+  const [connectUnread, setConnectUnread] = useState(0)
+
+  // Listen for unread count updates from ConnectPage
+  useEffect(() => {
+    const handler = (e) => setConnectUnread(e.detail || 0)
+    window.addEventListener('connect-unread-update', handler)
+    // Also check window.__connectUnread on mount
+    if (window.__connectUnread) setConnectUnread(window.__connectUnread)
+    return () => window.removeEventListener('connect-unread-update', handler)
+  }, [])
+
+  // Fallback: poll DB for unread when not on Connect page
+  useEffect(() => {
+    if (!user || module === 'connect') return
+    const fetchUnread = async () => {
+      const { data: parts } = await supabase
+        .from('chat_participants')
+        .select('conversation_id, last_read_at')
+        .eq('user_id', user.id)
+      if (!parts?.length) return
+      let total = 0
+      await Promise.all(parts.map(async p => {
+        const q = supabase
+          .from('chat_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', p.conversation_id)
+          .eq('is_deleted', false)
+          .neq('sender_id', user.id)
+        if (p.last_read_at) q.gt('created_at', p.last_read_at)
+        const { count } = await q
+        total += (count || 0)
+      }))
+      setConnectUnread(total)
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 60000)
+    return () => clearInterval(interval)
+  }, [user, module])
 
   const config = (() => {
     const full = ALL_MODULES[module]
@@ -638,6 +679,15 @@ export default function Sidebar({ module }) {
                         onMouseOut={e =>  { if (!isActive) { e.currentTarget.style.background = 'transparent';     e.currentTarget.style.color = 'var(--text-mid)' } }}>
                         <span className="material-icons" style={{ fontSize: 15 }}>{page.icon}</span>
                         {page.label}
+                        {page.id === 'chats' && connectUnread > 0 && (
+                          <span style={{
+                            background: 'var(--red)', color: '#fff', fontSize: 10, fontWeight: 800,
+                            borderRadius: 10, padding: '1px 6px', minWidth: 18, textAlign: 'center',
+                            marginLeft: 'auto',
+                          }}>
+                            {connectUnread > 99 ? '99+' : connectUnread}
+                          </span>
+                        )}
                       </button>
                     )
                   })}
