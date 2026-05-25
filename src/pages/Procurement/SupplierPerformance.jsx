@@ -165,14 +165,76 @@ export default function SupplierPerformance() {
     }
   }, [])
 
+  // ── Price variance metrics (PI vs PO lines) ───────────────────────────────
+  const loadPriceVarianceMetrics = useCallback(async (supplierIds) => {
+    if (!supplierIds?.length) return
+
+    // Get purchase invoice lines with unit_price + po_id, joined with PO lines for contracted rate
+    const { data: piLines } = await supabase
+      .from('purchase_invoice_lines')
+      .select('id, invoice_id, item_id, item_name, qty, unit_price, po_line_id, purchase_invoices!inner(supplier_id, invoice_date, status)')
+      .in('purchase_invoices.supplier_id', supplierIds)
+      .not('purchase_invoices.status', 'eq', 'Cancelled')
+      .not('po_line_id', 'is', null)
+      .limit(500)
+
+    if (!piLines?.length) return
+
+    // Get PO lines for price comparison
+    const poLineIds = piLines.map(l => l.po_line_id).filter(Boolean)
+    const { data: poLines } = await supabase
+      .from('purchase_order_lines')
+      .select('id, unit_price, rate, purchase_orders!inner(supplier_id)')
+      .in('id', poLineIds)
+
+    const poLineMap = Object.fromEntries((poLines||[]).map(l => [l.id, l]))
+
+    // Compute variance per supplier
+    const variances = {}
+    for (const piLine of piLines) {
+      const supplierId = piLine.purchase_invoices?.supplier_id
+      if (!supplierId || !supplierIds.includes(supplierId)) continue
+      const poLine = poLineMap[piLine.po_line_id]
+      if (!poLine) continue
+      const poRate = poLine.unit_price || poLine.rate || 0
+      const piRate = piLine.unit_price || 0
+      if (poRate === 0) continue
+      const variancePct = ((piRate - poRate) / poRate) * 100
+      if (!variances[supplierId]) variances[supplierId] = { total: 0, count: 0, overcharges: 0 }
+      variances[supplierId].total += variancePct
+      variances[supplierId].count += 1
+      if (variancePct > 0) variances[supplierId].overcharges += 1
+    }
+
+    const priceVarianceMetrics = {}
+    for (const [sid, v] of Object.entries(variances)) {
+      priceVarianceMetrics[sid] = {
+        avgVariancePct: v.count > 0 ? (v.total / v.count).toFixed(1) : 0,
+        overchargeCount: v.overcharges,
+        totalComparisons: v.count,
+      }
+    }
+
+    setSupplierMetrics(prev => {
+      const updated = { ...prev }
+      for (const [sid, m] of Object.entries(priceVarianceMetrics)) {
+        updated[sid] = { ...(updated[sid] || {}), ...m }
+      }
+      return updated
+    })
+  }, [])
+
   // ── Load GRN metrics once suppliers with POs are known ────────────────────
   useEffect(() => {
     const suppliersWithPOs = suppliers.filter(s =>
       purchaseOrders.some(po => po.supplier_id === s.id || po.supplier_name === s.name)
     )
     const ids = suppliersWithPOs.map(s => s.id).filter(Boolean)
-    if (ids.length > 0) loadGRNMetrics(ids)
-  }, [suppliers, purchaseOrders, loadGRNMetrics])
+    if (ids.length > 0) {
+      loadGRNMetrics(ids)
+      loadPriceVarianceMetrics(ids)
+    }
+  }, [suppliers, purchaseOrders, loadGRNMetrics, loadPriceVarianceMetrics])
 
   // ── Scorecard computation ──────────────────────────────────
   const scorecards = useMemo(() => {
@@ -511,6 +573,24 @@ export default function SupplierPerformance() {
                                 <strong style={{ color: 'var(--text)' }}>
                                   {supplierMetrics[sc.supplier.id].lastGrnDate || '—'}
                                 </strong>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Price Variance (PI vs PO) */}
+                          {supplierMetrics[sc.supplier.id]?.totalComparisons > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', fontSize: 12, borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                              <span style={{ color: 'var(--text-dim)' }}>Price Variance (PI vs PO)</span>
+                              <span style={{
+                                fontFamily: 'var(--mono)', fontWeight: 700,
+                                color: parseFloat(supplierMetrics[sc.supplier.id].avgVariancePct) > 5 ? 'var(--red)'
+                                     : parseFloat(supplierMetrics[sc.supplier.id].avgVariancePct) > 0 ? 'var(--yellow)'
+                                     : 'var(--green)'
+                              }}>
+                                {supplierMetrics[sc.supplier.id].avgVariancePct > 0 ? '+' : ''}{supplierMetrics[sc.supplier.id].avgVariancePct}%
+                                <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 4 }}>
+                                  ({supplierMetrics[sc.supplier.id].overchargeCount}/{supplierMetrics[sc.supplier.id].totalComparisons} lines over PO)
+                                </span>
                               </span>
                             </div>
                           )}
