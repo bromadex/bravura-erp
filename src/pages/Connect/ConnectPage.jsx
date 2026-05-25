@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import MessageBubble from '../../components/connect/MessageBubble'
 import SlashMentionPicker from '../../components/connect/SlashMentionPicker'
 import TxnCodeMessage from '../../components/connect/TxnCodeLink'
+import { PREFIX_REGISTRY, getSearchTables } from '../../engine/transactionEngine'
 
 // ── Keyframe CSS injection ────────────────────────────────────
 const KEYFRAME_CSS = `
@@ -662,28 +663,34 @@ export default function ConnectPage() {
     setMentionQuery(null)
   }, [])
 
-  // ── Transaction search ────────────────────────────────────
+  // ── Transaction search — powered by PREFIX_REGISTRY ─────────
+  // Searches every module in the system; deduplicates by table+numCol so
+  // prefixes that share a table (FL/GN/EM all use asset_registry) are queried once.
   const searchTransactions = useCallback(async (q) => {
     const term = q.replace('/', '').toUpperCase()
     if (!term) { setSlashResults([]); return }
     try {
-      const [poRes, srRes, mrRes, grnRes, invRes, pvRes] = await Promise.all([
-        supabase.from('purchase_orders').select('po_number,status,total_amount,supplier_name').ilike('po_number', `%${term}%`).limit(4),
-        supabase.from('store_requisitions').select('req_number,status,department').ilike('req_number', `%${term}%`).limit(4),
-        supabase.from('material_requests').select('mr_number,status,department').ilike('mr_number', `%${term}%`).limit(3),
-        supabase.from('goods_received').select('grn_number,status,supplier_name').ilike('grn_number', `%${term}%`).limit(3),
-        supabase.from('purchase_invoices').select('invoice_number,status,total_amount').ilike('invoice_number', `%${term}%`).limit(3),
-        supabase.from('payment_vouchers').select('voucher_number,status,amount').ilike('voucher_number', `%${term}%`).limit(3),
-      ])
-      const results = [
-        ...(poRes.data || []).map(r => ({ code: r.po_number, label: 'Purchase Order', status: r.status, amount: r.total_amount, icon: 'shopping_bag' })),
-        ...(srRes.data || []).map(r => ({ code: r.req_number, label: 'Store Requisition', status: r.status, amount: null, icon: 'assignment_returned' })),
-        ...(mrRes.data || []).map(r => ({ code: r.mr_number, label: 'Material Request', status: r.status, amount: null, icon: 'assignment' })),
-        ...(grnRes.data || []).map(r => ({ code: r.grn_number, label: 'GRN', status: r.status, amount: null, icon: 'move_to_inbox' })),
-        ...(invRes.data || []).map(r => ({ code: r.invoice_number, label: 'Purchase Invoice', status: r.status, amount: r.total_amount, icon: 'receipt_long' })),
-        ...(pvRes.data || []).map(r => ({ code: r.voucher_number, label: 'Payment Voucher', status: r.status, amount: r.amount, icon: 'payments' })),
-      ]
-      setSlashResults(results.filter(r => r.code).slice(0, 10))
+      // If term looks like a specific prefix (e.g. "PO", "SR", "LV"), limit to that table only
+      const exactEntry = PREFIX_REGISTRY[term]
+      const tables = exactEntry
+        ? [{ table: exactEntry.table, numCol: exactEntry.numCol, label: exactEntry.label, prefix: term, icon: exactEntry.icon, amtCol: exactEntry.amtCol }]
+        : getSearchTables()   // all 35+ modules, deduped by table
+
+      const perTable = Math.max(2, Math.floor(10 / tables.length))
+      const all = await Promise.all(
+        tables.map(async ({ table, numCol, label, prefix, icon, amtCol }) => {
+          const sel = [numCol, 'status', 'title', amtCol].filter(Boolean).join(',')
+          const { data } = await supabase.from(table).select(sel).ilike(numCol, `%${term}%`).limit(perTable)
+          return (data || []).map(row => ({
+            code:   row[numCol],
+            label,
+            status: row.status,
+            amount: amtCol ? row[amtCol] : null,
+            icon:   icon || 'receipt_long',
+          }))
+        })
+      )
+      setSlashResults(all.flat().filter(r => r.code).slice(0, 12))
     } catch {
       setSlashResults([])
     }
