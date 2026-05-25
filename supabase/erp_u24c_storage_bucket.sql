@@ -33,17 +33,22 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- ─── 2. Storage RLS policies ──────────────────────────────────────────────────
+-- DROP first so this script is safe to re-run
+DROP POLICY IF EXISTS "Authenticated users can upload chat attachments" ON storage.objects;
+DROP POLICY IF EXISTS "Public read chat attachments"                     ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own chat attachments"            ON storage.objects;
+
 -- Allow authenticated users to upload files
-CREATE POLICY IF NOT EXISTS "Authenticated users can upload chat attachments"
+CREATE POLICY "Authenticated users can upload chat attachments"
   ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'chat-attachments');
 
 -- Allow anyone to view/download files (bucket is public)
-CREATE POLICY IF NOT EXISTS "Public read chat attachments"
+CREATE POLICY "Public read chat attachments"
   ON storage.objects FOR SELECT TO public
   USING (bucket_id = 'chat-attachments');
 
 -- Allow users to delete only their own uploads
-CREATE POLICY IF NOT EXISTS "Users can delete own chat attachments"
+CREATE POLICY "Users can delete own chat attachments"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'chat-attachments' AND owner = auth.uid()::text);
