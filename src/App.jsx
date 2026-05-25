@@ -256,6 +256,13 @@ const ITF16Certificates      = lazy(() => import('./pages/HR/ITF16Certificates')
 const NSSARemittance         = lazy(() => import('./pages/HR/NSSARemittance'))
 // Phase 17 — WHT Return (procurement)
 const WHTReturn              = lazy(() => import('./pages/Procurement/WHTReturn'))
+// Phase 18 — ZIMRA Indirect Tax
+const VATReturn              = lazy(() => import('./pages/Procurement/VATReturn'))
+const WHTCertificates        = lazy(() => import('./pages/Procurement/WHTCertificates'))
+const IMTTTracker            = lazy(() => import('./pages/Procurement/IMTTTracker'))
+// Phase 19 — Finance Integration
+const CashFlow               = lazy(() => import('./pages/Accounting/CashFlow'))
+const BankReconciliation     = lazy(() => import('./pages/Accounting/BankReconciliation'))
 const EmployeeIncentives     = lazy(() => import('./pages/HR/EmployeeIncentives'))
 const RetentionBonuses       = lazy(() => import('./pages/HR/RetentionBonuses'))
 const SalaryComponentAccounts = lazy(() => import('./pages/HR/SalaryComponentAccounts'))
@@ -517,6 +524,9 @@ function AppRoutes() {
           <Route path="spend-analytics"         element={<SpendAnalytics />}        />
           <Route path="purchase-contracts"      element={<PurchaseContracts />}     />
           <Route path="wht-return"              element={<WHTReturn />}             />
+          <Route path="vat-return"              element={<VATReturn />}             />
+          <Route path="wht-certificates"        element={<WHTCertificates />}       />
+          <Route path="imtt-tracker"            element={<IMTTTracker />}           />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
@@ -863,9 +873,11 @@ function AppRoutes() {
           </ProtectedRoute>
         }>
           <Route index                    element={<ChartOfAccounts />}  />
-          <Route path="chart-of-accounts" element={<ChartOfAccounts />}  />
-          <Route path="journal-entries"   element={<JournalEntries />}   />
-          <Route path="reports"           element={<FinancialReports />} />
+          <Route path="chart-of-accounts"   element={<ChartOfAccounts />}    />
+          <Route path="journal-entries"     element={<JournalEntries />}     />
+          <Route path="reports"             element={<FinancialReports />}   />
+          <Route path="cash-flow"           element={<CashFlow />}           />
+          <Route path="bank-reconciliation" element={<BankReconciliation />} />
         </Route>
 
         {/* ── SETTINGS ──────────────────────────────────────── */}
