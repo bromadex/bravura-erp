@@ -72,17 +72,18 @@ export default function StoreRequisitions() {
   const [departments,    setDepartments]    = useState([])
   const [employees,      setEmployees]      = useState([])
   const [storageLocations, setStorageLocations] = useState([])
+  const [jobs,           setJobs]           = useState([])
 
   useEffect(() => {
-    // Fetch inventory items (for item picker)
     supabase.from('items').select('id, name, category, unit, balance, item_code').order('name')
       .then(({ data }) => { if (data) setInventoryItems(data) })
-    // Fetch departments (for dept picker)
     supabase.from('departments').select('id, name').order('name')
       .then(({ data }) => { if (data) setDepartments(data) })
-    // Fetch employees (super admin can select on behalf of others)
     supabase.from('employees').select('id, name, department_id').neq('status', 'Terminated').order('name')
       .then(({ data }) => { if (data) setEmployees(data) })
+    supabase.from('jobs').select('id, job_number, title, status')
+      .in('status', ['Open', 'In Progress']).order('job_number')
+      .then(({ data }) => { if (data) setJobs(data) })
   }, [])
 
   const [modalOpen,    setModalOpen]    = useState(false)
@@ -101,7 +102,9 @@ export default function StoreRequisitions() {
     requester_name: user?.full_name || user?.username || '',
     requester_id:   user?.id || '',
     items: [{ item_id: '', name: '', category: '', qty: 1, unit: 'pcs', notes: '', is_returnable: false }],
-    notes: '',
+    notes:          '',
+    job_id:         '',
+    job_number:     '',
   })
   const [form, setForm] = useState(emptyForm())
 
@@ -116,6 +119,8 @@ export default function StoreRequisitions() {
       requester_id:   r.requester_id,
       items:          typeof r.items === 'string' ? JSON.parse(r.items) : r.items,
       notes:          r.notes || '',
+      job_id:         r.job_id || '',
+      job_number:     r.job_number || '',
     })
     setModalOpen(true)
   }
@@ -307,13 +312,13 @@ export default function StoreRequisitions() {
         <table className="stock-table">
           <thead>
             <tr>
-              <th>SR #</th><th>Date</th><th>Department</th><th>Priority</th>
+              <th>SR #</th><th>Date</th><th>Department</th><th>Job</th><th>Priority</th>
               <th>Requested By</th><th>Items</th><th>Status</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td colSpan="8" style={{ textAlign: 'center', padding: 40 }}>Loading…</td></tr>
-            : filtered.length === 0 ? <tr><td colSpan="8" className="empty-state">No requisitions found</td></tr>
+            {loading ? <tr><td colSpan="9" style={{ textAlign: 'center', padding: 40 }}>Loading…</td></tr>
+            : filtered.length === 0 ? <tr><td colSpan="9" className="empty-state">No requisitions found</td></tr>
             : filtered.map(r => {
               const items = parseItems(r.items)
               const srNum = r.sr_number || r.req_number
@@ -324,6 +329,7 @@ export default function StoreRequisitions() {
                   <td className="td-mono" style={{ color: 'var(--gold)' }}>{srNum || '—'}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
                   <td style={{ fontWeight: 600 }}>{r.department}</td>
+                  <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: r.job_number ? 'var(--teal)' : 'var(--text-dim)' }}>{r.job_number || '—'}</td>
                   <td><span style={{ fontSize: 11, fontWeight: 700, color: PRIORITY_COLORS[r.priority] || 'var(--text-dim)', textTransform: 'uppercase' }}>{r.priority}</span></td>
                   <td>{r.requester_name || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{items.length}</td>
@@ -380,6 +386,7 @@ export default function StoreRequisitions() {
               <div><span style={{ color: 'var(--text-dim)' }}>Priority:</span> <span style={{ fontWeight: 700, color: PRIORITY_COLORS[viewReq.priority] }}>{viewReq.priority?.toUpperCase()}</span></div>
               <div><span style={{ color: 'var(--text-dim)' }}>Requested By:</span> {viewReq.requester_name}</div>
               <div><span style={{ color: 'var(--text-dim)' }}>Department:</span> {viewReq.department}</div>
+              {viewReq.job_number && <div><span style={{ color: 'var(--text-dim)' }}>Job:</span> <span style={{ fontFamily: 'var(--mono)', color: 'var(--teal)' }}>{viewReq.job_number}</span></div>}
               {viewReq.approver_name && <div><span style={{ color: 'var(--text-dim)' }}>Approved By:</span> {viewReq.approver_name}</div>}
               {viewReq.approved_at && <div><span style={{ color: 'var(--text-dim)' }}>Approved At:</span> {new Date(viewReq.approved_at).toLocaleString()}</div>}
               <div style={{ marginTop: 16 }}>
@@ -471,6 +478,18 @@ export default function StoreRequisitions() {
             <label>Priority</label>
             <select className="form-control" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
               {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Job (optional)</label>
+            <select className="form-control" value={form.job_id}
+              onChange={e => {
+                const job = jobs.find(j => j.id === e.target.value)
+                setForm(f => ({ ...f, job_id: e.target.value, job_number: job?.job_number || '' }))
+              }}>
+              <option value="">— No Job —</option>
+              {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number} — {j.title}</option>)}
             </select>
           </div>
         </div>
