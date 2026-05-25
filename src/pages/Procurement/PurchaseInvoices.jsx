@@ -2,7 +2,7 @@
 // Accounts payable — record supplier invoices, track payment status,
 // 3-way match verification, aging analysis.
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useProcurement } from '../../contexts/ProcurementContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -55,11 +55,54 @@ function MatchBadge({ status }) {
   )
 }
 
+function OverrideModal({ modal, reason, ack, onReasonChange, onAckChange, onConfirm, onClose }) {
+  if (!modal.open) return null
+  return (
+    <ModalDialog open onClose={onClose} title="⚠ Match Exceptions Require Override" size="md">
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--surface2)', border: '1px solid var(--red)', borderRadius: 8 }}>
+        <div style={{ fontWeight: 700, color: 'var(--red)', marginBottom: 8 }}>
+          {modal.exceptions.length} exception(s) found:
+        </div>
+        {modal.exceptions.map(e => (
+          <div key={e.id} style={{ fontSize: 12, marginBottom: 4, color: 'var(--text-mid)' }}>
+            <span style={{ fontFamily: 'var(--mono)', marginRight: 8 }}>{e.item_name || 'Item'}</span>
+            <span style={{ fontWeight: 700, color: 'var(--red)' }}>{e.match_status}</span>
+            {e.match_notes && <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>— {e.match_notes}</span>}
+          </div>
+        ))}
+      </div>
+
+      <div className="form-group">
+        <label>Override Reason *</label>
+        <textarea className="form-control" rows={3} placeholder="Explain why this invoice should be posted despite exceptions…"
+          value={reason} onChange={e => onReasonChange(e.target.value)} />
+      </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
+        <input type="checkbox" checked={ack} onChange={e => onAckChange(e.target.checked)} />
+        <span style={{ fontSize: 13 }}>
+          I acknowledge these exceptions and take responsibility for posting this invoice.
+        </span>
+      </label>
+
+      <ModalActions>
+        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <button className="btn btn-danger" disabled={!reason.trim() || !ack}
+          onClick={onConfirm}>
+          Post With Override
+        </button>
+      </ModalActions>
+    </ModalDialog>
+  )
+}
+
 export default function PurchaseInvoices() {
   const {
     purchaseInvoices, purchaseOrders, goodsReceived, suppliers,
+    invoiceLines,
     createPurchaseInvoice, updatePurchaseInvoice, recordPayment,
     getInvoiceLines, getMatchStatus,
+    fetchAll,
     loading,
   } = useProcurement()
   const { user } = useAuth()
@@ -79,6 +122,11 @@ export default function PurchaseInvoices() {
   const [viewInv,    setViewInv]    = useState(null)
   const [payInv,     setPayInv]     = useState(null)
   const [editInv,    setEditInv]    = useState(null)
+
+  // Override modal (3-way match enforcement)
+  const [overrideModal, setOverrideModal] = useState({ open: false, invoiceId: null, exceptions: [] })
+  const [overrideReason, setOverrideReason] = useState('')
+  const [overrideAck, setOverrideAck] = useState(false)
 
   // ── Create Invoice form ───────────────────────────────────
   const emptyForm = () => ({
@@ -315,11 +363,9 @@ export default function PurchaseInvoices() {
       toast.success('Invoice created')
       setCreateOpen(false)
 
-      // Prompt to post
-      if (window.confirm('Post invoice now? (Changes status from Draft to Posted)')) {
-        await updatePurchaseInvoice(id, { status: 'Posted' })
-        toast.success('Invoice posted')
-      }
+      // Prompt to post — goes through 3-way match gate
+      const shouldPost = window.confirm('Post invoice now? (Changes status from Draft to Posted)')
+      if (shouldPost) await attemptPost(id)
     } catch (err) {
       toast.error(err.message || 'Failed to create invoice')
     } finally { setSaving(false) }
@@ -384,6 +430,39 @@ export default function PurchaseInvoices() {
     } catch (err) { toast.error(err.message) }
   }
 
+  // ── Posting gate (hard 3-way match enforcement) ───────────
+  const attemptPost = useCallback(async (invoiceId) => {
+    const invLines = invoiceLines.filter(l => l.invoice_id === invoiceId)
+    const exceptions = invLines.filter(l => ['Overbilled', 'Rate Mismatch'].includes(l.match_status))
+    if (exceptions.length > 0) {
+      setOverrideModal({ open: true, invoiceId, exceptions })
+      setOverrideReason('')
+      setOverrideAck(false)
+      return
+    }
+    await updatePurchaseInvoice(invoiceId, { status: 'Posted' })
+    toast.success('Invoice posted')
+    await fetchAll()
+  }, [invoiceLines, updatePurchaseInvoice, fetchAll])
+
+  const handleOverrideConfirm = useCallback(async () => {
+    const { invoiceId } = overrideModal
+    try {
+      const inv = purchaseInvoices.find(i => i.id === invoiceId)
+      const existingNotes = inv?.notes || ''
+      const overrideNote = `[MATCH OVERRIDE ${new Date().toLocaleDateString()}] ${overrideReason}`
+      await updatePurchaseInvoice(invoiceId, {
+        status: 'Posted',
+        notes: existingNotes ? `${existingNotes}\n${overrideNote}` : overrideNote,
+      })
+      toast.success('Invoice posted with override recorded')
+      setOverrideModal({ open: false, invoiceId: null, exceptions: [] })
+      await fetchAll()
+    } catch (err) {
+      toast.error('Failed to post: ' + err.message)
+    }
+  }, [overrideModal, overrideReason, purchaseInvoices, updatePurchaseInvoice, fetchAll])
+
   // ── Run 3-Way Match Check ─────────────────────────────────
   const handleRunMatch = async (inv) => {
     const lines = getInvoiceLines(inv.id)
@@ -402,7 +481,7 @@ export default function PurchaseInvoices() {
         if (grnQty !== null && poRate !== null) {
           if (invQty > (grnQty || 0) * 1.001) {
             matchStatus = 'Overbilled'
-            matchNotes  = `Invoice qty ${invQty} > GRN accepted ${grnQty}`
+            matchNotes  = `Invoiced ${invQty} > GRN accepted ${grnQty}`
           } else if (poRate && Math.abs(invRate - poRate) / poRate > 0.01) {
             matchStatus = 'Rate Mismatch'
             matchNotes  = `Invoice rate ${invRate} vs PO rate ${poRate}`
@@ -1050,6 +1129,18 @@ export default function PurchaseInvoices() {
               )}
 
               <ModalActions>
+                {viewInv.status === 'Draft' && (
+                  <button
+                    className="btn btn-primary"
+                    style={hasExceptions ? { background: 'var(--yellow)', color: '#000', borderColor: 'var(--yellow)' } : undefined}
+                    onClick={() => { setViewInv(null); attemptPost(viewInv.id) }}
+                  >
+                    <span className="material-icons" style={{ fontSize: 16 }}>
+                      {hasExceptions ? 'warning' : 'publish'}
+                    </span>
+                    {hasExceptions ? ' Post (Exceptions!)' : ' Post Invoice'}
+                  </button>
+                )}
                 {!['Paid','Cancelled'].includes(viewInv.status) && (
                   <button className="btn btn-primary" onClick={() => { setViewInv(null); setPayInv(viewInv) }}>
                     <span className="material-icons">payments</span> Record Payment
@@ -1061,6 +1152,17 @@ export default function PurchaseInvoices() {
           )
         })()}
       </ModalDialog>
+
+      {/* ── OVERRIDE MODAL (3-way match enforcement) ────── */}
+      <OverrideModal
+        modal={overrideModal}
+        reason={overrideReason}
+        ack={overrideAck}
+        onReasonChange={setOverrideReason}
+        onAckChange={setOverrideAck}
+        onConfirm={handleOverrideConfirm}
+        onClose={() => setOverrideModal({ open: false, invoiceId: null, exceptions: [] })}
+      />
 
       {/* ── EDIT INVOICE MODAL ───────────────────────────── */}
       <ModalDialog open={!!editInv} onClose={() => setEditInv(null)} title={editInv ? `Edit · ${editInv.pi_number}` : ''} size="lg">
