@@ -1,7 +1,8 @@
 // src/pages/Accounting/FinancialReports.jsx — Balance Sheet + P&L + Trial Balance
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useAccounting } from '../../contexts/AccountingContext'
 import { exportAoa } from '../../engine/reportingEngine'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
@@ -34,6 +35,82 @@ export default function FinancialReports() {
 
   const bs = getBalanceSheet()
   const pl = getProfitLoss()
+
+  // ── Period filter state ──────────────────────────────────────────────────
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]
+  })
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [periodData, setPeriodData] = useState(null)  // null = show all-time
+  const [periodLoading, setPeriodLoading] = useState(false)
+
+  const loadPeriodData = useCallback(async () => {
+    setPeriodLoading(true)
+    try {
+      const { data: plLines } = await supabase
+        .from('journal_lines')
+        .select('account_id, debit, credit, journal_entries!inner(entry_date, status)')
+        .gte('journal_entries.entry_date', fromDate)
+        .lte('journal_entries.entry_date', toDate)
+        .eq('journal_entries.status', 'posted')
+
+      const { data: bsLines } = await supabase
+        .from('journal_lines')
+        .select('account_id, debit, credit, journal_entries!inner(entry_date, status)')
+        .lte('journal_entries.entry_date', toDate)
+        .eq('journal_entries.status', 'posted')
+
+      const plMap = {}
+      const bsMap = {}
+      ;(plLines || []).forEach(l => {
+        if (!plMap[l.account_id]) plMap[l.account_id] = 0
+        plMap[l.account_id] += (l.debit || 0) - (l.credit || 0)
+      })
+      ;(bsLines || []).forEach(l => {
+        if (!bsMap[l.account_id]) bsMap[l.account_id] = 0
+        bsMap[l.account_id] += (l.debit || 0) - (l.credit || 0)
+      })
+
+      setPeriodData({ plMap, bsMap })
+    } catch (e) {
+      toast.error('Failed to load period data')
+    } finally { setPeriodLoading(false) }
+  }, [fromDate, toDate])
+
+  // ── Period-aware P&L and BS ──────────────────────────────────────────────
+  const activePL = useMemo(() => {
+    if (!periodData) return pl
+    const DEBIT_NORMAL = ['Asset', 'Expense']
+    const withPeriodBalance = accounts.map(a => {
+      const rawDelta = periodData.plMap[a.id] || 0
+      const balance = DEBIT_NORMAL.includes(a.type) ? rawDelta : -rawDelta
+      return { ...a, balance }
+    })
+    const revenue  = withPeriodBalance.filter(a => a.type === 'Revenue')
+    const expenses = withPeriodBalance.filter(a => a.type === 'Expense')
+    const totalRev = revenue.reduce((s, a) => s + (a.balance || 0), 0)
+    const totalExp = expenses.reduce((s, a) => s + (a.balance || 0), 0)
+    return { revenue, expenses, totalRevenue: totalRev, totalExpenses: totalExp, netProfit: totalRev - totalExp }
+  }, [periodData, accounts, pl])
+
+  const activeBS = useMemo(() => {
+    if (!periodData) return bs
+    const DEBIT_NORMAL = ['Asset', 'Expense']
+    const withPeriodBalance = accounts.map(a => {
+      const rawDelta = periodData.bsMap[a.id] || 0
+      const balance = DEBIT_NORMAL.includes(a.type) ? rawDelta : -rawDelta
+      return { ...a, balance }
+    })
+    const assets      = withPeriodBalance.filter(a => a.type === 'Asset')
+    const liabilities = withPeriodBalance.filter(a => a.type === 'Liability')
+    const equity      = withPeriodBalance.filter(a => a.type === 'Equity')
+    return {
+      assets, liabilities, equity,
+      totalAssets:      assets.reduce((s, a) => s + (a.balance || 0), 0),
+      totalLiabilities: liabilities.reduce((s, a) => s + (a.balance || 0), 0),
+      totalEquity:      equity.reduce((s, a) => s + (a.balance || 0), 0),
+    }
+  }, [periodData, accounts, bs])
 
   // ── Trial Balance ────────────────────────────────────────────────────────
   const tb = useMemo(() => {
@@ -69,34 +146,36 @@ export default function FinancialReports() {
     if (view === 'pl') {
       data = [
         ['Profit & Loss Statement'],
+        periodData ? [`Period: ${fromDate} to ${toDate}`] : ['All-time balances'],
         [],
         ['REVENUE'],
-        ...pl.revenue.map(a => [a.code, a.name, a.balance]),
-        ['', 'TOTAL REVENUE', pl.totalRevenue],
+        ...activePL.revenue.map(a => [a.code, a.name, a.balance]),
+        ['', 'TOTAL REVENUE', activePL.totalRevenue],
         [],
         ['EXPENSES'],
-        ...pl.expenses.map(a => [a.code, a.name, a.balance]),
-        ['', 'TOTAL EXPENSES', pl.totalExpenses],
+        ...activePL.expenses.map(a => [a.code, a.name, a.balance]),
+        ['', 'TOTAL EXPENSES', activePL.totalExpenses],
         [],
-        ['', 'NET PROFIT / (LOSS)', pl.netProfit],
+        ['', 'NET PROFIT / (LOSS)', activePL.netProfit],
       ]
       filename = `PnL_${new Date().toISOString().split('T')[0]}`
       sheet    = 'P&L'
     } else if (view === 'bs') {
       data = [
         ['Balance Sheet'],
+        periodData ? [`As at: ${toDate}`] : ['All-time balances'],
         [],
         ['ASSETS'],
-        ...bs.assets.map(a => [a.code, a.name, a.balance]),
-        ['', 'TOTAL ASSETS', bs.totalAssets],
+        ...activeBS.assets.map(a => [a.code, a.name, a.balance]),
+        ['', 'TOTAL ASSETS', activeBS.totalAssets],
         [],
         ['LIABILITIES'],
-        ...bs.liabilities.map(a => [a.code, a.name, a.balance]),
-        ['', 'TOTAL LIABILITIES', bs.totalLiabilities],
+        ...activeBS.liabilities.map(a => [a.code, a.name, a.balance]),
+        ['', 'TOTAL LIABILITIES', activeBS.totalLiabilities],
         [],
         ['EQUITY'],
-        ...bs.equity.map(a => [a.code, a.name, a.balance]),
-        ['', 'TOTAL EQUITY', bs.totalEquity],
+        ...activeBS.equity.map(a => [a.code, a.name, a.balance]),
+        ['', 'TOTAL EQUITY', activeBS.totalEquity],
       ]
       filename = `BalanceSheet_${new Date().toISOString().split('T')[0]}`
       sheet    = 'Balance Sheet'
@@ -124,7 +203,11 @@ export default function FinancialReports() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 800 }}>Financial Reports</h2>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Based on current account balances</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {periodData
+              ? `Period: ${fromDate} to ${toDate}`
+              : 'Based on current account balances (all-time)'}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" onClick={exportReport}>
@@ -147,15 +230,42 @@ export default function FinancialReports() {
         ))}
       </div>
 
+      {/* Period filter bar — only for P&L and Balance Sheet */}
+      {(view === 'pl' || view === 'bs') && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, flexWrap: 'wrap' }}>
+          <span className="material-icons" style={{ fontSize: 16, color: 'var(--text-dim)' }}>date_range</span>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600 }}>PERIOD</span>
+          <input type="date" className="form-control" style={{ width: 140 }}
+            value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>to</span>
+          <input type="date" className="form-control" style={{ width: 140 }}
+            value={toDate} onChange={e => setToDate(e.target.value)} />
+          <button className="btn btn-secondary" onClick={loadPeriodData} disabled={periodLoading}>
+            {periodLoading ? 'Loading…' : 'Apply'}
+          </button>
+          {periodData && (
+            <button className="btn btn-secondary" onClick={() => setPeriodData(null)}
+              style={{ color: 'var(--text-dim)' }}>
+              Clear (All-time)
+            </button>
+          )}
+          {periodData && (
+            <span style={{ fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>
+              Period: {fromDate} → {toDate}
+            </span>
+          )}
+        </div>
+      )}
+
       <div style={{ maxWidth: view === 'tb' ? 900 : 720 }}>
         {view === 'pl' ? (
           <>
             {/* P&L summary cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
               {[
-                { label: 'Total Revenue',  value: pl.totalRevenue,  color: 'var(--green)' },
-                { label: 'Total Expenses', value: pl.totalExpenses, color: 'var(--red)'   },
-                { label: 'Net Profit',     value: pl.netProfit,     color: pl.netProfit >= 0 ? 'var(--teal)' : 'var(--red)' },
+                { label: 'Total Revenue',  value: activePL.totalRevenue,  color: 'var(--green)' },
+                { label: 'Total Expenses', value: activePL.totalExpenses, color: 'var(--red)'   },
+                { label: 'Net Profit',     value: activePL.netProfit,     color: activePL.netProfit >= 0 ? 'var(--teal)' : 'var(--red)' },
               ].map(k => (
                 <div key={k.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1, marginBottom: 6 }}>{k.label.toUpperCase()}</div>
@@ -163,11 +273,11 @@ export default function FinancialReports() {
                 </div>
               ))}
             </div>
-            <AccountGroup title="Revenue" accounts={pl.revenue} total={pl.totalRevenue} color="var(--green)" />
-            <AccountGroup title="Expenses" accounts={pl.expenses} total={pl.totalExpenses} color="var(--red)" />
+            <AccountGroup title="Revenue" accounts={activePL.revenue} total={activePL.totalRevenue} color="var(--green)" />
+            <AccountGroup title="Expenses" accounts={activePL.expenses} total={activePL.totalExpenses} color="var(--red)" />
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '2px solid var(--border2)', marginTop: 8 }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>NET PROFIT / (LOSS)</div>
-              <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16, color: pl.netProfit >= 0 ? 'var(--teal)' : 'var(--red)' }}>{fmt(pl.netProfit)}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16, color: activePL.netProfit >= 0 ? 'var(--teal)' : 'var(--red)' }}>{fmt(activePL.netProfit)}</div>
             </div>
           </>
         ) : view === 'bs' ? (
@@ -175,9 +285,9 @@ export default function FinancialReports() {
             {/* Balance Sheet summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
               {[
-                { label: 'Total Assets',      value: bs.totalAssets,      color: 'var(--green)' },
-                { label: 'Total Liabilities', value: bs.totalLiabilities, color: 'var(--red)'   },
-                { label: 'Total Equity',      value: bs.totalEquity,      color: 'var(--blue)'  },
+                { label: 'Total Assets',      value: activeBS.totalAssets,      color: 'var(--green)' },
+                { label: 'Total Liabilities', value: activeBS.totalLiabilities, color: 'var(--red)'   },
+                { label: 'Total Equity',      value: activeBS.totalEquity,      color: 'var(--blue)'  },
               ].map(k => (
                 <div key={k.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)', letterSpacing: 1, marginBottom: 6 }}>{k.label.toUpperCase()}</div>
@@ -185,13 +295,13 @@ export default function FinancialReports() {
                 </div>
               ))}
             </div>
-            <AccountGroup title="Assets" accounts={bs.assets} total={bs.totalAssets} color="var(--green)" />
-            <AccountGroup title="Liabilities" accounts={bs.liabilities} total={bs.totalLiabilities} color="var(--red)" />
-            <AccountGroup title="Equity" accounts={bs.equity} total={bs.totalEquity} color="var(--blue)" />
+            <AccountGroup title="Assets" accounts={activeBS.assets} total={activeBS.totalAssets} color="var(--green)" />
+            <AccountGroup title="Liabilities" accounts={activeBS.liabilities} total={activeBS.totalLiabilities} color="var(--red)" />
+            <AccountGroup title="Equity" accounts={activeBS.equity} total={activeBS.totalEquity} color="var(--blue)" />
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '2px solid var(--border2)', marginTop: 8 }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>LIABILITIES + EQUITY</div>
-              <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16, color: Math.abs(bs.totalAssets - bs.totalLiabilities - bs.totalEquity) < 0.01 ? 'var(--green)' : 'var(--red)' }}>
-                {fmt(bs.totalLiabilities + bs.totalEquity)}
+              <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16, color: Math.abs(activeBS.totalAssets - activeBS.totalLiabilities - activeBS.totalEquity) < 0.01 ? 'var(--green)' : 'var(--red)' }}>
+                {fmt(activeBS.totalLiabilities + activeBS.totalEquity)}
               </div>
             </div>
           </>

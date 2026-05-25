@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PageHeader, KPICard, EmptyState, Spinner, StatusBadge } from '../../components/ui'
-import { exportXLSX, fmtNum } from '../../engine/reportingEngine'
+import { exportXLSX, exportMultiSheet, fmtNum } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -200,11 +200,12 @@ export default function VATReturn() {
       'Total Amount': r.total_amount || 0,
       'Status':       r.status      || '',
     }))
-    exportXLSX(
-      summaryRows,
-      `VAT7_Return_${year}_${pad2(month0 + 1)}`,
-      'VAT7 Summary',
-      [{ name: 'Purchase Invoices', rows: detailRows }]
+    exportMultiSheet(
+      [
+        { name: 'VAT7 Summary',       rows: summaryRows },
+        { name: 'Purchase Invoices',  rows: detailRows  },
+      ],
+      `VAT7_Return_${year}_${pad2(month0 + 1)}`
     )
   }
 
