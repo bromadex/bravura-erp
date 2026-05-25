@@ -252,6 +252,10 @@ const SalaryArrears          = lazy(() => import('./pages/HR/SalaryArrears'))
 const SalaryWithholdings     = lazy(() => import('./pages/HR/SalaryWithholdings'))
 const PayrollCorrections     = lazy(() => import('./pages/HR/PayrollCorrections'))
 const ZIMRAReturns           = lazy(() => import('./pages/HR/ZIMRAReturns'))
+const ITF16Certificates      = lazy(() => import('./pages/HR/ITF16Certificates'))
+const NSSARemittance         = lazy(() => import('./pages/HR/NSSARemittance'))
+// Phase 17 — WHT Return (procurement)
+const WHTReturn              = lazy(() => import('./pages/Procurement/WHTReturn'))
 const EmployeeIncentives     = lazy(() => import('./pages/HR/EmployeeIncentives'))
 const RetentionBonuses       = lazy(() => import('./pages/HR/RetentionBonuses'))
 const SalaryComponentAccounts = lazy(() => import('./pages/HR/SalaryComponentAccounts'))
@@ -512,6 +516,7 @@ function AppRoutes() {
           <Route path="grir"                    element={<GRIRReconciliation />}    />
           <Route path="spend-analytics"         element={<SpendAnalytics />}        />
           <Route path="purchase-contracts"      element={<PurchaseContracts />}     />
+          <Route path="wht-return"              element={<WHTReturn />}             />
         </Route>
 
         {/* ── FUEL ─────────────────────────────────────────── */}
@@ -673,6 +678,8 @@ function AppRoutes() {
             <Route path="salary-withholdings"     element={<SalaryWithholdings />} />
             <Route path="payroll-corrections"     element={<PayrollCorrections />} />
             <Route path="zimra-returns"           element={<ZIMRAReturns />} />
+            <Route path="itf16-certificates"      element={<ITF16Certificates />} />
+            <Route path="nssa-remittance"         element={<NSSARemittance />} />
             <Route path="employee-incentives"     element={<EmployeeIncentives />} />
             <Route path="retention-bonuses"       element={<RetentionBonuses />} />
             <Route path="component-accounts"      element={<SalaryComponentAccounts />} />
