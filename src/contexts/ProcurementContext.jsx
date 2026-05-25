@@ -495,7 +495,7 @@ export function ProcurementProvider({ children }) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }))
-      await supabase.from('purchase_order_lines').insert(lineInserts).catch(() => null)
+      await supabase.from('purchase_order_lines').insert(lineInserts).then(r => r, () => null)
     }
 
     await fetchAll()
@@ -631,7 +631,7 @@ export function ProcurementProvider({ children }) {
       })
     }
     if (grnLineInserts.length > 0) {
-      await supabase.from('grn_lines').insert(grnLineInserts).catch(() => null)
+      await supabase.from('grn_lines').insert(grnLineInserts).then(r => r, () => null)
     }
 
     // Auto GL posting for GRN

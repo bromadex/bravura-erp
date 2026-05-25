@@ -678,16 +678,21 @@ export default function ConnectPage() {
 
       const perTable = Math.max(2, Math.floor(10 / tables.length))
       const all = await Promise.all(
-        tables.map(async ({ table, numCol, label, prefix, icon, amtCol }) => {
-          const sel = [numCol, 'status', 'title', amtCol].filter(Boolean).join(',')
-          const { data } = await supabase.from(table).select(sel).ilike(numCol, `%${term}%`).limit(perTable)
-          return (data || []).map(row => ({
-            code:   row[numCol],
-            label,
-            status: row.status,
-            amount: amtCol ? row[amtCol] : null,
-            icon:   icon || 'receipt_long',
-          }))
+        tables.map(async ({ table, numCol, label, icon, amtCol }) => {
+          // Only select columns we know exist; skip 'title' — not present on all tables
+          const sel = [numCol, 'status', amtCol].filter(Boolean).join(',')
+          try {
+            const { data } = await supabase.from(table).select(sel).ilike(numCol, `%${term}%`).limit(perTable)
+            return (data || []).map(row => ({
+              code:   row[numCol],
+              label,
+              status: row.status,
+              amount: amtCol ? row[amtCol] : null,
+              icon:   icon || 'receipt_long',
+            }))
+          } catch {
+            return []   // table missing or column mismatch — silently skip
+          }
         })
       )
       setSlashResults(all.flat().filter(r => r.code).slice(0, 12))
