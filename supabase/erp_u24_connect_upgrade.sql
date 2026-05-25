@@ -40,8 +40,10 @@ ALTER TABLE chat_conversations
   ADD CONSTRAINT chat_conversations_type_check
   CHECK (type IN ('direct', 'group', 'channel'));
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_conv_slug ON chat_conversations(channel_slug)
-  WHERE channel_slug IS NOT NULL;
+-- Regular (non-partial) unique index: PostgreSQL allows multiple NULLs naturally,
+-- so non-channel rows (channel_slug IS NULL) never conflict with each other.
+-- A regular index also satisfies ON CONFLICT (channel_slug) without a WHERE clause.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_conv_slug ON chat_conversations(channel_slug);
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 4. APP_USERS — online presence
