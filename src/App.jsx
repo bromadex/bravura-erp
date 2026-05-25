@@ -96,6 +96,10 @@ const InventoryDashboard    = lazy(() => import('./pages/Inventory/InventoryDash
 const DepartmentConsumption = lazy(() => import('./pages/Inventory/DepartmentConsumption'))
 const StockLedger           = lazy(() => import('./pages/Inventory/StockLedger'))
 const OpeningStock          = lazy(() => import('./pages/Inventory/OpeningStock'))
+// Phase 20 — Advanced Inventory
+const CycleCount            = lazy(() => import('./pages/Inventory/CycleCount'))
+const AutoMRScheduler       = lazy(() => import('./pages/Inventory/AutoMRScheduler'))
+const Consignment           = lazy(() => import('./pages/Inventory/Consignment'))
 const StockValuationReport  = lazy(() => import('./pages/Inventory/StockValuationReport'))
 
 // Procurement
@@ -481,6 +485,9 @@ function AppRoutes() {
           <Route path="uom-conversion"          element={<UOMConversion />} />
           <Route path="stock-ledger"            element={<StockLedger />} />
           <Route path="opening-stock"           element={<OpeningStock />} />
+          <Route path="cycle-count"             element={<CycleCount />} />
+          <Route path="auto-mr"                 element={<AutoMRScheduler />} />
+          <Route path="consignment"             element={<Consignment />} />
           <Route path="stock-valuation"         element={<StockValuationReport />} />
         </Route>
 
