@@ -76,6 +76,12 @@ export default function PaymentVouchers() {
     cheque_date:    '',
     reference_no:   '',
     remarks:        '',
+    wht_applicable: false,
+    wht_type:       '',
+    wht_rate:       0,
+    wht_amount:     0,
+    gross_amount:   0,
+    net_payment:    0,
   })
   const [form,       setForm]       = useState(emptyForm())
   const [allocations,setAllocations]= useState([])  // {invoice_id, pi_number, invoice_date, invoice_total, outstanding, amount_paid, discount_taken}
@@ -144,8 +150,19 @@ export default function PaymentVouchers() {
         discount_taken: parseFloat(a.discount_taken) || 0,
         notes:         a.notes || null,
       }))
+      const whtPayload = form.wht_applicable
+        ? {
+            wht_applicable: true,
+            wht_type:       form.wht_type,
+            wht_rate:       form.wht_rate,
+            gross_amount:   allocatedTotal,
+            wht_amount:     allocatedTotal * form.wht_rate / 100,
+            net_payment:    allocatedTotal - (allocatedTotal * form.wht_rate / 100),
+          }
+        : { wht_applicable: false, wht_type: '', wht_rate: 0, gross_amount: 0, wht_amount: 0, net_payment: 0 }
       await createPaymentVoucher({
         ...form,
+        ...whtPayload,
         total_amount: allocatedTotal,
         created_by:   user?.full_name || user?.username || '',
       }, lines)
@@ -336,7 +353,10 @@ export default function PaymentVouchers() {
                   <td style={{ whiteSpace: 'nowrap' }}>{pv.payment_date}</td>
                   <td style={{ fontWeight: 600 }}>{pv.supplier_name}</td>
                   <td style={{ fontSize: 12 }}>{pv.payment_method}</td>
-                  <td style={{ fontFamily: 'var(--mono)', textAlign: 'right', fontWeight: 600 }}>${fmt(pv.total_amount)}</td>
+                  <td style={{ fontFamily: 'var(--mono)', textAlign: 'right', fontWeight: 600 }}>
+                    ${fmt(pv.total_amount)}
+                    {pv.wht_applicable && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: 'var(--yellow)', background: 'rgba(234,179,8,.12)', border: '1px solid rgba(234,179,8,.3)', padding: '1px 6px', borderRadius: 8 }}>WHT</span>}
+                  </td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{pv.reference_no || '—'}</td>
                   <td>
                     <span style={{ fontWeight: 600, fontSize: 12, color: STATUS_COLORS[pv.status] || 'var(--text-dim)' }}>
@@ -411,6 +431,63 @@ export default function PaymentVouchers() {
               <label>Remarks</label>
               <input className="form-control" placeholder="Optional remarks" value={form.remarks} onChange={e => setForm(f => ({ ...f, remarks: e.target.value }))} />
             </div>
+
+            {/* WHT Section */}
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={form.wht_applicable}
+                  onChange={e => {
+                    const applicable = e.target.checked
+                    setForm(f => ({
+                      ...f,
+                      wht_applicable: applicable,
+                      wht_type: applicable ? f.wht_type : '',
+                      wht_rate: applicable ? (f.wht_type === 'Contractors 15%' ? 15 : 10) : 0,
+                    }))
+                  }} />
+                <span>WHT Applicable (Withholding Tax)</span>
+              </label>
+            </div>
+
+            {form.wht_applicable && (
+              <>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>WHT Type</label>
+                  <select className="form-control" value={form.wht_type}
+                    onChange={e => {
+                      const type = e.target.value
+                      const rate = type === 'Contractors 15%' ? 15 : 10
+                      const grossAmt = parseFloat(allocatedTotal) || 0
+                      const whtAmt = grossAmt * rate / 100
+                      setForm(f => ({
+                        ...f,
+                        wht_type: type, wht_rate: rate,
+                        gross_amount: grossAmt,
+                        wht_amount: whtAmt,
+                        net_payment: grossAmt - whtAmt,
+                      }))
+                    }}>
+                    <option value="">Select WHT type…</option>
+                    <option value="Services 10%">Services 10% — Professional/Management services</option>
+                    <option value="Contractors 15%">Contractors 15% — Sub-contractors</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: '1 / -1', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>Gross Amount:</span>
+                    <span style={{ fontFamily: 'var(--mono)' }}>${fmtNum(form.gross_amount || allocatedTotal || 0)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--red)' }}>WHT Deducted ({form.wht_rate}%):</span>
+                    <span style={{ fontFamily: 'var(--mono)', color: 'var(--red)' }}>-${fmtNum(form.wht_amount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
+                    <span>Net Payment to Supplier:</span>
+                    <span style={{ fontFamily: 'var(--mono)', color: 'var(--green)' }}>${fmtNum(form.net_payment)}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Invoice allocation table */}
@@ -524,6 +601,11 @@ export default function PaymentVouchers() {
                 ['Status',          viewPV.status],
                 ['Posted By',       viewPV.posted_by || '—'],
                 ['Remarks',         viewPV.remarks || '—'],
+                ...(viewPV.wht_applicable ? [
+                  ['WHT Type',        viewPV.wht_type || '—'],
+                  ['WHT Amount',      `-$${fmt(viewPV.wht_amount)}`],
+                  ['Net Payment',     `$${fmt(viewPV.net_payment)}`],
+                ] : []),
               ].map(([label, val]) => (
                 <div key={label} style={{ background: 'var(--surface2)', borderRadius: 6, padding: '8px 12px' }}>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>

@@ -61,6 +61,8 @@ export default function Payroll() {
   const [historyEmployee, setHistoryEmployee] = useState(null)
   const [historyRecords,  setHistoryRecords]  = useState([])
 
+  const [periodCurrency, setPeriodCurrency] = useState('USD')
+
   const [glModal,    setGlModal]    = useState(false)
   const [glPosted,   setGlPosted]   = useState(false)
   const [posting,    setPosting]    = useState(false)
@@ -142,7 +144,7 @@ export default function Payroll() {
   const createPeriod = async () => {
     const { start, end, label } = getPayrollPeriod()
     if (periods.find(p => p.start_date === start)) { toast.error('Period already exists'); return }
-    const { data, error } = await supabase.from('payroll_periods').insert([{ id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36), period_label: label, start_date: start, end_date: end }]).select().single()
+    const { data, error } = await supabase.from('payroll_periods').insert([{ id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36), period_label: label, start_date: start, end_date: end, currency: periodCurrency }]).select().single()
     if (error) { toast.error(error.message); return }
     setPeriods(prev => [data, ...prev]); setSelectedPeriod(data)
     toast.success(`Period created: ${label}`)
@@ -398,8 +400,20 @@ export default function Payroll() {
           {/* Period selector */}
           <div className="card" style={{ padding: 16, marginBottom: 20 }}>
             <div className="form-row">
-              <div className="form-group" style={{ flex: 2 }}><label>Payroll Period</label><select className="form-control" value={selectedPeriod?.id || ''} onChange={e => setSelectedPeriod(periods.find(p => p.id === e.target.value) || null)}><option value="">— Select period —</option>{periods.map(p => <option key={p.id} value={p.id}>{p.period_label} ({p.start_date} → {p.end_date})</option>)}</select></div>
+              <div className="form-group" style={{ flex: 2 }}><label>Payroll Period</label><select className="form-control" value={selectedPeriod?.id || ''} onChange={e => setSelectedPeriod(periods.find(p => p.id === e.target.value) || null)}><option value="">— Select period —</option>{periods.map(p => <option key={p.id} value={p.id}>{p.period_label}{p.currency && p.currency !== 'USD' ? ` (${p.currency})` : ''} ({p.start_date} → {p.end_date})</option>)}</select></div>
               {selectedPeriod && <div className="form-group"><label>Status</label><div style={{ paddingTop: 8 }}>{statusBadge(selectedPeriod.status)}</div></div>}
+            </div>
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label>Payroll Currency <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>(for next new period)</span></label>
+              <select className="form-control" value={periodCurrency} onChange={e => setPeriodCurrency(e.target.value)}>
+                <option value="USD">USD — US Dollar (standard)</option>
+                <option value="ZiG">ZiG — Zimbabwe Gold</option>
+              </select>
+              {periodCurrency === 'ZiG' && (
+                <small style={{ color: 'var(--yellow)', fontSize: 11 }}>
+                  ⚠ ZiG payroll: salary amounts must be entered in ZiG. Exchange rate for GL reporting will be applied at posting.
+                </small>
+              )}
             </div>
             {selectedPeriod && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Period: {selectedPeriod.start_date} → {selectedPeriod.end_date}{selectedPeriod.approved_by && ` · Approved by ${selectedPeriod.approved_by}`}</div>}
           </div>

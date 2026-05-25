@@ -85,7 +85,14 @@ export default function Employees() {
     basic_salary: 0, allowances: 0,
     paye_rate: 25, nssa_rate: 4.5, aids_levy_rate: 3,
     medical_aid: 0, other_deductions: 0,
-    bank_name: '', bank_account: '', nssa_number: ''
+    bank_name: '', bank_account: '', nssa_number: '',
+    national_id: '',
+    tin_number: '',
+    bp_number: '',
+    pension_fund: '',
+    employee_pension_pct: 0,
+    employer_pension_pct: 0,
+    pension_fixed_amount: 0,
   })
   const [savingComp, setSavingComp] = useState(false)
 
@@ -136,16 +143,23 @@ export default function Employees() {
 
   const loadCompensation = (employee) => {
     setCompForm({
-      basic_salary:      employee.basic_salary      || 0,
-      allowances:        employee.allowances         || 0,
-      paye_rate:         employee.paye_rate          ?? 25,
-      nssa_rate:         employee.nssa_rate          ?? 4.5,
-      aids_levy_rate:    employee.aids_levy_rate     ?? 3,
-      medical_aid:       employee.medical_aid        || 0,
-      other_deductions:  employee.other_deductions   || 0,
-      bank_name:         employee.bank_name          || '',
-      bank_account:      employee.bank_account       || '',
-      nssa_number:       employee.nssa_number        || '',
+      basic_salary:         employee.basic_salary         || 0,
+      allowances:           employee.allowances            || 0,
+      paye_rate:            employee.paye_rate             ?? 25,
+      nssa_rate:            employee.nssa_rate             ?? 4.5,
+      aids_levy_rate:       employee.aids_levy_rate        ?? 3,
+      medical_aid:          employee.medical_aid           || 0,
+      other_deductions:     employee.other_deductions      || 0,
+      bank_name:            employee.bank_name             || '',
+      bank_account:         employee.bank_account          || '',
+      nssa_number:          employee.nssa_number           || '',
+      national_id:          employee.national_id           || '',
+      tin_number:           employee.tin_number            || '',
+      bp_number:            employee.bp_number             || '',
+      pension_fund:         employee.pension_fund          || '',
+      employee_pension_pct: employee.employee_pension_pct  || 0,
+      employer_pension_pct: employee.employer_pension_pct  || 0,
+      pension_fixed_amount: employee.pension_fixed_amount  || 0,
     })
   }
 
@@ -493,6 +507,44 @@ export default function Employees() {
             <div className="form-group"><label>Bank Name</label><input className="form-control" value={compForm.bank_name} onChange={e => setCompForm(p => ({ ...p, bank_name: e.target.value }))} placeholder="e.g. CBZ, Steward Bank" /></div>
             <div className="form-group"><label>Bank Account Number</label><input className="form-control" value={compForm.bank_account} onChange={e => setCompForm(p => ({ ...p, bank_account: e.target.value }))} /></div>
             <div className="form-group"><label>NSSA Number</label><input className="form-control" value={compForm.nssa_number} onChange={e => setCompForm(p => ({ ...p, nssa_number: e.target.value }))} /></div>
+          </div>
+
+          {/* ZIMRA identifiers */}
+          <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 8 }}>ZIMRA IDENTIFIERS</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div className="form-group">
+                <label>National ID</label>
+                <input className="form-control" placeholder="63-123456X01" value={compForm.national_id || ''} onChange={e => setCompForm(p => ({ ...p, national_id: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>ZIMRA TIN</label>
+                <input className="form-control" placeholder="TIN number" value={compForm.tin_number || ''} onChange={e => setCompForm(p => ({ ...p, tin_number: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>BP Number</label>
+                <input className="form-control" placeholder="Business partner no" value={compForm.bp_number || ''} onChange={e => setCompForm(p => ({ ...p, bp_number: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          {/* Pension / Provident Fund */}
+          <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 8 }}>PENSION / PROVIDENT FUND</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div className="form-group">
+                <label>Fund Name</label>
+                <input className="form-control" placeholder="POSB, Old Mutual, ZIMNAT…" value={compForm.pension_fund || ''} onChange={e => setCompForm(p => ({ ...p, pension_fund: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Employee Contribution (%)</label>
+                <input className="form-control" type="number" min="0" max="20" step="0.5" value={compForm.employee_pension_pct || 0} onChange={e => setCompForm(p => ({ ...p, employee_pension_pct: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div className="form-group">
+                <label>Employer Contribution (%)</label>
+                <input className="form-control" type="number" min="0" max="20" step="0.5" value={compForm.employer_pension_pct || 0} onChange={e => setCompForm(p => ({ ...p, employer_pension_pct: parseFloat(e.target.value) || 0 }))} />
+              </div>
+            </div>
           </div>
         </div>
 
