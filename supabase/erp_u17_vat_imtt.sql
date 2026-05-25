@@ -40,6 +40,6 @@ CREATE POLICY "auth_vat_return_periods"
   ON vat_return_periods FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- Numbering for WHT certificates
-INSERT INTO numbering_series (entity, prefix, padding, description)
+INSERT INTO numbering_series (series_key, prefix, padding, description)
 VALUES ('wht_certificates', 'WHT002-', 4, 'WHT Certificates (ZIMRA Form WHT002)')
-ON CONFLICT (entity) DO NOTHING;
+ON CONFLICT (series_key) DO NOTHING;

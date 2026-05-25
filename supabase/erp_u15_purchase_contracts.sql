@@ -79,9 +79,9 @@ CREATE INDEX IF NOT EXISTS idx_pcl_item     ON purchase_contract_lines(item_id);
 -- ═══════════════════════════════════════════════════════════════════
 -- 4. NUMBERING SERIES
 -- ═══════════════════════════════════════════════════════════════════
-INSERT INTO numbering_series (entity, prefix, padding, description)
+INSERT INTO numbering_series (series_key, prefix, padding, description)
 VALUES ('purchase_contracts', 'PC-', 4, 'Purchase Contracts')
-ON CONFLICT (entity) DO NOTHING;
+ON CONFLICT (series_key) DO NOTHING;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 5. RLS — open to authenticated users (inherits org policy)
