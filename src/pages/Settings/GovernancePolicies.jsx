@@ -2,6 +2,8 @@
 //
 // Phase 18 — Governance: manage system-wide governance policies and
 // notification schedule configuration for Inventory and Procurement.
+// Phase 19 — Added Governance Configuration section (top) with
+// persistent settings stored in governance_policies table.
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -239,6 +241,203 @@ function ScheduleRow({ schedule, onToggled }) {
   )
 }
 
+// ── Governance Configuration Section ─────────────────────────
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+const GOV_SETTING_KEYS = [
+  'gov_auto_archive_days',
+  'gov_ethics_annual_resign',
+  'gov_policy_mandatory_default',
+  'gov_reminder_days',
+  'gov_ethics_resign_month',
+  'gov_require_checkbox_ack',
+]
+
+function GovernanceConfig({ allPolicies, onSaved }) {
+  // Derive initial values from policies already loaded (setting_key column)
+  const findVal = (key, fallback) => {
+    const row = allPolicies.find(p => p.setting_key === key)
+    if (!row) return fallback
+    if (row.value_type === 'boolean') return row.value_boolean ?? fallback
+    if (row.value_type === 'number')  return row.value_number  ?? fallback
+    return row.value_text ?? fallback
+  }
+
+  const [archiveDays,      setArchiveDays]      = useState(() => findVal('gov_auto_archive_days', 90))
+  const [annualResign,     setAnnualResign]      = useState(() => findVal('gov_ethics_annual_resign', true))
+  const [resignMonth,      setResignMonth]       = useState(() => findVal('gov_ethics_resign_month', 'January'))
+  const [mandatoryDefault, setMandatoryDefault]  = useState(() => findVal('gov_policy_mandatory_default', false))
+  const [requireCheckbox,  setRequireCheckbox]   = useState(() => findVal('gov_require_checkbox_ack', true))
+  const [reminderDays,     setReminderDays]       = useState(() => findVal('gov_reminder_days', 3))
+  const [saving,           setSaving]             = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const now = new Date().toISOString()
+      const rows = [
+        { setting_key: 'gov_auto_archive_days',       value_type: 'number',  value_number: Number(archiveDays),  value_boolean: null, value_text: null, updated_at: now },
+        { setting_key: 'gov_ethics_annual_resign',     value_type: 'boolean', value_boolean: annualResign,        value_number: null,  value_text: null, updated_at: now },
+        { setting_key: 'gov_ethics_resign_month',      value_type: 'text',    value_text: resignMonth,            value_boolean: null, value_number: null, updated_at: now },
+        { setting_key: 'gov_policy_mandatory_default', value_type: 'boolean', value_boolean: mandatoryDefault,    value_number: null,  value_text: null, updated_at: now },
+        { setting_key: 'gov_require_checkbox_ack',     value_type: 'boolean', value_boolean: requireCheckbox,     value_number: null,  value_text: null, updated_at: now },
+        { setting_key: 'gov_reminder_days',            value_type: 'number',  value_number: Number(reminderDays), value_boolean: null, value_text: null, updated_at: now },
+      ]
+
+      const { error } = await supabase
+        .from('governance_policies')
+        .upsert(rows, { onConflict: 'setting_key' })
+
+      if (error) throw error
+      toast.success('Governance configuration saved')
+      onSaved()
+    } catch (err) {
+      toast.error('Failed to save: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const rowStyle = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 0', borderBottom: '1px solid var(--border)',
+    gap: 16,
+  }
+  const labelStyle = { flex: 1, minWidth: 0 }
+  const labelTitle = { fontSize: 13, fontWeight: 600, marginBottom: 2 }
+  const labelDesc  = { fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.4 }
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 12, padding: '20px 24px', marginTop: 20,
+    }}>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <span className="material-icons" style={{ fontSize: 20, color: 'var(--gold)' }}>
+          settings
+        </span>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Governance Configuration</h2>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+          background: 'var(--gold)22', color: 'var(--gold)',
+          border: '1px solid var(--gold)44', marginLeft: 4,
+        }}>
+          System-wide defaults
+        </span>
+      </div>
+
+      {/* 1. Auto-archive announcements */}
+      <div style={rowStyle}>
+        <div style={labelStyle}>
+          <div style={labelTitle}>Auto-archive announcements</div>
+          <div style={labelDesc}>Archive announcements after this many days</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <input
+            type="number"
+            min={1}
+            value={archiveDays}
+            onChange={e => setArchiveDays(e.target.value)}
+            style={{
+              width: 80, padding: '4px 8px', fontSize: 13, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', textAlign: 'right',
+            }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>days</span>
+        </div>
+      </div>
+
+      {/* 2. Ethics re-sign frequency */}
+      <div style={rowStyle}>
+        <div style={labelStyle}>
+          <div style={labelTitle}>Annual re-signing of Code of Ethics</div>
+          <div style={labelDesc}>Require employees to re-sign the Code of Ethics each year</div>
+        </div>
+        <Toggle checked={annualResign} onChange={() => setAnnualResign(v => !v)} />
+      </div>
+
+      {annualResign && (
+        <div style={{ ...rowStyle, paddingLeft: 16 }}>
+          <div style={labelStyle}>
+            <div style={labelTitle}>Re-sign month</div>
+            <div style={labelDesc}>Month in which the annual re-signing prompt is triggered</div>
+          </div>
+          <select
+            value={resignMonth}
+            onChange={e => setResignMonth(e.target.value)}
+            style={{
+              padding: '4px 8px', fontSize: 13, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', flexShrink: 0,
+            }}
+          >
+            {MONTHS.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* 3. Policy defaults */}
+      <div style={rowStyle}>
+        <div style={labelStyle}>
+          <div style={labelTitle}>New policies mandatory by default</div>
+          <div style={labelDesc}>Newly created policies require acknowledgement from all employees by default</div>
+        </div>
+        <Toggle checked={mandatoryDefault} onChange={() => setMandatoryDefault(v => !v)} />
+      </div>
+
+      {/* 4. Signature method */}
+      <div style={rowStyle}>
+        <div style={labelStyle}>
+          <div style={labelTitle}>Require checkbox acknowledgement</div>
+          <div style={labelDesc}>Employees must tick a checkbox to confirm they have read each policy</div>
+        </div>
+        <Toggle checked={requireCheckbox} onChange={() => setRequireCheckbox(v => !v)} />
+      </div>
+
+      {/* 5. Reminder schedule */}
+      <div style={{ ...rowStyle, borderBottom: 'none' }}>
+        <div style={labelStyle}>
+          <div style={labelTitle}>Reminder schedule</div>
+          <div style={labelDesc}>Send reminders for unacknowledged items after this many days</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <input
+            type="number"
+            min={1}
+            value={reminderDays}
+            onChange={e => setReminderDays(e.target.value)}
+            style={{
+              width: 80, padding: '4px 8px', fontSize: 13, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface2)',
+              color: 'var(--text)', textAlign: 'right',
+            }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>days</span>
+        </div>
+      </div>
+
+      {/* Save button */}
+      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? 'Saving…' : 'Save Governance Config'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────
 export default function GovernancePolicies() {
   const [policies,   setPolicies]   = useState([])
@@ -260,8 +459,12 @@ export default function GovernancePolicies() {
 
   useEffect(() => { load() }, [load])
 
-  // Group policies by module
-  const policyGroups = policies.reduce((acc, pol) => {
+  // Separate governance config settings from operational policies
+  const configPolicies = policies.filter(p => p.setting_key && p.setting_key.startsWith('gov_'))
+  const opPolicies     = policies.filter(p => !p.setting_key || !p.setting_key.startsWith('gov_'))
+
+  // Group operational policies by module
+  const policyGroups = opPolicies.reduce((acc, pol) => {
     const mod = pol.module || 'other'
     if (!acc[mod]) acc[mod] = []
     acc[mod].push(pol)
@@ -290,6 +493,9 @@ export default function GovernancePolicies() {
         </button>
       </PageHeader>
 
+      {/* ── Section 0: Governance Configuration (new) ── */}
+      <GovernanceConfig allPolicies={policies} onSaved={load} />
+
       {/* ── Section 1: Policy Controls ── */}
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
@@ -301,11 +507,11 @@ export default function GovernancePolicies() {
           </span>
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Policy Controls</h2>
           <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 4 }}>
-            {policies.length} polic{policies.length === 1 ? 'y' : 'ies'}
+            {opPolicies.length} polic{opPolicies.length === 1 ? 'y' : 'ies'}
           </span>
         </div>
 
-        {policies.length === 0 ? (
+        {opPolicies.length === 0 ? (
           <EmptyState icon="policy" message="No governance policies found" />
         ) : (
           Object.entries(policyGroups).map(([mod, group]) => (
