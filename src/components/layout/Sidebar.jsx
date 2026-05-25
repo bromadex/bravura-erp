@@ -129,6 +129,7 @@ const ALL_MODULES = {
           { id: 'stock-in',           label: 'Stock In',           icon: 'add_circle'         },
           { id: 'stock-transfers',    label: 'Stock Transfers',    icon: 'sync_alt'           },
           { id: 'store-requisitions', label: 'Store Requisitions', icon: 'assignment_returned'},
+          { id: 'pick-list',          label: 'Pick List',          icon: 'assignment'         },
           { id: 'stock-reservations', label: 'Stock Reservations', icon: 'lock_clock'         },
           { id: 'stock-out',          label: 'Stock Out',          icon: 'remove_circle'      },
           { id: 'stock-taking',       label: 'Stock Taking',       icon: 'fact_check'         },

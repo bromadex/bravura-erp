@@ -115,3 +115,34 @@ VALUES
   ('cycle_count_sessions', 'CC-',  4, 'Cycle Count Sessions'),
   ('consignment_stock',    'CON-', 4, 'Consignment Stock')
 ON CONFLICT (series_key) DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- 4. SERIAL REPAIR LOG (append to erp_u19)
+-- ═══════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS serial_repair_logs (
+  id              TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+  serial_no       TEXT NOT NULL,           -- FK item_serials(serial_no)
+  item_id         TEXT NOT NULL,
+  item_name       TEXT NOT NULL,
+
+  -- Repair event
+  fault_description TEXT NOT NULL,
+  repair_vendor   TEXT,
+  date_sent       DATE NOT NULL DEFAULT CURRENT_DATE,
+  date_returned   DATE,
+  repair_cost     NUMERIC(15,4) NOT NULL DEFAULT 0,
+  outcome         TEXT NOT NULL DEFAULT 'Repaired'
+                    CHECK (outcome IN ('Repaired','Scrapped','Under Warranty','Pending','Unrepairable')),
+  technician_notes TEXT,
+
+  created_by      TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_srl_serial ON serial_repair_logs(serial_no);
+CREATE INDEX IF NOT EXISTS idx_srl_item   ON serial_repair_logs(item_id);
+
+ALTER TABLE serial_repair_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_serial_repair_logs" ON serial_repair_logs;
+CREATE POLICY "auth_serial_repair_logs"
+  ON serial_repair_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);

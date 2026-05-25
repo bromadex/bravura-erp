@@ -596,13 +596,34 @@ function BatchModal({ batch, canEdit, onClose, onUpdate }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Serial Modal — history timeline + status update
+// Serial Modal — history timeline + status update + repairs tab
 // ═══════════════════════════════════════════════════════════
 function SerialModal({ serial, canEdit, onClose, onUpdate }) {
   const [newStatus, setNewStatus] = useState(serial.status)
   const [notes,     setNotes]     = useState('')
   const [saving,    setSaving]    = useState(false)
   const [mode,      setMode]      = useState(serial._updateMode ? 'update' : 'view')
+
+  const [detailTab, setDetailTab] = useState('info')  // 'info' | 'repairs'
+  const [repairs, setRepairs]     = useState([])
+  const [repairLoading, setRepairLoading] = useState(false)
+  const [showRepairForm, setShowRepairForm] = useState(false)
+  const [repairForm, setRepairForm] = useState({
+    fault_description: '', repair_vendor: '', date_sent: new Date().toISOString().split('T')[0],
+    date_returned: '', repair_cost: '', outcome: 'Repaired', technician_notes: ''
+  })
+
+  const loadRepairs = async () => {
+    setRepairLoading(true)
+    const { data } = await supabase
+      .from('serial_repair_logs')
+      .select('*')
+      .eq('serial_no', serial.serial_no)
+      .order('date_sent', { ascending: false })
+    setRepairs(data || [])
+    setRepairLoading(false)
+  }
+  useEffect(() => { if (detailTab === 'repairs') loadRepairs() }, [detailTab])
 
   const history = Array.isArray(serial.history) ? serial.history : []
 
@@ -624,98 +645,233 @@ function SerialModal({ serial, canEdit, onClose, onUpdate }) {
 
   return (
     <ModalDialog open onClose={onClose} title={`Serial: ${serial.serial_no}`} size="lg">
-      {/* Serial info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <InfoRow label="Serial No"    value={<span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{serial.serial_no}</span>} />
-        <InfoRow label="Item"         value={serial.item_name} />
-        <InfoRow label="Status"       value={<span className={`badge ${STATUS_BADGE[serial.status] || 'badge-gray'}`}>{serial.status}</span>} />
-        <InfoRow label="Warehouse"    value={serial.warehouses?.name || '—'} />
-        <InfoRow label="Issued To"    value={serial.issued_to || '—'} />
-        <InfoRow label="Department"   value={serial.issued_to_department || '—'} />
-        <InfoRow label="Issued Date"  value={serial.issued_date || '—'} />
-        <InfoRow label="Returned"     value={serial.returned_date || '—'} />
-        <InfoRow label="Asset Code"   value={serial.asset_code || '—'} />
-        <InfoRow label="Purchase Rate" value={serial.purchase_rate ? `$${Number(serial.purchase_rate).toFixed(2)}` : '—'} />
-        <InfoRow label="Purchase Date" value={serial.purchase_date || '—'} />
-        <InfoRow label="Warranty Expiry" value={
-          <span style={{ color: wColor, fontWeight: wColor !== 'var(--text)' ? 700 : 400 }}>
-            {serial.warranty_expiry || '—'}
-            {wLabel && <span style={{ marginLeft: 6, fontSize: 11, opacity: .8 }}>({wLabel})</span>}
-          </span>
-        } />
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
+        {[
+          { id: 'info', label: 'Details', icon: 'info' },
+          { id: 'repairs', label: 'Repairs', icon: 'build' },
+        ].map(t => (
+          <button key={t.id} onClick={() => setDetailTab(t.id)}
+            style={{ padding: '7px 14px', background: 'transparent', border: 'none',
+              borderBottom: `2px solid ${detailTab === t.id ? 'var(--gold)' : 'transparent'}`,
+              color: detailTab === t.id ? 'var(--gold)' : 'var(--text-dim)',
+              cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span className="material-icons" style={{ fontSize: 14 }}>{t.icon}</span>{t.label}
+          </button>
+        ))}
       </div>
 
-      {/* History timeline */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
-          History Timeline
-        </div>
-        {history.length === 0 ? (
-          <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '8px 0' }}>No history entries yet.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {history.map((h, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, borderLeft: '3px solid var(--teal)' }}>
-                <span className="material-icons" style={{ fontSize: 16, color: 'var(--teal)', flexShrink: 0, marginTop: 1 }}>timeline</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{h.action}</div>
-                  {(h.from_status || h.to_status) && (
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                      <span className={`badge ${STATUS_BADGE[h.from_status] || 'badge-gray'}`} style={{ fontSize: 10 }}>{h.from_status}</span>
-                      <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', margin: '0 4px' }}>arrow_forward</span>
-                      <span className={`badge ${STATUS_BADGE[h.to_status] || 'badge-gray'}`} style={{ fontSize: 10 }}>{h.to_status}</span>
+      {/* Info tab */}
+      {detailTab === 'info' && (
+        <>
+          {/* Serial info */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <InfoRow label="Serial No"    value={<span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{serial.serial_no}</span>} />
+            <InfoRow label="Item"         value={serial.item_name} />
+            <InfoRow label="Status"       value={<span className={`badge ${STATUS_BADGE[serial.status] || 'badge-gray'}`}>{serial.status}</span>} />
+            <InfoRow label="Warehouse"    value={serial.warehouses?.name || '—'} />
+            <InfoRow label="Issued To"    value={serial.issued_to || '—'} />
+            <InfoRow label="Department"   value={serial.issued_to_department || '—'} />
+            <InfoRow label="Issued Date"  value={serial.issued_date || '—'} />
+            <InfoRow label="Returned"     value={serial.returned_date || '—'} />
+            <InfoRow label="Asset Code"   value={serial.asset_code || '—'} />
+            <InfoRow label="Purchase Rate" value={serial.purchase_rate ? `$${Number(serial.purchase_rate).toFixed(2)}` : '—'} />
+            <InfoRow label="Purchase Date" value={serial.purchase_date || '—'} />
+            <InfoRow label="Warranty Expiry" value={
+              <span style={{ color: wColor, fontWeight: wColor !== 'var(--text)' ? 700 : 400 }}>
+                {serial.warranty_expiry || '—'}
+                {wLabel && <span style={{ marginLeft: 6, fontSize: 11, opacity: .8 }}>({wLabel})</span>}
+              </span>
+            } />
+          </div>
+
+          {/* History timeline */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' }}>
+              History Timeline
+            </div>
+            {history.length === 0 ? (
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '8px 0' }}>No history entries yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {history.map((h, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, borderLeft: '3px solid var(--teal)' }}>
+                    <span className="material-icons" style={{ fontSize: 16, color: 'var(--teal)', flexShrink: 0, marginTop: 1 }}>timeline</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{h.action}</div>
+                      {(h.from_status || h.to_status) && (
+                        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                          <span className={`badge ${STATUS_BADGE[h.from_status] || 'badge-gray'}`} style={{ fontSize: 10 }}>{h.from_status}</span>
+                          <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', margin: '0 4px' }}>arrow_forward</span>
+                          <span className={`badge ${STATUS_BADGE[h.to_status] || 'badge-gray'}`} style={{ fontSize: 10 }}>{h.to_status}</span>
+                        </div>
+                      )}
+                      {h.notes && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{h.notes}</div>}
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, fontFamily: 'var(--mono)' }}>
+                        {h.date ? new Date(h.date).toLocaleString() : ''}
+                        {h.user ? ` — ${h.user}` : ''}
+                      </div>
                     </div>
-                  )}
-                  {h.notes && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{h.notes}</div>}
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, fontFamily: 'var(--mono)' }}>
-                    {h.date ? new Date(h.date).toLocaleString() : ''}
-                    {h.user ? ` — ${h.user}` : ''}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Update form */}
+          {canEdit && mode === 'update' ? (
+            <form onSubmit={handleSubmit}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
+                  Add Status Update
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>New Status *</label>
+                    <select className="form-control" required value={newStatus} onChange={e => setNewStatus(e.target.value)}>
+                      {['In Stock', 'Issued', 'In Repair', 'Scrapped', 'Returned', 'Transferred'].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
+                <div className="form-group">
+                  <label>Notes</label>
+                  <textarea className="form-control" rows="2" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes about this status change…" />
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Update form */}
-      {canEdit && mode === 'update' ? (
-        <form onSubmit={handleSubmit}>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
-              Add Status Update
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>New Status *</label>
-                <select className="form-control" required value={newStatus} onChange={e => setNewStatus(e.target.value)}>
-                  {['In Stock', 'Issued', 'In Repair', 'Scrapped', 'Returned', 'Transferred'].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Notes</label>
-              <textarea className="form-control" rows="2" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes about this status change…" />
-            </div>
-          </div>
-          <ModalActions>
-            <button type="button" className="btn btn-secondary" onClick={() => setMode('view')}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Update Status'}
-            </button>
-          </ModalActions>
-        </form>
-      ) : (
-        <ModalActions>
-          {canEdit && (
-            <button type="button" className="btn btn-primary" onClick={() => setMode('update')}>
-              <span className="material-icons" style={{ fontSize: 15 }}>edit</span> Update Status
-            </button>
+              <ModalActions>
+                <button type="button" className="btn btn-secondary" onClick={() => setMode('view')}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Saving…' : 'Update Status'}
+                </button>
+              </ModalActions>
+            </form>
+          ) : (
+            <ModalActions>
+              {canEdit && (
+                <button type="button" className="btn btn-primary" onClick={() => setMode('update')}>
+                  <span className="material-icons" style={{ fontSize: 15 }}>edit</span> Update Status
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+            </ModalActions>
           )}
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-        </ModalActions>
+        </>
+      )}
+
+      {/* Repairs tab */}
+      {detailTab === 'repairs' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              {repairs.length} repair event{repairs.length !== 1 ? 's' : ''} ·
+              Total cost: <span style={{ fontFamily: 'var(--mono)', color: 'var(--gold)' }}>
+                ${repairs.reduce((s,r) => s + Number(r.repair_cost||0), 0).toFixed(2)}
+              </span>
+            </div>
+            {canEdit && (
+              <button className="btn btn-secondary" style={{ fontSize: 12 }}
+                onClick={() => setShowRepairForm(f => !f)}>
+                <span className="material-icons" style={{ fontSize: 14 }}>add</span> Log Repair
+              </button>
+            )}
+          </div>
+
+          {/* Log Repair Form */}
+          {showRepairForm && (
+            <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                  <label>Fault Description *</label>
+                  <textarea className="form-control" rows={2} value={repairForm.fault_description}
+                    onChange={e => setRepairForm(f => ({ ...f, fault_description: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Repair Vendor</label>
+                  <input className="form-control" value={repairForm.repair_vendor}
+                    onChange={e => setRepairForm(f => ({ ...f, repair_vendor: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Outcome</label>
+                  <select className="form-control" value={repairForm.outcome}
+                    onChange={e => setRepairForm(f => ({ ...f, outcome: e.target.value }))}>
+                    {['Repaired','Scrapped','Under Warranty','Pending','Unrepairable'].map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Date Sent</label>
+                  <input type="date" className="form-control" value={repairForm.date_sent}
+                    onChange={e => setRepairForm(f => ({ ...f, date_sent: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Date Returned</label>
+                  <input type="date" className="form-control" value={repairForm.date_returned}
+                    onChange={e => setRepairForm(f => ({ ...f, date_returned: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>Repair Cost ($)</label>
+                  <input type="number" className="form-control" value={repairForm.repair_cost}
+                    onChange={e => setRepairForm(f => ({ ...f, repair_cost: e.target.value }))} />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                  <label>Technician Notes</label>
+                  <textarea className="form-control" rows={2} value={repairForm.technician_notes}
+                    onChange={e => setRepairForm(f => ({ ...f, technician_notes: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={() => setShowRepairForm(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={async () => {
+                  if (!repairForm.fault_description.trim()) { toast.error('Fault description required'); return }
+                  await supabase.from('serial_repair_logs').insert({
+                    id: crypto.randomUUID(),
+                    serial_no: serial.serial_no,
+                    item_id: serial.item_id,
+                    item_name: serial.item_name,
+                    ...repairForm,
+                    repair_cost: parseFloat(repairForm.repair_cost) || 0,
+                    created_by: 'user',
+                  })
+                  // If outcome is Scrapped, also update serial status
+                  if (repairForm.outcome === 'Scrapped') {
+                    await onUpdate(serial, 'Scrapped', `Scrapped after repair attempt: ${repairForm.fault_description}`)
+                  }
+                  toast.success('Repair logged')
+                  setShowRepairForm(false)
+                  setRepairForm({ fault_description:'', repair_vendor:'', date_sent: new Date().toISOString().split('T')[0], date_returned:'', repair_cost:'', outcome:'Repaired', technician_notes:'' })
+                  loadRepairs()
+                }}>Save Repair</button>
+              </div>
+            </div>
+          )}
+
+          {/* Repair log list */}
+          {repairLoading ? <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>Loading…</div>
+          : repairs.length === 0 ? <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '12px 0' }}>No repair records yet.</div>
+          : repairs.map(r => (
+            <div key={r.id} style={{ padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8, marginBottom: 8,
+              borderLeft: `3px solid ${r.outcome === 'Repaired' ? 'var(--green)' : r.outcome === 'Scrapped' ? 'var(--red)' : 'var(--yellow)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{r.fault_description}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--gold)' }}>${Number(r.repair_cost).toFixed(2)}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', display: 'flex', gap: 16 }}>
+                <span>{r.date_sent}{r.date_returned ? ` → ${r.date_returned}` : ' (ongoing)'}</span>
+                {r.repair_vendor && <span>Vendor: {r.repair_vendor}</span>}
+                <span style={{ fontWeight: 700, color: r.outcome === 'Repaired' ? 'var(--green)' : r.outcome === 'Scrapped' ? 'var(--red)' : 'var(--yellow)' }}>{r.outcome}</span>
+              </div>
+              {r.technician_notes && <div style={{ fontSize: 11, color: 'var(--text-mid)', marginTop: 4 }}>{r.technician_notes}</div>}
+            </div>
+          ))}
+
+          <ModalActions>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+          </ModalActions>
+        </div>
       )}
     </ModalDialog>
   )

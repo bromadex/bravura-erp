@@ -101,6 +101,8 @@ const CycleCount            = lazy(() => import('./pages/Inventory/CycleCount'))
 const AutoMRScheduler       = lazy(() => import('./pages/Inventory/AutoMRScheduler'))
 const Consignment           = lazy(() => import('./pages/Inventory/Consignment'))
 const StockValuationReport  = lazy(() => import('./pages/Inventory/StockValuationReport'))
+// Gap fix — Pick List workflow
+const PickList              = lazy(() => import('./pages/Inventory/PickList'))
 
 // Procurement
 const Suppliers            = lazy(() => import('./pages/Procurement/Suppliers'))
@@ -493,6 +495,7 @@ function AppRoutes() {
           <Route path="auto-mr"                 element={<AutoMRScheduler />} />
           <Route path="consignment"             element={<Consignment />} />
           <Route path="stock-valuation"         element={<StockValuationReport />} />
+          <Route path="pick-list"               element={<PickList />} />
         </Route>
 
         {/* ── PROCUREMENT ─────────────────────────────────── */}
