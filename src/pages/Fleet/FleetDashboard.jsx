@@ -56,14 +56,13 @@ export default function FleetDashboard() {
       if (docRes.data)   setDocWarnings(docRes.data)
     }).catch(console.error)
 
-    // Expiry warnings from fleet_documents
+    // getExpiringDocuments is synchronous — merge with DB results
     if (getExpiringDocuments) {
-      getExpiringDocuments(30).then(docs => {
-        if (docs?.length) setDocWarnings(prev => {
-          const ids = new Set(prev.map(d => d.id))
-          return [...prev, ...docs.filter(d => !ids.has(d.id))]
-        })
-      }).catch(() => {})
+      const docs = getExpiringDocuments(30)
+      if (docs?.length) setDocWarnings(prev => {
+        const ids = new Set(prev.map(d => d.id))
+        return [...prev, ...docs.filter(d => !ids.has(d.id))]
+      })
     }
   }, [getExpiringDocuments])
 
