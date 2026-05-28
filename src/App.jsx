@@ -171,6 +171,8 @@ const PreventiveMaintenance = lazy(() => import('./pages/Fleet/PreventiveMainten
 const TyreManagement        = lazy(() => import('./pages/Fleet/TyreManagement'))
 const DowntimeAnalytics     = lazy(() => import('./pages/Fleet/DowntimeAnalytics'))
 const FleetCostAnalysis     = lazy(() => import('./pages/Fleet/FleetCostAnalysis'))
+const TripManagement        = lazy(() => import('./pages/Fleet/TripManagement'))
+const AccidentReports       = lazy(() => import('./pages/Fleet/AccidentReports'))
 
 // HR
 const HRDashboard        = lazy(() => import('./pages/HR/HRDashboard'))
@@ -594,6 +596,8 @@ function AppRoutes() {
           <Route path="tyre-management"         element={<TyreManagement />} />
           <Route path="downtime-analytics"      element={<DowntimeAnalytics />} />
           <Route path="cost-analysis"           element={<FleetCostAnalysis />} />
+          <Route path="trips"                   element={<TripManagement />} />
+          <Route path="accidents"               element={<AccidentReports />} />
           {/* Asset Registry — unified asset master */}
           <Route path="asset-registry"          element={<AssetDashboard />} />
           <Route path="registry"                element={<AssetRegistry />} />
