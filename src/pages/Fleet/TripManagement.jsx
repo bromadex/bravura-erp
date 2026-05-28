@@ -63,9 +63,9 @@ export default function TripManagement() {
 
   // Load reference data
   useEffect(() => {
-    supabase.from('asset_registry').select('id, name, reg_no, asset_code, asset_type, status')
+    supabase.from('asset_registry').select('id, asset_name, plate_number, asset_code, asset_category, status')
       .in('status', ['Active', 'active'])
-      .order('name')
+      .order('asset_name')
       .then(({ data }) => setAssets(data || []))
 
     supabase.from('employees').select('id, name, status').neq('status', 'Terminated').order('name')
@@ -262,7 +262,7 @@ export default function TripManagement() {
             <label>Asset</label>
             <select className="form-control" value={assetFilter} onChange={e => setAssetFilter(e.target.value)}>
               <option value="">All Assets</option>
-              {assets.map(a => <option key={a.id} value={a.id}>{a.name || a.reg_no || a.asset_code}</option>)}
+              {assets.map(a => <option key={a.id} value={a.id}>{a.asset_name || a.plate_number || a.asset_code}</option>)}
             </select>
           </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -361,7 +361,7 @@ export default function TripManagement() {
                   <option value="">Select asset…</option>
                   {assets.map(a => (
                     <option key={a.id} value={a.id}>
-                      {a.name || a.reg_no || a.asset_code} ({a.asset_type})
+                      {a.asset_name || a.plate_number || a.asset_code} ({a.asset_category})
                     </option>
                   ))}
                 </select>

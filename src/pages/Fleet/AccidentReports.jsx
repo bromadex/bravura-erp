@@ -77,7 +77,7 @@ export default function AccidentReports() {
   const debounceRef = useRef(null)
 
   useEffect(() => {
-    supabase.from('asset_registry').select('id,name,reg_no,asset_code,asset_type').order('name')
+    supabase.from('asset_registry').select('id,asset_name,plate_number,asset_code,asset_category').order('asset_name')
       .then(({ data }) => setAssets(data || []))
     supabase.from('employees').select('id,name').neq('status', 'Terminated').order('name')
       .then(({ data }) => setEmployees(data || []))
@@ -129,8 +129,8 @@ export default function AccidentReports() {
     setForm(f => ({
       ...f,
       asset_id:   assetId,
-      asset_reg:  asset ? (asset.reg_no || asset.asset_code || asset.name) : '',
-      asset_type: asset?.asset_type || 'vehicle',
+      asset_reg:  asset ? (asset.plate_number || asset.asset_code || asset.asset_name) : '',
+      asset_type: asset?.asset_category || 'vehicle',
     }))
   }
 
@@ -396,7 +396,7 @@ export default function AccidentReports() {
                       onChange={e => handleAssetChange(e.target.value)}>
                       <option value="">Select asset or type below…</option>
                       {assets.map(a => (
-                        <option key={a.id} value={a.id}>{a.name || a.reg_no || a.asset_code}</option>
+                        <option key={a.id} value={a.id}>{a.asset_name || a.plate_number || a.asset_code}</option>
                       ))}
                     </select>
                   </div>
