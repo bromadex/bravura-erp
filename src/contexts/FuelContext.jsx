@@ -62,9 +62,10 @@ export function FuelProvider({ children }) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [tanksRes, issuanceRes, delRes, dipRes, reqRes, calRes] = await Promise.all([
+      const [tanksRes, issuanceRes, fuelLogRes, delRes, dipRes, reqRes, calRes] = await Promise.all([
         supabase.from('fuel_tanks').select('*').order('name'),
         supabase.from('fuel_issuance').select('*').order('date', { ascending: false }).limit(500),
+        supabase.from('fuel_log').select('*').order('date', { ascending: false }).limit(500),
         supabase.from('fuel_deliveries').select('*').order('date', { ascending: false }),
         supabase.from('dipstick_log').select('*').order('date', { ascending: false }),
         supabase.from('fuel_requests').select('*').order('request_date', { ascending: false }).limit(200),
@@ -72,7 +73,16 @@ export function FuelProvider({ children }) {
       ])
 
       setTanks(safe(tanksRes))
-      setIssuances(safe(issuanceRes).map(normalizeIssuance))
+
+      // Merge fuel_issuance (new, rich) + fuel_log (legacy) — fuel_issuance wins on txn_code match
+      const newRows = safe(issuanceRes).map(normalizeIssuance)
+      const newTxnCodes = new Set(newRows.map(r => r.txn_code).filter(Boolean))
+      const legacyRows = safe(fuelLogRes)
+        .filter(r => !r.txn_code || !newTxnCodes.has(r.txn_code))
+        .map(r => ({ ...r, amount: r.amount ?? 0, vehicle: r.vehicle || '', driver: r.driver || '', _source: 'fuel_log' }))
+      const merged = [...newRows, ...legacyRows].sort((a, b) => new Date(b.date) - new Date(a.date))
+      setIssuances(merged)
+
       setDeliveries(safe(delRes))
       setDipstickLog(safe(dipRes))
       setFuelRequests(safe(reqRes))
