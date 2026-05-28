@@ -1,5 +1,4 @@
-// src/pages/Fuel/FuelTanks.jsx
-// Modern redesign: live tank gauge, low-level alerts, 7-day chart, by-vehicle/by-driver bars
+// src/pages/Fuel/FuelTanks.jsx — multi-tank aware
 
 import { useState } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
@@ -10,55 +9,111 @@ import { PageHeader, KPICard, EmptyState, TabNav, AlertBanner } from '../../comp
 
 const today = new Date().toISOString().split('T')[0]
 
+function TankGauge({ tank, level, percentage }) {
+  const levelColor = percentage < 10 ? 'var(--red)' : percentage < 20 ? 'var(--yellow)' : percentage < 40 ? 'var(--yellow)' : 'var(--teal)'
+  const statusLabel = percentage < 10 ? 'Critical' : percentage < 20 ? 'Low' : percentage < 40 ? 'Below 40%' : 'Normal'
+  const badgeClass = percentage < 10 ? 'badge-red' : percentage < 20 ? 'badge-yellow' : percentage < 40 ? 'badge-yellow' : 'badge-green'
+
+  return (
+    <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{tank.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            {tank.tank_code || tank.id} · {tank.fuel_type || 'DIESEL'} · Capacity: {(tank.capacity || 0).toLocaleString()} L
+            {tank.location && ` · ${tank.location}`}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', color: levelColor }}>
+            {percentage.toFixed(0)}%
+          </span>
+          <span className={`badge ${badgeClass}`}>{statusLabel}</span>
+        </div>
+      </div>
+
+      {/* Gauge bar */}
+      <div style={{ position: 'relative', height: 32, background: 'var(--surface2)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, percentage)}%`, background: levelColor, borderRadius: 8, transition: 'width .8s ease', display: 'flex', alignItems: 'center', paddingLeft: 10 }}>
+          {percentage > 10 && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+              {level.toLocaleString()} L
+            </span>
+          )}
+        </div>
+        {[20, 40, 60, 80].map(pct => (
+          <div key={pct} style={{ position: 'absolute', left: `${pct}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.18)' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
+        <span>0</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span><span>100%</span>
+      </div>
+
+      {tank.unit_cost > 0 && (
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-dim)' }}>
+          Value: <strong style={{ color: 'var(--text)' }}>${(level * tank.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+          {' '}at ${tank.unit_cost}/L
+          {tank.alert_threshold > 0 && (
+            <span style={{ marginLeft: 12 }}>Alert threshold: {tank.alert_threshold.toLocaleString()} L</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function FuelTanks() {
   const {
-    issuances, deliveries, dipstickLog,
+    tanks, issuances, deliveries, dipstickLog,
     getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES,
-    loading
+    loading,
   } = useFuel()
 
   const canEdit = useCanEdit('fuel', 'tanks')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const currentLevel = getCurrentTankLevel()
-  const percentage   = getTankPercentage()
-  const totalIssued     = issuances.reduce((s, i) => s + (i.amount || 0), 0)
-  const totalDelivered  = deliveries.reduce((s, d) => s + (d.qty    || 0), 0)
-  const issuedToday     = issuances.filter(i => i.date === today).reduce((s, i) => s + (i.amount || 0), 0)
-  const issuedThisMonth = issuances.filter(i => i.date?.startsWith(today.slice(0, 7))).reduce((s, i) => s + (i.amount || 0), 0)
+  // Aggregate KPIs (all tanks combined)
+  const totalIssued     = issuances.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+  const totalDelivered  = deliveries.reduce((s, d) => s + (d.qty || d.amount || 0), 0)
+  const issuedToday     = issuances.filter(i => String(i.date).slice(0, 10) === today).reduce((s, i) => s + (Number(i.amount) || 0), 0)
+  const issuedThisMonth = issuances.filter(i => String(i.date).slice(0, 7) === today.slice(0, 7)).reduce((s, i) => s + (Number(i.amount) || 0), 0)
 
-  // Level colour
-  const levelColor = percentage < 10 ? 'var(--red)' : percentage < 20 ? 'var(--yellow)' : percentage < 40 ? 'var(--yellow)' : 'var(--teal)'
+  // For backward compat: if no tanks in DB, show single hardcoded gauge
+  const showMultiTank = tanks.length > 0
+  const primaryLevel   = getCurrentTankLevel()
+  const primaryPct     = getTankPercentage()
+  const criticalTanks  = tanks.filter(t => getTankPercentage(t.id) < 10)
+  const lowTanks       = tanks.filter(t => { const p = getTankPercentage(t.id); return p >= 10 && p < 20 })
 
   // 7-day trend
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i))
     const ds = d.toISOString().split('T')[0]
     return {
-      label: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
+      label:   d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }),
       dateStr: ds,
-      issued: issuances.filter(iss => iss.date === ds).reduce((s, r) => s + (r.amount || 0), 0)
+      issued:  issuances.filter(iss => String(iss.date).slice(0, 10) === ds).reduce((s, r) => s + (Number(r.amount) || 0), 0),
     }
   })
   const maxDay = Math.max(...last7.map(d => d.issued), 1)
 
   // By vehicle (top 8)
   const vehicleMap = {}
-  issuances.forEach(i => { const k = i.vehicle || 'Unknown'; vehicleMap[k] = (vehicleMap[k] || 0) + (i.amount || 0) })
+  issuances.forEach(i => { const k = i.vehicle || i.equipment_name || 'Unknown'; vehicleMap[k] = (vehicleMap[k] || 0) + (Number(i.amount) || 0) })
   const byVehicle = Object.entries(vehicleMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
   const maxVehicle = Math.max(...byVehicle.map(v => v[1]), 1)
 
   // By driver (top 8)
   const driverMap = {}
-  issuances.forEach(i => { const k = i.driver || 'Unknown'; driverMap[k] = (driverMap[k] || 0) + (i.amount || 0) })
+  issuances.forEach(i => { const k = i.driver || i.driver_operator || 'Unknown'; driverMap[k] = (driverMap[k] || 0) + (Number(i.amount) || 0) })
   const byDriver = Object.entries(driverMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
   const maxDriver = Math.max(...byDriver.map(d => d[1]), 1)
 
   const handleExport = () => {
     exportMultiSheet([
-      { name: 'Issuances',   rows: issuances.map(i => ({ Date: i.date, Vehicle: i.vehicle, Driver: i.driver, Litres: i.amount, Purpose: i.purpose })) },
-      { name: 'By Vehicle',  rows: byVehicle.map(([v, l]) => ({ Vehicle: v, TotalLitres: l })) },
-      { name: 'By Driver',   rows: byDriver.map(([d, l]) => ({ Driver: d, TotalLitres: l })) },
+      { name: 'Issuances',  rows: issuances.map(i => ({ Date: i.date, Vehicle: i.vehicle, Driver: i.driver, Litres: i.amount, Purpose: i.purpose, Tank: i.tank_id })) },
+      { name: 'By Vehicle', rows: byVehicle.map(([v, l]) => ({ Vehicle: v, TotalLitres: l })) },
+      { name: 'By Driver',  rows: byDriver.map(([d, l])  => ({ Driver: d,  TotalLitres: l })) },
     ], `FuelTanks_${today}`)
     toast.success('Exported')
   }
@@ -76,73 +131,78 @@ export default function FuelTanks() {
         </button>
       </PageHeader>
 
-      {/* ── Critical / Low alert banner ─────────────────────── */}
-      {percentage < 20 && (
+      {/* Critical alert banners */}
+      {criticalTanks.map(t => (
+        <AlertBanner key={t.id} type="danger" message={
+          <span>
+            <strong>CRITICAL — {t.name} nearly empty:</strong>{' '}
+            {getTankPercentage(t.id).toFixed(0)}% · {getCurrentTankLevel(t.id).toLocaleString()} L remaining of {(t.capacity || 0).toLocaleString()} L
+          </span>
+        } />
+      ))}
+      {lowTanks.map(t => (
+        <AlertBanner key={t.id} type="warning" message={
+          <span>
+            <strong>LOW FUEL — {t.name}:</strong>{' '}
+            {getTankPercentage(t.id).toFixed(0)}% · {getCurrentTankLevel(t.id).toLocaleString()} L remaining — place order soon
+          </span>
+        } />
+      ))}
+      {/* Fallback single-tank alert if no tanks in DB */}
+      {!showMultiTank && primaryPct < 20 && (
         <AlertBanner
-          type={percentage < 10 ? 'danger' : 'warning'}
-          message={
-            <div>
-              <div style={{ fontWeight: 700, color: levelColor }}>
-                {percentage < 10 ? 'CRITICAL — Fuel tank nearly empty' : 'LOW FUEL — Place order soon'}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                Main tank (ZUFTA10): <strong style={{ color: levelColor }}>{percentage.toFixed(0)}%</strong>
-                {' · '}{currentLevel.toLocaleString()} L remaining of {TANK_MAX_LITRES.toLocaleString()} L capacity
-              </div>
-            </div>
-          }
+          type={primaryPct < 10 ? 'danger' : 'warning'}
+          message={`${primaryPct < 10 ? 'CRITICAL — Tank nearly empty' : 'LOW FUEL'}: ${primaryPct.toFixed(0)}% · ${primaryLevel.toLocaleString()} L`}
         />
       )}
 
-      {/* Tabs */}
       <TabNav tabs={TABS} active={activeTab} onChange={setActiveTab} />
 
-      {/* ── OVERVIEW TAB ────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <>
-          {/* Tank gauge card */}
-          <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>Main Tank — ZUFTA10</div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Capacity: {TANK_MAX_LITRES.toLocaleString()} L</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--mono)', color: levelColor }}>
-                  {percentage.toFixed(0)}%
+          {/* Tank gauges */}
+          {showMultiTank ? (
+            tanks.map(tank => (
+              <TankGauge
+                key={tank.id}
+                tank={tank}
+                level={getCurrentTankLevel(tank.id)}
+                percentage={getTankPercentage(tank.id)}
+              />
+            ))
+          ) : (
+            /* Backward compat: no tanks in DB — show hardcoded single-tank gauge */
+            <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Main Tank</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Capacity: {TANK_MAX_LITRES.toLocaleString()} L</div>
+                </div>
+                <span style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--mono)' }}>
+                  {primaryPct.toFixed(0)}%
                 </span>
-                <span className={`badge ${percentage < 10 ? 'badge-red' : percentage < 20 ? 'badge-yellow' : percentage < 40 ? 'badge-yellow' : 'badge-green'}`}>
-                  {percentage < 10 ? 'Critical' : percentage < 20 ? 'Low' : percentage < 40 ? 'Below 40%' : 'Normal'}
-                </span>
+              </div>
+              <div style={{ height: 36, background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, primaryPct)}%`, background: primaryPct < 20 ? 'var(--yellow)' : 'var(--teal)', borderRadius: 10, display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
+                  {primaryPct > 12 && <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{primaryLevel.toLocaleString()} L</span>}
+                </div>
               </div>
             </div>
-
-            {/* Gauge bar */}
-            <div style={{ position: 'relative', height: 36, background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 10 }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, percentage)}%`, background: levelColor, borderRadius: 10, transition: 'width .8s ease', display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
-                {percentage > 12 && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
-                    {currentLevel.toLocaleString()} L
-                  </span>
-                )}
-              </div>
-              {/* 20% and 40% markers */}
-              {[20, 40].map(pct => (
-                <div key={pct} style={{ position: 'absolute', left: `${pct}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.2)' }} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
-              <span>0</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span><span>100%</span>
-            </div>
-          </div>
+          )}
 
           {/* KPIs */}
           <div className="kpi-grid" style={{ marginBottom: 20 }}>
-            <KPICard label="Current Level" value={`${currentLevel.toLocaleString()} L`} sub={`${percentage.toFixed(1)}% full`} color="teal" />
-            <KPICard label="Issued Today" value={`${issuedToday.toLocaleString()} L`} sub={today} color="yellow" />
-            <KPICard label="Issued This Month" value={`${issuedThisMonth.toLocaleString()} L`} sub={today.slice(0, 7)} />
-            <KPICard label="Total Delivered" value={`${totalDelivered.toLocaleString()} L`} sub={`${deliveries.length} deliveries`} color="green" />
-            <KPICard label="Total Issued" value={`${totalIssued.toLocaleString()} L`} sub={`${issuances.length} transactions`} />
+            {showMultiTank ? (
+              tanks.map(t => (
+                <KPICard key={t.id} label={t.name} value={`${getCurrentTankLevel(t.id).toLocaleString()} L`} sub={`${getTankPercentage(t.id).toFixed(1)}% · cap: ${(t.capacity || 0).toLocaleString()} L`} color={getTankPercentage(t.id) < 20 ? 'red' : 'teal'} />
+              ))
+            ) : (
+              <KPICard label="Current Level" value={`${primaryLevel.toLocaleString()} L`} sub={`${primaryPct.toFixed(1)}% full`} color="teal" />
+            )}
+            <KPICard label="Issued Today"       value={`${issuedToday.toLocaleString()} L`}    sub={today} color="yellow" />
+            <KPICard label="Issued This Month"  value={`${issuedThisMonth.toLocaleString()} L`} sub={today.slice(0, 7)} />
+            <KPICard label="Total Delivered"    value={`${totalDelivered.toLocaleString()} L`}  sub={`${deliveries.length} deliveries`} color="green" />
+            <KPICard label="Total Issued"       value={`${totalIssued.toLocaleString()} L`}     sub={`${issuances.length} transactions`} />
           </div>
 
           {/* Recent issuances */}
@@ -150,19 +210,27 @@ export default function FuelTanks() {
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Recent Issuances</div>
             <div className="table-wrap">
               <table className="stock-table">
-                <thead><tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Amount (L)</th><th>Purpose</th></tr></thead>
+                <thead>
+                  <tr><th>Date</th><th>Vehicle</th><th>Driver</th><th>Amount (L)</th><th>Purpose</th>
+                    {showMultiTank && <th>Tank</th>}
+                  </tr>
+                </thead>
                 <tbody>
-                  {issuances.slice(0, 8).map(i => (
-                    <tr key={i.id}>
-                      <td>{i.date}</td>
-                      <td style={{ fontWeight: 600 }}>{i.vehicle || '—'}</td>
-                      <td>{i.driver || '—'}</td>
-                      <td className="td-mono" style={{ color: 'var(--yellow)' }}>{i.amount} L</td>
-                      <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{i.purpose || '—'}</td>
-                    </tr>
-                  ))}
+                  {issuances.slice(0, 8).map(i => {
+                    const tank = tanks.find(t => t.id === i.tank_id)
+                    return (
+                      <tr key={i.id}>
+                        <td>{String(i.date).slice(0, 10)}</td>
+                        <td style={{ fontWeight: 600 }}>{i.vehicle || '—'}</td>
+                        <td>{i.driver || '—'}</td>
+                        <td className="td-mono" style={{ color: 'var(--yellow)' }}>{Number(i.amount).toLocaleString()} L</td>
+                        <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{i.purpose || '—'}</td>
+                        {showMultiTank && <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{tank?.name || '—'}</td>}
+                      </tr>
+                    )
+                  })}
                   {issuances.length === 0 && (
-                    <tr><td colSpan="5"><EmptyState icon="local_gas_station" message="No issuances yet" /></td></tr>
+                    <tr><td colSpan={showMultiTank ? 6 : 5}><EmptyState icon="local_gas_station" message="No issuances yet" /></td></tr>
                   )}
                 </tbody>
               </table>
@@ -180,7 +248,7 @@ export default function FuelTanks() {
                     <tr key={d.id}>
                       <td>{d.date}</td>
                       <td style={{ fontWeight: 600 }}>{d.supplier || '—'}</td>
-                      <td className="td-mono" style={{ color: 'var(--green)' }}>{d.qty?.toLocaleString()} L</td>
+                      <td className="td-mono" style={{ color: 'var(--green)' }}>{(d.qty || 0).toLocaleString()} L</td>
                       <td><span className={`badge ${d.fuel_type === 'DIESEL' ? 'badge-yellow' : 'badge-green'}`}>{d.fuel_type}</span></td>
                       <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{d.delivery_note || '—'}</td>
                     </tr>
@@ -195,13 +263,12 @@ export default function FuelTanks() {
         </>
       )}
 
-      {/* ── ANALYTICS TAB ───────────────────────────────────── */}
       {activeTab === 'analytics' && (
         <>
-          {/* 7-day bar chart (CSS) */}
+          {/* 7-day bar chart */}
           <div className="card" style={{ padding: 20, marginBottom: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>7-Day Consumption Trend</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Litres issued per day</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Litres issued per day (all tanks)</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 140 }}>
               {last7.map((day, i) => {
                 const pct     = (day.issued / maxDay) * 100
@@ -224,24 +291,20 @@ export default function FuelTanks() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* By vehicle */}
             <div className="card" style={{ padding: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>By Vehicle</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Total litres issued per vehicle</div>
-              {byVehicle.length === 0 ? (
-                <EmptyState icon="directions_car" message="No data yet" />
-              ) : byVehicle.map(([vehicle, litres]) => {
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>By Vehicle (top 8)</div>
+              {byVehicle.length === 0 ? <EmptyState icon="directions_car" message="No data yet" /> : byVehicle.map(([vehicle, litres]) => {
                 const pct = (litres / maxVehicle) * 100
                 const pctTotal = totalIssued > 0 ? ((litres / totalIssued) * 100).toFixed(0) : 0
                 return (
                   <div key={vehicle} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }} title={vehicle}>{vehicle}</span>
+                      <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }} title={vehicle}>{vehicle}</span>
                       <span style={{ fontSize: 12, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--teal)' }}>
                         {litres.toLocaleString()} L <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({pctTotal}%)</span>
                       </span>
                     </div>
-                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 4 }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: 'var(--teal)', borderRadius: 4 }} />
                     </div>
                   </div>
@@ -249,13 +312,9 @@ export default function FuelTanks() {
               })}
             </div>
 
-            {/* By driver */}
             <div className="card" style={{ padding: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>By Driver / Operator</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>Total litres issued per driver</div>
-              {byDriver.length === 0 ? (
-                <EmptyState icon="person" message="No data yet" />
-              ) : byDriver.map(([driver, litres]) => {
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>By Driver / Operator (top 8)</div>
+              {byDriver.length === 0 ? <EmptyState icon="person" message="No data yet" /> : byDriver.map(([driver, litres]) => {
                 const pct = (litres / maxDriver) * 100
                 const pctTotal = totalIssued > 0 ? ((litres / totalIssued) * 100).toFixed(0) : 0
                 return (
@@ -266,7 +325,7 @@ export default function FuelTanks() {
                         {litres.toLocaleString()} L <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({pctTotal}%)</span>
                       </span>
                     </div>
-                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 4 }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: 'var(--yellow)', borderRadius: 4 }} />
                     </div>
                   </div>
@@ -275,18 +334,19 @@ export default function FuelTanks() {
             </div>
           </div>
 
-          {/* Dipstick trend */}
           {dipstickLog.length > 0 && (
             <div className="card" style={{ padding: 20, marginTop: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Tank Level History (from Dipstick)</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Tank Level History (Dipstick)</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 16 }}>End-of-day levels from dipstick readings</div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 100, overflowX: 'auto' }}>
                 {[...dipstickLog].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-30).map((d, i) => {
                   const lvl = d.fuel_end || 0
-                  const pct = (lvl / TANK_MAX_LITRES) * 100
+                  const tank = tanks.find(t => t.id === d.tank_id)
+                  const cap = tank?.capacity || TANK_MAX_LITRES
+                  const pct = (lvl / cap) * 100
                   const col = pct < 10 ? 'var(--red)' : pct < 20 ? 'var(--yellow)' : 'var(--teal)'
                   return (
-                    <div key={i} title={`${d.date}: ${lvl.toLocaleString()} L`}
+                    <div key={i} title={`${d.date}: ${lvl.toLocaleString()} L${tank ? ` (${tank.name})` : ''}`}
                       style={{ flex: '0 0 20px', height: `${Math.max(4, pct)}%`, background: col, borderRadius: '3px 3px 0 0', cursor: 'pointer', transition: 'opacity .15s' }}
                       onMouseOver={e => e.currentTarget.style.opacity = '0.7'}
                       onMouseOut={e  => e.currentTarget.style.opacity = '1'} />

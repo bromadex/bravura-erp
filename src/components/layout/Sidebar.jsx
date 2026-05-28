@@ -204,6 +204,8 @@ const ALL_MODULES = {
         { id: 'vehicles',           label: 'Vehicles',           icon: 'directions_car'       },
         { id: 'generators',         label: 'Generators',         icon: 'bolt'                 },
         { id: 'heavy-equipment',    label: 'Heavy Equipment',    icon: 'construction'         },
+        { id: 'trips',              label: 'Trip Management',    icon: 'route'                },
+        { id: 'accidents',          label: 'Accident Reports',   icon: 'car_crash'            },
         { id: 'maintenance-alerts', label: 'Maintenance Alerts', icon: 'notifications_active' },
         { id: 'asset-issues',       label: 'Asset Issues',       icon: 'bug_report'           },
       ],

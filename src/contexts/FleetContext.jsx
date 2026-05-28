@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
 import { generateTxnCode } from '../engine/transactionEngine'
+import { postToGL } from '../engine/accountingEngine'
 
 const FleetContext = createContext(null)
 
@@ -39,7 +40,16 @@ function toVehicle(a) {
     service_interval_km:        a.measurement_type === 'km' ? (a.service_interval || null) : null,
     service_interval_days:      a.metadata?.service_interval_days || null,
     utilization_available_hours: a.metadata?.utilization_available_hours || null,
-    // enhancement fields stored in metadata
+    // identity fields (direct columns on asset_registry)
+    make:                       a.make || '',
+    model:                      a.model || '',
+    year:                       a.year || null,
+    colour:                     a.colour || '',
+    vin_serial:                 a.vin_serial || '',
+    engine_number:              a.engine_number || '',
+    chassis_number:             a.chassis_number || '',
+    fuel_type:                  a.fuel_type || '',
+    // compliance fields stored in metadata
     tare_weight:                a.metadata?.tare_weight || null,
     gross_vehicle_mass:         a.metadata?.gross_vehicle_mass || null,
     licence_expiry:             a.metadata?.licence_expiry || null,
@@ -67,6 +77,15 @@ function fromVehicle(v, id, asset_code) {
     last_service_date:     v.last_service_date || null,
     last_service_val:      v.last_service_km ? parseFloat(v.last_service_km) : null,
     plate_number:          v.reg || '',
+    // identity fields
+    make:                  v.make || null,
+    model:                 v.model || null,
+    year:                  v.year ? parseInt(v.year) : null,
+    colour:                v.colour || null,
+    vin_serial:            v.vin_serial || null,
+    engine_number:         v.engine_number || null,
+    chassis_number:        v.chassis_number || null,
+    fuel_type:             v.fuel_type || null,
     status:                v.status || 'Active',
     assigned_to:           v.driver_name || '',
     assigned_project:      v.assigned_project || '',
@@ -176,6 +195,15 @@ function vehicleUpdateToAR(updates, currentAsset) {
   if ('acquisition_cost' in updates)   ar.purchase_cost = parseFloat(updates.acquisition_cost) || 0
   if ('acquisition_date' in updates)   ar.purchase_date = updates.acquisition_date
   if ('salvage_value' in updates)      ar.salvage_value = parseFloat(updates.salvage_value) || 0
+  // identity fields
+  if ('make' in updates)           ar.make = updates.make || null
+  if ('model' in updates)          ar.model = updates.model || null
+  if ('year' in updates)           ar.year = updates.year ? parseInt(updates.year) : null
+  if ('colour' in updates)         ar.colour = updates.colour || null
+  if ('vin_serial' in updates)     ar.vin_serial = updates.vin_serial || null
+  if ('engine_number' in updates)  ar.engine_number = updates.engine_number || null
+  if ('chassis_number' in updates) ar.chassis_number = updates.chassis_number || null
+  if ('fuel_type' in updates)      ar.fuel_type = updates.fuel_type || null
   // Metadata patch — merge with existing
   const META_FIELDS = ['driver_id','service_interval_days','utilization_available_hours','tare_weight',
     'gross_vehicle_mass','licence_expiry','insurance_expiry','roadworthy_expiry','tracker_id','cost_center']
@@ -221,6 +249,9 @@ export function FleetProvider({ children }) {
   const [workOrders, setWorkOrders]             = useState([])
   const [tyreInventory, setTyreInventory]       = useState([])
   const [tyreMovements, setTyreMovements]       = useState([])
+  const [meterReadings, setMeterReadings]       = useState([])
+  const [accidentReports, setAccidentReports]   = useState([])
+  const [fleetDocuments, setFleetDocuments]     = useState([])
   const [loading, setLoading]                   = useState(true)
 
   const generateId = () =>
@@ -238,7 +269,7 @@ export function FleetProvider({ children }) {
         arRes, cfgRes,
         legacyFleetRes, legacyEMRes, legacyGenRes,
         grRes, dtRes, mtRes, fRes, vtRes, ehRes, aiRes,
-        msRes, woRes, tiRes, tmRes,
+        msRes, woRes, tiRes, tmRes, mrRes, accRes, fdRes,
       ] = await Promise.all([
         safe(supabase.from('asset_registry').select('*').order('asset_name')),
         safe(supabase.from('asset_category_config').select('*').order('sort_order')),
@@ -256,6 +287,9 @@ export function FleetProvider({ children }) {
         safe(supabase.from('maintenance_work_orders').select('*').order('created_at', { ascending: false })),
         safe(supabase.from('tyre_inventory').select('*').order('serial_number')),
         safe(supabase.from('tyre_movements').select('*').order('event_date', { ascending: false })),
+        safe(supabase.from('meter_readings').select('*').order('reading_date', { ascending: false }).limit(500)),
+        safe(supabase.from('accident_reports').select('*').order('incident_date', { ascending: false })),
+        safe(supabase.from('fleet_documents').select('*').order('expiry_date')),
       ])
 
       const arRows = arRes.data || []
@@ -301,6 +335,9 @@ export function FleetProvider({ children }) {
       if (woRes.data)  setWorkOrders(woRes.data)
       if (tiRes.data)  setTyreInventory(tiRes.data)
       if (tmRes.data)  setTyreMovements(tmRes.data)
+      if (mrRes.data)  setMeterReadings(mrRes.data)
+      if (accRes.data) setAccidentReports(accRes.data)
+      if (fdRes.data)  setFleetDocuments(fdRes.data)
     } catch (err) {
       console.error(err)
       toast.error('Failed to load fleet data')
@@ -650,6 +687,116 @@ export function FleetProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Meter Readings ────────────────────────────────────────────────────────
+
+  const addMeterReading = async (reading) => {
+    // Validate: new reading must be >= last reading for this asset
+    const lastReading = meterReadings
+      .filter(r => r.asset_id === reading.asset_id && r.reading_type === reading.reading_type)
+      .sort((a, b) => new Date(b.reading_date) - new Date(a.reading_date))[0]
+    if (lastReading && parseFloat(reading.reading_value) < parseFloat(lastReading.reading_value)) {
+      throw new Error(`Meter reading cannot decrease. Last value: ${lastReading.reading_value}`)
+    }
+    const id = generateId()
+    const { error } = await supabase.from('meter_readings').insert([{
+      id, ...reading, created_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    // Update asset_registry primary_metric_val
+    await safe(supabase.from('asset_registry')
+      .update({ primary_metric_val: parseFloat(reading.reading_value), updated_at: new Date().toISOString() })
+      .eq('id', reading.asset_id))
+    auditLog({ module: 'fleet', action: 'METER', entityType: 'meter_reading', entityId: id, entityName: reading.asset_id })
+    await fetchAll()
+  }
+
+  const getAssetMeterHistory = (assetId, readingType = 'odometer') =>
+    meterReadings.filter(r => r.asset_id === assetId && r.reading_type === readingType)
+      .sort((a, b) => new Date(a.reading_date) - new Date(b.reading_date))
+
+  // ── Accident Reports ──────────────────────────────────────────────────────
+
+  const addAccidentReport = async (report) => {
+    const id = generateId()
+    const report_number = await generateTxnCode('ACC').catch(() => `ACC-${Date.now()}`)
+    const { error } = await supabase.from('accident_reports').insert([{
+      id, report_number, ...report, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'accident_report', entityId: id, entityName: report_number })
+    await fetchAll()
+    return report_number
+  }
+
+  const updateAccidentReport = async (id, updates) => {
+    const { error } = await supabase.from('accident_reports')
+      .update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+    auditLog({ module: 'fleet', action: 'UPDATE', entityType: 'accident_report', entityId: id })
+    await fetchAll()
+  }
+
+  // ── Fleet Documents ───────────────────────────────────────────────────────
+
+  const addFleetDocument = async (doc) => {
+    const id = generateId()
+    const { error } = await supabase.from('fleet_documents').insert([{
+      id, ...doc, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'fleet_document', entityId: id, entityName: doc.doc_type })
+    await fetchAll()
+  }
+
+  const updateFleetDocument = async (id, updates) => {
+    const { error } = await supabase.from('fleet_documents')
+      .update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const deleteFleetDocument = async (id) => {
+    const { error } = await supabase.from('fleet_documents').delete().eq('id', id)
+    if (error) throw error
+    await fetchAll()
+  }
+
+  const getExpiringDocuments = (days = 30) => {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + days)
+    const today = new Date()
+    return fleetDocuments.filter(d => {
+      if (!d.expiry_date || !d.is_active) return false
+      const exp = new Date(d.expiry_date)
+      return exp <= cutoff
+    }).sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))
+  }
+
+  // Compute expiry warnings from asset metadata fields (before fleet_documents populated)
+  const getAssetExpiryWarnings = (days = 30) => {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + days)
+    const warnings = []
+    vehicles.forEach(v => {
+      const checks = [
+        { field: 'licence_expiry', label: 'License' },
+        { field: 'insurance_expiry', label: 'Insurance' },
+        { field: 'roadworthy_expiry', label: 'Roadworthy' },
+      ]
+      checks.forEach(({ field, label }) => {
+        const dateStr = v[field] || v.metadata?.[field]
+        if (!dateStr) return
+        const exp = new Date(dateStr)
+        if (exp <= cutoff) {
+          const daysLeft = Math.ceil((exp - new Date()) / 86400000)
+          warnings.push({
+            asset: v.reg, assetId: v.id, type: label,
+            expiry: dateStr, daysLeft, overdue: daysLeft < 0,
+          })
+        }
+      })
+    })
+    return warnings.sort((a, b) => a.daysLeft - b.daysLeft)
+  }
+
   // ── Tyre Inventory ────────────────────────────────────────────────────────
 
   const addTyre = async (tyre) => {
@@ -951,6 +1098,7 @@ export function FleetProvider({ children }) {
       vehicles, generators, earthMovers, genRunLogs, downtimeLogs, maintenanceLogs, fuelLogs,
       vehicleTrips, equipmentHourLogs, assetIssues,
       maintenanceSchedules, workOrders, tyreInventory, tyreMovements,
+      meterReadings, accidentReports, fleetDocuments,
       categoryConfigs,
       loading,
       addVehicle, updateVehicle, deleteVehicle,
@@ -965,6 +1113,10 @@ export function FleetProvider({ children }) {
       createWorkOrder, updateWorkOrder, closeWorkOrder,
       addTyre, updateTyre, scrapTyre,
       recordTyreMovement,
+      addMeterReading, getAssetMeterHistory,
+      addAccidentReport, updateAccidentReport,
+      addFleetDocument, updateFleetDocument, deleteFleetDocument,
+      getExpiringDocuments, getAssetExpiryWarnings,
       getVehicleFuelEfficiency, getGeneratorEfficiency, getEquipmentEfficiency,
       getNextService, getHealthScore, getHealthStatus, getOverdueAlerts,
       getUpcomingPM, getVehicleTyres, getFleetCosts, getAssetReliability,
