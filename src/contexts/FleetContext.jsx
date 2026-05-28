@@ -352,12 +352,28 @@ export function FleetProvider({ children }) {
 
   const addVehicle = async (vehicle) => {
     const id = generateId()
-    const asset_code = await generateTxnCode('FL').catch(() => `FL-${Date.now()}`)
-    const { error } = await supabase.from('asset_registry')
-      .insert([{ ...fromVehicle(vehicle, id, asset_code), created_at: new Date().toISOString() }])
-    if (error) throw error
-    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'vehicle', entityId: id, entityName: vehicle.reg || id })
-    await fetchAll()
+    // Try up to 3 times — self-heals if the counter ever drifts behind existing records
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let asset_code
+      try { asset_code = await generateTxnCode('FL') }
+      catch { asset_code = `FL-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g,'').slice(0,8).toUpperCase()}` }
+
+      const { error } = await supabase.from('asset_registry')
+        .insert([{ ...fromVehicle(vehicle, id, asset_code), created_at: new Date().toISOString() }])
+
+      if (!error) {
+        auditLog({ module: 'fleet', action: 'CREATE', entityType: 'vehicle', entityId: id, entityName: vehicle.reg || id })
+        await fetchAll()
+        return
+      }
+      // On unique-code collision, advance the counter and retry
+      if (error.code === '23505' && error.message?.includes('asset_code')) {
+        await supabase.rpc('next_txn_code', { p_prefix: 'FL', p_year: new Date().getFullYear() })
+        continue
+      }
+      throw error
+    }
+    throw new Error('Failed to generate a unique asset code — please try again')
   }
 
   const updateVehicle = async (id, updates) => {
@@ -399,12 +415,24 @@ export function FleetProvider({ children }) {
 
   const addGenerator = async (generator) => {
     const id = generateId()
-    const asset_code = await generateTxnCode('GN').catch(() => `GN-${Date.now()}`)
-    const { error } = await supabase.from('asset_registry')
-      .insert([{ ...fromGenerator(generator, id, asset_code), created_at: new Date().toISOString() }])
-    if (error) throw error
-    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'generator', entityId: id, entityName: generator.gen_code || id })
-    await fetchAll()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let asset_code
+      try { asset_code = await generateTxnCode('GN') }
+      catch { asset_code = `GN-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g,'').slice(0,8).toUpperCase()}` }
+      const { error } = await supabase.from('asset_registry')
+        .insert([{ ...fromGenerator(generator, id, asset_code), created_at: new Date().toISOString() }])
+      if (!error) {
+        auditLog({ module: 'fleet', action: 'CREATE', entityType: 'generator', entityId: id, entityName: generator.gen_code || id })
+        await fetchAll()
+        return
+      }
+      if (error.code === '23505' && error.message?.includes('asset_code')) {
+        await supabase.rpc('next_txn_code', { p_prefix: 'GN', p_year: new Date().getFullYear() })
+        continue
+      }
+      throw error
+    }
+    throw new Error('Failed to generate a unique asset code — please try again')
   }
 
   const updateGenerator = async (id, updates) => {
@@ -448,12 +476,24 @@ export function FleetProvider({ children }) {
 
   const addEarthMover = async (equipment) => {
     const id = generateId()
-    const asset_code = await generateTxnCode('EM').catch(() => `EM-${Date.now()}`)
-    const { error } = await supabase.from('asset_registry')
-      .insert([{ ...fromEarthMover(equipment, id, asset_code), created_at: new Date().toISOString() }])
-    if (error) throw error
-    auditLog({ module: 'fleet', action: 'CREATE', entityType: 'heavy_equipment', entityId: id, entityName: equipment.reg || id })
-    await fetchAll()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let asset_code
+      try { asset_code = await generateTxnCode('EM') }
+      catch { asset_code = `EM-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g,'').slice(0,8).toUpperCase()}` }
+      const { error } = await supabase.from('asset_registry')
+        .insert([{ ...fromEarthMover(equipment, id, asset_code), created_at: new Date().toISOString() }])
+      if (!error) {
+        auditLog({ module: 'fleet', action: 'CREATE', entityType: 'heavy_equipment', entityId: id, entityName: equipment.reg || id })
+        await fetchAll()
+        return
+      }
+      if (error.code === '23505' && error.message?.includes('asset_code')) {
+        await supabase.rpc('next_txn_code', { p_prefix: 'EM', p_year: new Date().getFullYear() })
+        continue
+      }
+      throw error
+    }
+    throw new Error('Failed to generate a unique asset code — please try again')
   }
 
   const updateEarthMover = async (id, updates) => {
