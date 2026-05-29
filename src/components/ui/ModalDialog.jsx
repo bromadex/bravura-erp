@@ -3,7 +3,7 @@
 // Clicks outside the modal box close it.
 
 export function ModalDialog({ open, onClose, title, size = '', children, style }) {
-  if (!open) return null
+  if (open === false) return null
   const sizeClass = size ? `modal-${size}` : ''
   return (
     <div className="overlay" onClick={onClose}>
