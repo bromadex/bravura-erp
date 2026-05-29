@@ -184,8 +184,10 @@ const ALL_MODULES = {
         { id: 'tanks',           label: 'Fuel Tanks',       icon: 'water'              },
         { id: 'requests',        label: 'Fuel Requests',    icon: 'assignment'         },
         { id: 'issuance',        label: 'Fuel Issuance',    icon: 'local_gas_station'  },
+        { id: 'shifts',          label: 'Fuel Shifts',      icon: 'schedule'           },
         { id: 'deliveries',      label: 'Deliveries',       icon: 'local_shipping'     },
         { id: 'dipstick',        label: 'Dipstick Log',     icon: 'straighten'         },
+        { id: 'bowser',          label: 'Bowser Dispatch',  icon: 'local_shipping'     },
       ],
     }, {
       label: 'Analytics', pages: [

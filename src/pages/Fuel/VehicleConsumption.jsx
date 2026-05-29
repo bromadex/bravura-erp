@@ -1,10 +1,11 @@
 // src/pages/Fuel/VehicleConsumption.jsx
-// Per-vehicle fuel efficiency analytics with abnormal usage detection.
+// Per-vehicle fuel efficiency analytics with abnormal usage detection and benchmarking.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { PageHeader, KPICard, AlertBanner, EmptyState, Spinner } from '../../components/ui'
 import { exportXLSX, exportCSV, fmtNum, fmtDate, dateTag } from '../../engine/reportingEngine'
+import toast from 'react-hot-toast'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -30,9 +31,28 @@ export default function VehicleConsumption() {
   const [filter, setFilter]   = useState('')
   const [rows,   setRows]     = useState([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState(null) // vehicle name
+  const [expanded, setExpanded]   = useState(null)
+  const [activeTab, setActiveTab] = useState('analytics')
 
-  // ── fetch ──────────────────────────────────────────────────────────────────
+  // ── Benchmarks state ──────────────────────────────────────────────────────
+  const [benchmarks,      setBenchmarks]      = useState([])
+  const [bLoading,        setBLoading]        = useState(true)
+  const [showBenchModal,  setShowBenchModal]  = useState(false)
+  const [benchForm,       setBenchForm]       = useState({ vehicle: '', target_l_per_100km: '', target_l_per_hr: '', measurement_type: 'km', notes: '' })
+  const [editBenchId,     setEditBenchId]     = useState(null)
+  const [benchSaving,     setBenchSaving]     = useState(false)
+
+  // ── fetch benchmarks ─────────────────────────────────────────────────────
+  const fetchBenchmarks = useCallback(() => {
+    setBLoading(true)
+    supabase.from('fuel_benchmarks').select('*').order('vehicle')
+      .then(({ data }) => { setBenchmarks(data || []); setBLoading(false) })
+      .catch(() => setBLoading(false))
+  }, [])
+
+  useEffect(() => { fetchBenchmarks() }, [fetchBenchmarks])
+
+  // ── fetch fuel log ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -195,6 +215,55 @@ export default function VehicleConsumption() {
     exportCSV(exportRows, `VehicleConsumption_${dateTag()}`)
   }
 
+  // ── benchmark CRUD ─────────────────────────────────────────────────────────
+  const openNewBench = (vehicleName) => {
+    setEditBenchId(null)
+    setBenchForm({ vehicle: vehicleName || '', target_l_per_100km: '', target_l_per_hr: '', measurement_type: 'km', notes: '' })
+    setShowBenchModal(true)
+  }
+
+  const openEditBench = (b) => {
+    setEditBenchId(b.id)
+    setBenchForm({ vehicle: b.vehicle, target_l_per_100km: b.target_l_per_100km || '', target_l_per_hr: b.target_l_per_hr || '', measurement_type: b.measurement_type || 'km', notes: b.notes || '' })
+    setShowBenchModal(true)
+  }
+
+  const handleSaveBench = async () => {
+    if (!benchForm.vehicle.trim()) { toast.error('Enter vehicle name'); return }
+    setBenchSaving(true)
+    try {
+      const payload = {
+        vehicle:           benchForm.vehicle.trim(),
+        target_l_per_100km: benchForm.target_l_per_100km !== '' ? parseFloat(benchForm.target_l_per_100km) : null,
+        target_l_per_hr:    benchForm.target_l_per_hr    !== '' ? parseFloat(benchForm.target_l_per_hr)    : null,
+        measurement_type:  benchForm.measurement_type,
+        notes:             benchForm.notes || null,
+        updated_at:        new Date().toISOString(),
+      }
+      if (editBenchId) {
+        const { error } = await supabase.from('fuel_benchmarks').update(payload).eq('id', editBenchId)
+        if (error) throw error
+        toast.success('Benchmark updated')
+      } else {
+        const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2)
+        const { error } = await supabase.from('fuel_benchmarks').insert([{ id, ...payload, created_at: new Date().toISOString() }])
+        if (error) throw error
+        toast.success('Benchmark saved')
+      }
+      setShowBenchModal(false)
+      fetchBenchmarks()
+    } catch (e) { toast.error(e.message) }
+    setBenchSaving(false)
+  }
+
+  const handleDeleteBench = async (id) => {
+    if (!window.confirm('Delete this benchmark?')) return
+    const { error } = await supabase.from('fuel_benchmarks').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Benchmark deleted')
+    fetchBenchmarks()
+  }
+
   // ── status badge ───────────────────────────────────────────────────────────
   function StatusBadge({ status }) {
     if (status === 'normal') return <span className="badge badge-green" style={{ fontSize: 11 }}>Normal</span>
@@ -203,19 +272,161 @@ export default function VehicleConsumption() {
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
-  if (loading) return <div style={{ padding: 40 }}><Spinner /></div>
+  if (loading && activeTab === 'analytics') return <div style={{ padding: 40 }}><Spinner /></div>
 
   return (
     <div>
       {/* Header */}
-      <PageHeader title="Vehicle Consumption Analytics" subtitle="Per-vehicle fuel efficiency and abnormal usage detection">
-        <button className="btn btn-secondary" onClick={handleExportCSV}>
-          <span className="material-icons">download</span> CSV
-        </button>
-        <button className="btn btn-secondary" onClick={handleExportXLSX}>
-          <span className="material-icons">table_chart</span> Excel
-        </button>
+      <PageHeader title="Vehicle Consumption Analytics" subtitle="Per-vehicle fuel efficiency, benchmarking and abnormal usage detection">
+        {activeTab === 'analytics' && (
+          <>
+            <button className="btn btn-secondary" onClick={handleExportCSV}>
+              <span className="material-icons">download</span> CSV
+            </button>
+            <button className="btn btn-secondary" onClick={handleExportXLSX}>
+              <span className="material-icons">table_chart</span> Excel
+            </button>
+          </>
+        )}
+        {activeTab === 'benchmarks' && (
+          <button className="btn btn-primary" onClick={() => openNewBench('')}>
+            <span className="material-icons">add</span> Add Benchmark
+          </button>
+        )}
       </PageHeader>
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+        {[
+          { id: 'analytics',   label: 'Consumption Analytics', icon: 'speed'      },
+          { id: 'benchmarks',  label: 'Benchmarks',            icon: 'flag'       },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 13, fontWeight: 600,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: activeTab === tab.id ? 'var(--gold)' : 'var(--text-dim)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--gold)' : '2px solid transparent',
+              marginBottom: -1,
+            }}>
+            <span className="material-icons" style={{ fontSize: 16 }}>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'benchmarks' && (
+        <div>
+          {bLoading ? <div style={{ padding: 40 }}><Spinner /></div> : (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {benchmarks.length === 0 ? (
+                <div style={{ padding: 32 }}>
+                  <EmptyState icon="flag" message="No benchmarks set. Click 'Add Benchmark' to define target consumption for a vehicle." />
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['Vehicle', 'Target L/100km', 'Target L/hr', 'Actual Avg L/100km', 'vs Target', 'Type', 'Notes', ''].map(h => (
+                          <th key={h} style={{ padding: '10px 14px', textAlign: h === 'vs Target' || h === 'Actual Avg L/100km' || h === 'Target L/100km' || h === 'Target L/hr' ? 'right' : 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid var(--border2)', color: 'var(--text-dim)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {benchmarks.map(b => {
+                        const vData = vehicleData.find(v => v.vehicle === b.vehicle)
+                        const actual = vData?.avgL100
+                        const target = parseFloat(b.target_l_per_100km)
+                        const diff   = actual != null && target > 0 ? actual - target : null
+                        const diffColor = diff == null ? 'var(--text-dim)' : diff > target * 0.2 ? 'var(--red)' : diff > 0 ? 'var(--yellow)' : 'var(--green)'
+                        return (
+                          <tr key={b.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 600 }}>{b.vehicle}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>
+                              {b.target_l_per_100km != null ? fmtNum(b.target_l_per_100km) : '—'}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>
+                              {b.target_l_per_hr != null ? fmtNum(b.target_l_per_hr) : '—'}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>
+                              {actual != null ? fmtNum(actual) : <span style={{ color: 'var(--text-dim)' }}>No data</span>}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: diffColor }}>
+                              {diff != null ? (diff > 0 ? '+' : '') + fmtNum(diff) : '—'}
+                            </td>
+                            <td style={{ padding: '10px 14px', fontSize: 12 }}>
+                              <span className="badge badge-yellow" style={{ fontSize: 10 }}>{b.measurement_type === 'hr' ? 'L/hr' : 'L/100km'}</span>
+                            </td>
+                            <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-dim)' }}>{b.notes || '—'}</td>
+                            <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', marginRight: 4 }} onClick={() => openEditBench(b)}>Edit</button>
+                              <button className="btn btn-ghost" style={{ fontSize: 11, padding: '3px 8px', color: 'var(--red)' }} onClick={() => handleDeleteBench(b.id)}>Del</button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Benchmark modal */}
+          {showBenchModal && (
+            <div className="overlay" onClick={() => setShowBenchModal(false)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-title">{editBenchId ? 'Edit' : 'Add'} <span>Benchmark</span></div>
+                <div className="form-group">
+                  <label>Vehicle / Equipment *</label>
+                  <input className="form-control" list="vehicle-list" value={benchForm.vehicle}
+                    onChange={e => setBenchForm(f => ({ ...f, vehicle: e.target.value }))} />
+                  <datalist id="vehicle-list">
+                    {vehicleData.map(v => <option key={v.vehicle} value={v.vehicle} />)}
+                  </datalist>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label>Target L/100km</label>
+                    <input className="form-control" type="number" min="0" step="0.1"
+                      value={benchForm.target_l_per_100km}
+                      onChange={e => setBenchForm(f => ({ ...f, target_l_per_100km: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label>Target L/hr (equipment)</label>
+                    <input className="form-control" type="number" min="0" step="0.1"
+                      value={benchForm.target_l_per_hr}
+                      onChange={e => setBenchForm(f => ({ ...f, target_l_per_hr: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Primary Measurement</label>
+                  <select className="form-control" value={benchForm.measurement_type}
+                    onChange={e => setBenchForm(f => ({ ...f, measurement_type: e.target.value }))}>
+                    <option value="km">km (vehicles)</option>
+                    <option value="hr">hours (equipment)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Notes</label>
+                  <input className="form-control" value={benchForm.notes}
+                    onChange={e => setBenchForm(f => ({ ...f, notes: e.target.value }))} />
+                </div>
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => setShowBenchModal(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSaveBench} disabled={benchSaving}>
+                    {benchSaving ? 'Saving…' : 'Save Benchmark'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <>
 
       {/* Filters */}
       <div className="card" style={{ padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -388,6 +599,9 @@ export default function VehicleConsumption() {
             </table>
           </div>
         </div>
+      )}
+
+        </> // end analytics tab
       )}
     </div>
   )

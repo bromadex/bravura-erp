@@ -69,7 +69,7 @@ export default function FuelTanks() {
   const {
     tanks, issuances, deliveries, dipstickLog, transfers,
     getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES, addTransfer,
-    loading,
+    setOpeningFuelBalance, loading,
   } = useFuel()
   const { user } = useAuth()
 
@@ -78,6 +78,25 @@ export default function FuelTanks() {
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferForm, setTransferForm]           = useState(BLANK_TRANSFER)
   const [transferSaving, setTransferSaving]       = useState(false)
+  const [showOpeningModal, setShowOpeningModal]   = useState(false)
+  const [openingForm, setOpeningForm]             = useState({ tank_id: '', level: '', date: today, notes: '' })
+  const [openingSaving, setOpeningSaving]         = useState(false)
+
+  const handleOpeningBalance = async () => {
+    if (!openingForm.tank_id) { toast.error('Select a tank'); return }
+    const lvl = parseFloat(openingForm.level)
+    if (!openingForm.level || isNaN(lvl) || lvl < 0) { toast.error('Enter a valid level in litres'); return }
+    const tank = tanks.find(t => t.id === openingForm.tank_id)
+    if (tank && lvl > (tank.capacity || 0)) { toast.error(`Level exceeds tank capacity (${tank.capacity?.toLocaleString()}L)`); return }
+    setOpeningSaving(true)
+    try {
+      await setOpeningFuelBalance(openingForm.tank_id, lvl, openingForm.date, openingForm.notes)
+      toast.success(`Opening balance set: ${lvl.toLocaleString()}L`)
+      setShowOpeningModal(false)
+      setOpeningForm({ tank_id: '', level: '', date: today, notes: '' })
+    } catch (e) { toast.error(e.message) }
+    setOpeningSaving(false)
+  }
 
   const handleTransfer = async () => {
     if (!transferForm.from_tank_id || !transferForm.to_tank_id) { toast.error('Select both tanks'); return }
@@ -153,9 +172,14 @@ export default function FuelTanks() {
           <span className="material-icons">table_chart</span> Export
         </button>
         {canEdit && (
-          <button className="btn btn-primary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
-            <span className="material-icons">swap_horiz</span> Transfer
-          </button>
+          <>
+            <button className="btn btn-secondary" onClick={() => { setOpeningForm({ tank_id: tanks[0]?.id || '', level: '', date: today, notes: '' }); setShowOpeningModal(true) }}>
+              <span className="material-icons">inventory_2</span> Set Opening Balance
+            </button>
+            <button className="btn btn-primary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
+              <span className="material-icons">swap_horiz</span> Transfer
+            </button>
+          </>
         )}
       </PageHeader>
 
@@ -434,6 +458,54 @@ export default function FuelTanks() {
             </div>
           )}
         </div>
+      )}
+
+      {showOpeningModal && (
+        <ModalDialog title="Set Opening Fuel Balance" onClose={() => setShowOpeningModal(false)}>
+          <div style={{ marginBottom: 8, padding: '10px 12px', background: 'rgba(244,162,97,.1)', borderRadius: 6, fontSize: 12, color: 'var(--text-dim)' }}>
+            Creates a dipstick reading tagged as <strong>Opening Balance</strong>. Use this once when starting fresh or at period-open to establish the baseline tank level.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Tank *</label>
+              <select className="form-control" value={openingForm.tank_id}
+                onChange={e => setOpeningForm(f => ({ ...f, tank_id: e.target.value }))}>
+                <option value="">Select tank</option>
+                {tanks.map(t => <option key={t.id} value={t.id}>{t.name} (cap: {(t.capacity || 0).toLocaleString()}L)</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Opening Level (Litres) *</label>
+              <input className="form-control" type="number" min="0" step="1"
+                value={openingForm.level}
+                onChange={e => setOpeningForm(f => ({ ...f, level: e.target.value }))} />
+              {openingForm.tank_id && openingForm.level && (() => {
+                const tank = tanks.find(t => t.id === openingForm.tank_id)
+                const cap  = tank?.capacity || 0
+                const lvl  = parseFloat(openingForm.level) || 0
+                const pct  = cap > 0 ? ((lvl / cap) * 100).toFixed(0) : '—'
+                return <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-dim)' }}>{pct}% of capacity</div>
+              })()}
+            </div>
+            <div className="form-group">
+              <label>Date *</label>
+              <input className="form-control" type="date" value={openingForm.date}
+                onChange={e => setOpeningForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Notes</label>
+              <input className="form-control" placeholder="e.g. Period-open balance"
+                value={openingForm.notes}
+                onChange={e => setOpeningForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button className="btn btn-secondary" onClick={() => setShowOpeningModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleOpeningBalance} disabled={openingSaving}>
+              {openingSaving ? 'Saving…' : 'Set Opening Balance'}
+            </button>
+          </ModalActions>
+        </ModalDialog>
       )}
 
       {showTransferModal && (

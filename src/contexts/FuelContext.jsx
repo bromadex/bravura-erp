@@ -52,19 +52,21 @@ function normalizeIssuance(row) {
 }
 
 export function FuelProvider({ children }) {
-  const [tanks,        setTanks]        = useState([])
-  const [issuances,    setIssuances]    = useState([])
-  const [deliveries,   setDeliveries]   = useState([])
-  const [dipstickLog,  setDipstickLog]  = useState([])
-  const [fuelRequests, setFuelRequests] = useState([])
-  const [calibrations, setCalibrations] = useState({}) // { tankId: [[cm,litres],...] }
-  const [transfers,    setTransfers]    = useState([])
+  const [tanks,            setTanks]            = useState([])
+  const [issuances,        setIssuances]        = useState([])
+  const [deliveries,       setDeliveries]       = useState([])
+  const [dipstickLog,      setDipstickLog]      = useState([])
+  const [fuelRequests,     setFuelRequests]     = useState([])
+  const [calibrations,     setCalibrations]     = useState({})
+  const [transfers,        setTransfers]        = useState([])
+  const [bowserDispatches, setBowserDispatches] = useState([])
+  const [fuelShifts,       setFuelShifts]       = useState([])
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [tanksRes, issuanceRes, fuelLogRes, delRes, dipRes, reqRes, calRes, transfersRes] = await Promise.all([
+      const [tanksRes, issuanceRes, fuelLogRes, delRes, dipRes, reqRes, calRes, transfersRes, bowserRes, shiftsRes] = await Promise.all([
         supabase.from('fuel_tanks').select('*').order('name'),
         supabase.from('fuel_issuance').select('*').order('date', { ascending: false }).limit(500),
         supabase.from('fuel_log').select('*').order('date', { ascending: false }).limit(500),
@@ -73,6 +75,8 @@ export function FuelProvider({ children }) {
         supabase.from('fuel_requests').select('*').order('request_date', { ascending: false }).limit(200),
         supabase.from('fuel_calibration').select('*'),
         supabase.from('fuel_transfers').select('*').order('transfer_date', { ascending: false }).limit(200),
+        supabase.from('bowser_dispatches').select('*').order('dispatch_date', { ascending: false }).limit(200),
+        supabase.from('fuel_shifts').select('*').order('shift_date', { ascending: false }).limit(200),
       ])
 
       setTanks(safe(tanksRes))
@@ -90,6 +94,8 @@ export function FuelProvider({ children }) {
       setDipstickLog(safe(dipRes))
       setFuelRequests(safe(reqRes))
       setTransfers(safe(transfersRes))
+      setBowserDispatches(safe(bowserRes))
+      setFuelShifts(safe(shiftsRes))
 
       // Build per-tank calibration map
       const calData = safe(calRes)
@@ -436,6 +442,114 @@ export function FuelProvider({ children }) {
     return transfer_no
   }
 
+  // ── Opening Balance ────────────────────────────────────────────────
+
+  const setOpeningFuelBalance = async (tankId, level, date, notes) => {
+    await addDipstick({
+      tank_id:  tankId,
+      date:     date || new Date().toISOString().split('T')[0],
+      fuel_end: parseFloat(level) || 0,
+      source:   'opening',
+      notes:    notes || 'Opening balance',
+    })
+    auditLog({ module: 'fuel', action: 'OPENING_BALANCE', entityType: 'fuel_tank', entityId: tankId, entityName: `Opening: ${level}L` })
+  }
+
+  // ── Bowser Dispatch ────────────────────────────────────────────────
+
+  const addBowserDispatch = async (dispatch) => {
+    const id = newId()
+    let dispatch_no
+    try { dispatch_no = await generateTxnCode('BWD') } catch { dispatch_no = `BWD-${Date.now()}` }
+    const { error } = await supabase.from('bowser_dispatches').insert([{
+      id, dispatch_no,
+      bowser_id:     dispatch.bowser_id,
+      dispatch_date: dispatch.dispatch_date || new Date().toISOString().split('T')[0],
+      site:          dispatch.site || '',
+      dispatched_by: dispatch.dispatched_by || '',
+      opening_level: parseFloat(dispatch.opening_level) || 0,
+      status:        'dispatched',
+      notes:         dispatch.notes || null,
+      created_at:    new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'fuel', action: 'DISPATCH', entityType: 'bowser_dispatch', entityId: id, entityName: dispatch_no })
+    await fetchAll()
+    return dispatch_no
+  }
+
+  const returnBowser = async (dispatchId, closingLevel, returnDate) => {
+    const dispatch = bowserDispatches.find(d => d.id === dispatchId)
+    const fuelDispensed = (dispatch?.opening_level || 0) - (parseFloat(closingLevel) || 0)
+    const { error } = await supabase.from('bowser_dispatches').update({
+      closing_level:  parseFloat(closingLevel) || 0,
+      fuel_dispensed: Math.max(0, fuelDispensed),
+      return_date:    returnDate || new Date().toISOString().split('T')[0],
+      status:         'returned',
+    }).eq('id', dispatchId)
+    if (error) throw error
+    if (dispatch?.bowser_id) {
+      await supabase.from('fuel_tanks').update({
+        current_level: parseFloat(closingLevel) || 0,
+        updated_at:    new Date().toISOString(),
+      }).eq('id', dispatch.bowser_id)
+    }
+    auditLog({ module: 'fuel', action: 'RETURN', entityType: 'bowser_dispatch', entityId: dispatchId })
+    await fetchAll()
+  }
+
+  // ── Fuel Shifts ────────────────────────────────────────────────────
+
+  const addFuelShift = async (shift) => {
+    const id = newId()
+    let shift_no
+    try { shift_no = await generateTxnCode('FSH') } catch { shift_no = `FSH-${Date.now()}` }
+    const currentLevel = getCurrentTankLevel(shift.tank_id)
+    const { error } = await supabase.from('fuel_shifts').insert([{
+      id, shift_no,
+      shift_date:     shift.shift_date || new Date().toISOString().split('T')[0],
+      attendant_name: shift.attendant_name || '',
+      tank_id:        shift.tank_id || null,
+      opening_level:  shift.opening_level != null ? parseFloat(shift.opening_level) : currentLevel,
+      opening_meter:  parseFloat(shift.opening_meter) || 0,
+      status:         'open',
+      opened_by:      shift.opened_by || '',
+      opened_at:      new Date().toISOString(),
+      notes:          shift.notes || null,
+      created_at:     new Date().toISOString(),
+    }])
+    if (error) throw error
+    auditLog({ module: 'fuel', action: 'CREATE', entityType: 'fuel_shift', entityId: id, entityName: shift_no })
+    await fetchAll()
+    return shift_no
+  }
+
+  const closeFuelShift = async (shiftId, closingData, closedBy) => {
+    const shift = fuelShifts.find(s => s.id === shiftId)
+    const closingLevel = parseFloat(closingData.closing_level) || 0
+    const openingLevel = shift?.opening_level || 0
+    const shiftDate = String(shift?.shift_date || '').slice(0, 10)
+    const shiftIssuances = issuances.filter(i =>
+      i.shift_id === shiftId ||
+      (String(i.date).slice(0, 10) === shiftDate && i.tank_id === shift?.tank_id && !i.shift_id)
+    )
+    const totalIssued = shiftIssuances.reduce((s, i) => s + (Number(i.amount) || 0), 0)
+    const variance = (openingLevel - closingLevel) - totalIssued
+    const { error } = await supabase.from('fuel_shifts').update({
+      closing_level:   closingLevel,
+      closing_meter:   parseFloat(closingData.closing_meter) || 0,
+      issuances_count: shiftIssuances.length,
+      total_issued:    totalIssued,
+      variance:        Math.round(variance * 100) / 100,
+      status:          'closed',
+      closed_by:       closedBy || '',
+      closed_at:       new Date().toISOString(),
+    }).eq('id', shiftId)
+    if (error) throw error
+    auditLog({ module: 'fuel', action: 'CLOSE_SHIFT', entityType: 'fuel_shift', entityId: shiftId })
+    await fetchAll()
+  }
+
   // ── Anomaly Detection ──────────────────────────────────────────────
 
   const getAnomalousIssuances = (thresholdMultiplier = 2.5) => {
@@ -463,7 +577,8 @@ export function FuelProvider({ children }) {
   return (
     <FuelContext.Provider value={{
       // State
-      tanks, issuances, deliveries, dipstickLog, fuelRequests, calibrations, transfers, loading,
+      tanks, issuances, deliveries, dipstickLog, fuelRequests, calibrations, transfers,
+      bowserDispatches, fuelShifts, loading,
       // Backward-compat constant
       TANK_MAX_LITRES,
       // Tank helpers
@@ -484,6 +599,12 @@ export function FuelProvider({ children }) {
       addFuelRequest, updateFuelRequest, approveFuelRequest, rejectFuelRequest,
       // Fuel transfers
       addTransfer,
+      // Opening balance
+      setOpeningFuelBalance,
+      // Bowser dispatch
+      addBowserDispatch, returnBowser,
+      // Fuel shifts
+      addFuelShift, closeFuelShift,
       fetchAll,
     }}>
       {children}
