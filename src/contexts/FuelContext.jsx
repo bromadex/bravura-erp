@@ -364,6 +364,9 @@ export function FuelProvider({ children }) {
     try { request_no = await generateTxnCode('FLR') } catch { request_no = `FLR-${Date.now()}` }
     const { error } = await supabase.from('fuel_requests').insert([{
       id, request_no, ...req,
+      // Map frontend field names → DB NOT NULL base columns
+      requested_by:    req.requester_name || req.requested_by || '',
+      requested_liters: parseFloat(req.requested_qty || req.requested_liters) || 0,
       status: 'pending',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
