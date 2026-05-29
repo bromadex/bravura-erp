@@ -143,9 +143,12 @@ export default function FleetInspections() {
   async function handleSave() {
     if (!form.asset_id) { toast.error('Select an asset'); return }
     if (!form.inspection_date) { toast.error('Inspection date is required'); return }
+    if (overallResult === 'fail' && !form.defect_notes?.trim()) { toast.error('Defect notes are required when inspection fails'); return }
     setSaving(true)
     try {
-      const inspection_no = await generateTxnCode('INSP')
+      let inspection_no
+      try { inspection_no = await generateTxnCode('INSP') } catch { inspection_no = null }
+      if (!inspection_no) inspection_no = `INSP-${Date.now()}`
       const assetObj = assets.find(a => a.id === form.asset_id)
 
       const { data, error } = await supabase.from('vehicle_inspections').insert({
@@ -197,7 +200,9 @@ export default function FleetInspections() {
     if (!woForm.description.trim()) { toast.error('Description is required'); return }
     setWoSaving(true)
     try {
-      const wo_number = await generateTxnCode('WO')
+      let wo_number
+      try { wo_number = await generateTxnCode('WO') } catch { wo_number = null }
+      if (!wo_number) wo_number = `WO-${Date.now()}`
       const { data, error } = await supabase.from('maintenance_work_orders').insert({
         wo_number,
         asset_id:       woTarget.asset_id,

@@ -168,7 +168,12 @@ export default function DriverManagement() {
     if (!editRecord) {
       delete payload.updated_at
       payload.created_at = new Date().toISOString()
-      payload.driver_no  = await generateTxnCode('DRV')
+      try {
+        payload.driver_no = await generateTxnCode('DRV')
+      } catch {
+        payload.driver_no = `DRV-${Date.now()}`
+      }
+      if (!payload.driver_no) payload.driver_no = `DRV-${Date.now()}`
     }
 
     let error, data

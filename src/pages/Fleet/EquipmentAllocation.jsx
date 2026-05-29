@@ -159,7 +159,7 @@ export default function EquipmentAllocation() {
   // ── close allocation save ──────────────────────────────────────────────────
 
   async function handleCloseSave() {
-    if (!closeForm.actual_hours && closeForm.actual_hours !== 0) {
+    if (closeForm.actual_hours === '' || closeForm.actual_hours === null || closeForm.actual_hours === undefined) {
       toast.error('Actual hours is required'); return
     }
     setCloseSaving(true)
@@ -373,7 +373,7 @@ export default function EquipmentAllocation() {
                 <select className="input" value={allocForm.asset_id}
                   onChange={e => setAllocForm(f => ({ ...f, asset_id: e.target.value }))}>
                   <option value="">— Select asset —</option>
-                  {assets.map(a => (
+                  {assets.filter(a => !allocatedIds.has(a.id) && a.status !== 'deployed').map(a => (
                     <option key={a.id} value={a.id}>
                       {a.asset_name}{a.plate_number ? ` (${a.plate_number})` : ''} — {a.status}
                     </option>
