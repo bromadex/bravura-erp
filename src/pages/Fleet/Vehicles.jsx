@@ -59,6 +59,7 @@ export default function Vehicles() {
   const [tab,            setTab]            = useState('identity')
   const [editing,        setEditing]        = useState(null)
   const [employees,      setEmployees]      = useState([])
+  const [departments,    setDepartments]    = useState([])
   const [fuelMap,        setFuelMap]        = useState({})
   const [reclassAsset,   setReclassAsset]   = useState(null)
   const [reclassForm,    setReclassForm]    = useState({ newCategory: '', reason: '' })
@@ -70,6 +71,8 @@ export default function Vehicles() {
   useEffect(() => {
     supabase.from('employees').select('id, name, employee_number').neq('status', 'Terminated').order('name')
       .then(({ data }) => { if (data) setEmployees(data) })
+    supabase.from('departments').select('id,name').order('name')
+      .then(({ data }) => { if (data) setDepartments(data) })
     supabase.from('fuel_log').select('vehicle, amount')
       .then(({ data }) => {
         if (data) {
@@ -551,8 +554,11 @@ export default function Vehicles() {
                 </div>
                 <div className="form-group">
                   <label>Department</label>
-                  <input className="form-control" value={form.department}
-                    onChange={e => set('department', e.target.value)} />
+                  <select className="form-control" value={form.department}
+                    onChange={e => set('department', e.target.value)}>
+                    <option value="">— Select department —</option>
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="form-row">

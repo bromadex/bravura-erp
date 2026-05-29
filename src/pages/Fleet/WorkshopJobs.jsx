@@ -41,9 +41,10 @@ export default function WorkshopJobs() {
   const { user } = useAuth()
   const canEdit  = useCanEdit('fleet', 'maintenance')
 
-  const [wos,     setWos]     = useState([])
-  const [assets,  setAssets]  = useState([])
-  const [loading, setLoading] = useState(true)
+  const [wos,       setWos]       = useState([])
+  const [assets,    setAssets]    = useState([])
+  const [employees, setEmployees] = useState([])
+  const [loading,   setLoading]   = useState(true)
   const [tab,     setTab]     = useState('all')
 
   const [showNewModal,   setShowNewModal]   = useState(false)
@@ -57,12 +58,14 @@ export default function WorkshopJobs() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [woRes, assetRes] = await Promise.all([
+    const [woRes, assetRes, empRes] = await Promise.all([
       supabase.from('maintenance_work_orders').select('*').order('created_at', { ascending: false }).limit(500),
       supabase.from('asset_registry').select('id,asset_name,asset_code,plate_number,asset_category').order('asset_name'),
+      supabase.from('employees').select('id,name').neq('status','Terminated').order('name'),
     ])
     setWos(woRes.data || [])
     setAssets(assetRes.data || [])
+    if (!empRes.error) setEmployees(empRes.data || [])
     setLoading(false)
   }, [])
 
@@ -371,8 +374,11 @@ export default function WorkshopJobs() {
           <div className="form-row">
             <div className="form-group">
               <label>Assigned Technician</label>
-              <input className="form-control" placeholder="Name or team" value={newForm.assigned_to}
-                onChange={e => setNewForm(f => ({ ...f, assigned_to: e.target.value }))} />
+              <select className="form-control" value={newForm.assigned_to}
+                onChange={e => setNewForm(f => ({ ...f, assigned_to: e.target.value }))}>
+                <option value="">— Select technician —</option>
+                {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+              </select>
             </div>
             <div className="form-group">
               <label>Workshop / Bay</label>

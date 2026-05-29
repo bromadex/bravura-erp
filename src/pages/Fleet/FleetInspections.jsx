@@ -57,6 +57,7 @@ export default function FleetInspections() {
 
   const [inspections, setInspections] = useState([])
   const [assets,      setAssets]      = useState([])
+  const [employees,   setEmployees]   = useState([])
   const [loading,     setLoading]     = useState(true)
   const [activeTab,   setActiveTab]   = useState('Recent')
 
@@ -75,12 +76,14 @@ export default function FleetInspections() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [inspRes, assetRes] = await Promise.all([
+    const [inspRes, assetRes, empRes] = await Promise.all([
       supabase.from('vehicle_inspections').select('*').order('inspection_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
       supabase.from('asset_registry').select('id, asset_name, plate_number, asset_code, asset_category').order('asset_name'),
+      supabase.from('employees').select('id,name').neq('status','Terminated').order('name'),
     ])
     if (!inspRes.error)  setInspections(inspRes.data || [])
     if (!assetRes.error) setAssets(assetRes.data || [])
+    if (!empRes.error)   setEmployees(empRes.data || [])
     setLoading(false)
   }, [])
 
@@ -476,13 +479,19 @@ export default function FleetInspections() {
                 </div>
                 <div>
                   <label className="label">Inspector Name</label>
-                  <input className="input" value={form.inspector_name}
-                    onChange={e => setForm(f => ({ ...f, inspector_name: e.target.value }))} />
+                  <select className="input" value={form.inspector_name}
+                    onChange={e => setForm(f => ({ ...f, inspector_name: e.target.value }))}>
+                    <option value="">— Select inspector —</option>
+                    {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="label">Driver / Operator</label>
-                  <input className="input" value={form.driver_operator}
-                    onChange={e => setForm(f => ({ ...f, driver_operator: e.target.value }))} />
+                  <select className="input" value={form.driver_operator}
+                    onChange={e => setForm(f => ({ ...f, driver_operator: e.target.value }))}>
+                    <option value="">— Select driver/operator —</option>
+                    {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="label">Odometer Reading</label>
@@ -603,8 +612,11 @@ export default function FleetInspections() {
               </div>
               <div>
                 <label className="label">Assign To</label>
-                <input className="input" value={woForm.assigned_to}
-                  onChange={e => setWoForm(f => ({ ...f, assigned_to: e.target.value }))} />
+                <select className="input" value={woForm.assigned_to}
+                  onChange={e => setWoForm(f => ({ ...f, assigned_to: e.target.value }))}>
+                  <option value="">— Select technician —</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                </select>
               </div>
             </div>
           </div>

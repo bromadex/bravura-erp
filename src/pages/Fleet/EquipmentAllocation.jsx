@@ -43,10 +43,12 @@ export default function EquipmentAllocation() {
   const { user }  = useAuth()
   const canEdit   = useCanEdit('fleet', 'vehicles')
 
-  const [allocations, setAllocations] = useState([])
-  const [assets,      setAssets]      = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [activeTab,   setActiveTab]   = useState('Active Allocations')
+  const [allocations,  setAllocations]  = useState([])
+  const [assets,       setAssets]       = useState([])
+  const [employees,    setEmployees]    = useState([])
+  const [departments,  setDepartments]  = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [activeTab,    setActiveTab]    = useState('Active Allocations')
 
   // Allocate modal
   const [showAllocModal, setShowAllocModal] = useState(false)
@@ -63,12 +65,16 @@ export default function EquipmentAllocation() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [allocRes, assetRes] = await Promise.all([
+    const [allocRes, assetRes, empRes, deptRes] = await Promise.all([
       supabase.from('equipment_allocations').select('*').order('created_at', { ascending: false }),
       supabase.from('asset_registry').select('id, asset_name, plate_number, asset_code, asset_category, status').order('asset_name'),
+      supabase.from('employees').select('id,name').neq('status','Terminated').order('name'),
+      supabase.from('departments').select('id,name').order('name'),
     ])
     if (!allocRes.error)  setAllocations(allocRes.data || [])
     if (!assetRes.error)  setAssets(assetRes.data || [])
+    if (!empRes.error)    setEmployees(empRes.data || [])
+    if (!deptRes.error)   setDepartments(deptRes.data || [])
     setLoading(false)
   }, [])
 
@@ -393,13 +399,19 @@ export default function EquipmentAllocation() {
               </div>
               <div>
                 <label className="label">Department</label>
-                <input className="input" value={allocForm.department}
-                  onChange={e => setAllocForm(f => ({ ...f, department: e.target.value }))} />
+                <select className="input" value={allocForm.department}
+                  onChange={e => setAllocForm(f => ({ ...f, department: e.target.value }))}>
+                  <option value="">— Select department —</option>
+                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="label">Allocated By</label>
-                <input className="input" value={allocForm.allocated_by}
-                  onChange={e => setAllocForm(f => ({ ...f, allocated_by: e.target.value }))} />
+                <select className="input" value={allocForm.allocated_by}
+                  onChange={e => setAllocForm(f => ({ ...f, allocated_by: e.target.value }))}>
+                  <option value="">— Select employee —</option>
+                  {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="label">Start Date *</label>

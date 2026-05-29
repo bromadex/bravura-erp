@@ -423,8 +423,11 @@ export default function AccidentReports() {
                   </div>
                   <div className="form-group">
                     <label>Reported By</label>
-                    <input className="form-control" value={form.reported_by}
-                      onChange={e => setForm(f => ({ ...f, reported_by: e.target.value }))} />
+                    <select className="form-control" value={form.reported_by}
+                      onChange={e => setForm(f => ({ ...f, reported_by: e.target.value }))}>
+                      <option value="">— Select employee —</option>
+                      {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                    </select>
                   </div>
                 </div>
 

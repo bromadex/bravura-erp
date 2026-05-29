@@ -1,10 +1,11 @@
 // src/pages/Assets/AssetRegistry.jsx
 // Unified asset list with add, edit, reclassify, timeline detail panel.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAssetRegistry } from '../../contexts/AssetRegistryContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 const STATUSES = ['Active', 'Maintenance', 'Grounded', 'Retired', 'Standby']
@@ -50,6 +51,15 @@ export default function AssetRegistry() {
   const [editAsset,    setEditAsset]    = useState(null)
   const [form,         setForm]         = useState(BLANK_FORM)
   const [saving,       setSaving]       = useState(false)
+  const [employees,    setEmployees]    = useState([])
+  const [departments,  setDepartments]  = useState([])
+
+  useEffect(() => {
+    supabase.from('employees').select('id,name').neq('status','Terminated').order('name')
+      .then(({ data }) => setEmployees(data || []))
+    supabase.from('departments').select('id,name').order('name')
+      .then(({ data }) => setDepartments(data || []))
+  }, [])
 
   // Detail / Timeline panel
   const [detail,       setDetail]       = useState(null)
@@ -603,8 +613,20 @@ export default function AssetRegistry() {
               <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, marginTop: 12 }}>ASSIGNMENT</div>
               <div className="form-row">
                 <div className="form-group"><label>Project</label><input className="form-control" value={form.assigned_project} onChange={e => setForm(f => ({ ...f, assigned_project: e.target.value }))} /></div>
-                <div className="form-group"><label>Assigned To</label><input className="form-control" value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} /></div>
-                <div className="form-group"><label>Department</label><input className="form-control" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} /></div>
+                <div className="form-group">
+                  <label>Assigned To</label>
+                  <select className="form-control" value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}>
+                    <option value="">— Select employee —</option>
+                    {employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Department</label>
+                  <select className="form-control" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
+                    <option value="">— Select department —</option>
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-dim)', marginBottom: 8, marginTop: 12 }}>FINANCIAL</div>

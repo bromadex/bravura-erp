@@ -56,6 +56,7 @@ export default function DriverManagement() {
   const canEdit  = useCanEdit('fleet', 'drivers')
 
   const [rows,        setRows]        = useState([])
+  const [departments, setDepartments] = useState([])
   const [loading,     setLoading]     = useState(true)
   const [activeTab,   setActiveTab]   = useState('All')
   const [showModal,   setShowModal]   = useState(false)
@@ -81,12 +82,13 @@ export default function DriverManagement() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('driver_profiles')
-      .select('*')
-      .order('full_name')
-    if (!error) setRows(data || [])
+    const [driversRes, deptRes] = await Promise.all([
+      supabase.from('driver_profiles').select('*').order('full_name'),
+      supabase.from('departments').select('id,name').order('name'),
+    ])
+    if (!driversRes.error) setRows(driversRes.data || [])
     else toast.error('Failed to load drivers')
+    if (!deptRes.error) setDepartments(deptRes.data || [])
     setLoading(false)
   }, [])
 
@@ -376,8 +378,11 @@ export default function DriverManagement() {
                 </div>
                 <div>
                   <label className="label">Department</label>
-                  <input className="input" value={form.department}
-                    onChange={e => setForm(f => ({ ...f, department: e.target.value }))} />
+                  <select className="input" value={form.department}
+                    onChange={e => setForm(f => ({ ...f, department: e.target.value }))}>
+                    <option value="">— Select department —</option>
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="label">Status</label>
