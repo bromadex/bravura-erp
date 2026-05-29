@@ -85,15 +85,15 @@ export default function BowserDispatch() {
 
   const getBowserName = (id) => tanks.find(t => t.id === id)?.name || id || '—'
 
-  if (bowserTanks.length === 0 && bowserDispatches.length === 0) {
+  if (tanks.length === 0) {
     return (
       <div>
         <PageHeader title="Bowser Dispatch" />
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
           <span className="material-icons" style={{ fontSize: 56, color: 'var(--text-dim)', display: 'block', marginBottom: 12 }}>local_shipping</span>
-          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No Bowser Tanks Configured</div>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No Tanks Configured</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', maxWidth: 400, margin: '0 auto' }}>
-            To use bowser dispatch, mark one or more tanks as bowsers in the Fuel Tanks settings (enable the <strong>is_bowser</strong> flag on a tank record).
+            Add tanks in <strong>Fuel Tanks → Add Tank</strong> and enable the <strong>bowser flag</strong> on mobile tanks.
           </div>
         </div>
       </div>

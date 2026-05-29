@@ -420,7 +420,7 @@ export default function FuelRequests() {
                     setNewForm(f => ({ ...f, requester_name: val, department: match?.department || f.department }))
                   }} />
                 <datalist id="driver-list">
-                  {drivers.map(d => <option key={d.id} value={d.full_name}>{d.employee_no ? `${d.employee_no} — ${d.department || ''}` : d.department || ''}</option>)}
+                  {drivers.map(d => <option key={d.id} value={d.full_name} label={[d.employee_no, d.department].filter(Boolean).join(' — ')} />)}
                 </datalist>
               </div>
               <div className="form-group">
@@ -437,9 +437,9 @@ export default function FuelRequests() {
                   onChange={e => setNewForm({ ...newForm, equipment_name: e.target.value })} />
                 <datalist id="asset-list">
                   {assets.map(a => (
-                    <option key={a.id} value={a.plate_number || a.asset_name}>
-                      {a.asset_name}{a.plate_number ? ` (${a.plate_number})` : ''} — {a.asset_category || ''}
-                    </option>
+                    <option key={a.id}
+                      value={a.plate_number || a.asset_name}
+                      label={`${a.asset_name}${a.plate_number ? ` (${a.plate_number})` : ''} — ${a.asset_category || ''}`} />
                   ))}
                 </datalist>
               </div>
@@ -448,7 +448,7 @@ export default function FuelRequests() {
                 <input className="form-control" list="driver-list2" value={newForm.driver_operator}
                   onChange={e => setNewForm({ ...newForm, driver_operator: e.target.value })} />
                 <datalist id="driver-list2">
-                  {drivers.map(d => <option key={d.id} value={d.full_name} />)}
+                  {drivers.map(d => <option key={d.id} value={d.full_name} label={[d.employee_no, d.department].filter(Boolean).join(' — ')} />)}
                 </datalist>
               </div>
             </div>

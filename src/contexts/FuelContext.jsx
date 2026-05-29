@@ -410,7 +410,8 @@ export function FuelProvider({ children }) {
     const srcLevel = getCurrentTankLevel(transfer.from_tank_id)
     const qty = parseFloat(transfer.quantity) || 0
     if (qty <= 0) throw new Error('Transfer quantity must be positive')
-    if (srcLevel < qty) throw new Error(`Insufficient fuel in source tank: ${srcLevel.toLocaleString()}L available, ${qty}L requested`)
+    // Soft check — warn if level appears insufficient but allow override (level may not be set yet)
+    if (srcLevel > 0 && srcLevel < qty) throw new Error(`Insufficient fuel in source tank: ${srcLevel.toLocaleString()}L available, ${qty}L requested`)
 
     const { error } = await supabase.from('fuel_transfers').insert([{
       id, transfer_no,
