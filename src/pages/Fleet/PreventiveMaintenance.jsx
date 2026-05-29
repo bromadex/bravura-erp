@@ -112,9 +112,43 @@ function intervalLabel(s) {
 }
 
 function rowBorderStyle(urgency) {
-  if (urgency === 'overdue') return { borderLeft: '3px solid var(--red)' }
-  if (urgency === 'soon')   return { borderLeft: '3px solid var(--yellow)' }
+  if (urgency === 'overdue' || urgency === 'critical') return { borderLeft: '3px solid var(--red)' }
+  if (urgency === 'soon' || urgency === 'due_soon')   return { borderLeft: '3px solid var(--yellow)' }
   return {}
+}
+
+// Enhanced urgency computation using live asset odometer/hours
+const URGENCY_SORT = { critical: 0, overdue: 1, due_soon: 2, ok: 3, unknown: 4 }
+function computeUrgency(s, metrics) {
+  const asset = (metrics && metrics[s.asset_id]) || {}
+  const iv = Number(s.interval_value) || 0
+
+  if (s.interval_type === 'km' && s.next_due_km != null && asset.current_odometer != null) {
+    const rem = Number(s.next_due_km) - Number(asset.current_odometer)
+    const pct = iv > 0 ? Math.min(110, Math.max(0, 100 - (rem / iv * 100))) : null
+    if (rem < -(iv * 0.1)) return { urgency: 'critical', label: `${Math.abs(rem).toFixed(0)} km overdue`, color: 'var(--red)',    pct }
+    if (rem < 0)           return { urgency: 'overdue',  label: `${Math.abs(rem).toFixed(0)} km overdue`, color: 'var(--red)',    pct }
+    if (rem <= iv * 0.2)   return { urgency: 'due_soon', label: `${rem.toFixed(0)} km left`,              color: 'var(--yellow)', pct }
+    return                        { urgency: 'ok',       label: `${rem.toFixed(0)} km left`,              color: 'var(--green)',  pct }
+  }
+  if (s.interval_type === 'hours' && s.next_due_hours != null && asset.current_engine_hours != null) {
+    const rem = Number(s.next_due_hours) - Number(asset.current_engine_hours)
+    const pct = iv > 0 ? Math.min(110, Math.max(0, 100 - (rem / iv * 100))) : null
+    if (rem < -(iv * 0.1)) return { urgency: 'critical', label: `${Math.abs(rem).toFixed(1)} hrs overdue`, color: 'var(--red)',    pct }
+    if (rem < 0)           return { urgency: 'overdue',  label: `${Math.abs(rem).toFixed(1)} hrs overdue`, color: 'var(--red)',    pct }
+    if (rem <= iv * 0.2)   return { urgency: 'due_soon', label: `${rem.toFixed(1)} hrs left`,               color: 'var(--yellow)', pct }
+    return                        { urgency: 'ok',       label: `${rem.toFixed(1)} hrs left`,               color: 'var(--green)',  pct }
+  }
+  // Fall back to date-based
+  if (s.next_due_date) {
+    const d = diffDays(s.next_due_date)
+    const pct = iv > 0 ? Math.min(110, Math.max(0, 100 - (d / iv * 100))) : null
+    if (d < -(iv * 0.1)) return { urgency: 'critical', label: `${Math.abs(d)}d overdue`, color: 'var(--red)',    pct }
+    if (d < 0)           return { urgency: 'overdue',  label: `${Math.abs(d)}d overdue`, color: 'var(--red)',    pct }
+    if (d <= iv * 0.2)   return { urgency: 'due_soon', label: `${d}d remaining`,          color: 'var(--yellow)', pct }
+    return                      { urgency: 'ok',       label: `${d}d remaining`,          color: 'var(--green)',  pct }
+  }
+  return { urgency: 'unknown', label: '—', color: 'var(--text-dim)', pct: null }
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────────────
@@ -223,6 +257,7 @@ const BLANK_SCHED = {
   next_due_date: '', next_due_km: '', next_due_hours: '',
   last_done_date: '', last_done_km: '', last_done_hours: '',
   priority: 'medium', notes: '', is_active: true,
+  is_recurring: true, auto_advance: true, reminder_days: 7, reminder_km: '', reminder_hrs: '',
 }
 
 function ScheduleModal({ open, onClose, editing, allAssets }) {
@@ -249,6 +284,11 @@ function ScheduleModal({ open, onClose, editing, allAssets }) {
         priority:       editing.priority        || 'medium',
         notes:          editing.notes           || '',
         is_active:      editing.is_active != null ? editing.is_active : true,
+        is_recurring:   editing.is_recurring != null ? editing.is_recurring : true,
+        auto_advance:   editing.auto_advance  != null ? editing.auto_advance  : true,
+        reminder_days:  editing.reminder_days != null ? editing.reminder_days : 7,
+        reminder_km:    editing.reminder_km   != null ? editing.reminder_km   : '',
+        reminder_hrs:   editing.reminder_hrs  != null ? editing.reminder_hrs  : '',
       })
     } else {
       setForm(BLANK_SCHED)
@@ -278,6 +318,11 @@ function ScheduleModal({ open, onClose, editing, allAssets }) {
       next_due_date:  form.next_due_date  || null,
       last_done_date: form.last_done_date || null,
       notes:          form.notes          || null,
+      is_recurring:   form.is_recurring,
+      auto_advance:   form.auto_advance,
+      reminder_days:  form.reminder_days !== '' ? Number(form.reminder_days) : 7,
+      reminder_km:    form.reminder_km   !== '' ? Number(form.reminder_km)   : null,
+      reminder_hrs:   form.reminder_hrs  !== '' ? Number(form.reminder_hrs)  : null,
     }
     try {
       if (editing) {
@@ -387,6 +432,36 @@ function ScheduleModal({ open, onClose, editing, allAssets }) {
         <div className="form-group" style={{ marginBottom: 14 }}>
           <label>NOTES</label>
           <textarea className="form-control" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional notes…" />
+        </div>
+
+        {/* Recurring & auto-advance */}
+        <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="pm-recurring" checked={form.is_recurring} onChange={e => set('is_recurring', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <label htmlFor="pm-recurring" style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>Recurring schedule</label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" id="pm-advance" checked={form.auto_advance} onChange={e => set('auto_advance', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <label htmlFor="pm-advance" style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>Auto-advance on WO close</label>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 8 }}>REMINDER LEAD TIME</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div className="form-group">
+              <label>DAYS BEFORE</label>
+              <input className="form-control" type="number" min="0" value={form.reminder_days} onChange={e => set('reminder_days', e.target.value)} placeholder="7" />
+            </div>
+            <div className="form-group">
+              <label>KM BEFORE</label>
+              <input className="form-control" type="number" min="0" value={form.reminder_km} onChange={e => set('reminder_km', e.target.value)} placeholder="500" />
+            </div>
+            <div className="form-group">
+              <label>HOURS BEFORE</label>
+              <input className="form-control" type="number" min="0" value={form.reminder_hrs} onChange={e => set('reminder_hrs', e.target.value)} placeholder="10" />
+            </div>
+          </div>
         </div>
 
         <div className="form-group" style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1097,6 +1172,20 @@ function PMScheduleTab({ onCreateWO }) {
   const [search,         setSearch]         = useState('')
   const [modalOpen,      setModalOpen]      = useState(false)
   const [editing,        setEditing]        = useState(null)
+  const [assetMetrics,   setAssetMetrics]   = useState({})
+
+  // Load asset odometer/hours for urgency computation
+  useEffect(() => {
+    const ids = [...new Set(maintenanceSchedules.map(s => s.asset_id).filter(Boolean))]
+    if (!ids.length) return
+    supabase.from('asset_registry').select('id,current_odometer,current_engine_hours').in('id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(a => { map[a.id] = { current_odometer: a.current_odometer, current_engine_hours: a.current_engine_hours } })
+        setAssetMetrics(map)
+      })
+  }, [maintenanceSchedules])
 
   const activeSchedules = useMemo(() => maintenanceSchedules.filter(s => s.is_active !== false), [maintenanceSchedules])
 
@@ -1105,16 +1194,20 @@ function PMScheduleTab({ onCreateWO }) {
       if (filterType     && s.asset_type     !== filterType)     return false
       if (filterCategory && s.task_category  !== filterCategory) return false
       if (filterPriority && s.priority       !== filterPriority) return false
-      const st = scheduleStatus(s)
-      if (filterStatus && st.urgency !== filterStatus) return false
+      const urg = computeUrgency(s, assetMetrics)
+      if (filterStatus && urg.urgency !== filterStatus) return false
       if (search) {
         const q = search.toLowerCase()
         const label = assetLabel(s.asset_id).toLowerCase()
         if (!s.task_name?.toLowerCase().includes(q) && !label.includes(q)) return false
       }
       return true
+    }).sort((a, b) => {
+      const ua = URGENCY_SORT[computeUrgency(a, assetMetrics).urgency] ?? 99
+      const ub = URGENCY_SORT[computeUrgency(b, assetMetrics).urgency] ?? 99
+      return ua - ub
     })
-  }, [activeSchedules, filterType, filterCategory, filterPriority, filterStatus, search, assetLabel])
+  }, [activeSchedules, filterType, filterCategory, filterPriority, filterStatus, search, assetLabel, assetMetrics])
 
   const handleDelete = async (s) => {
     if (!confirm(`Delete schedule "${s.task_name}"? This cannot be undone.`)) return
@@ -1148,9 +1241,10 @@ function PMScheduleTab({ onCreateWO }) {
             value={filterStatus}
             onChange={setFilterStatus}
             options={[
-              { value: 'overdue', label: 'Overdue' },
-              { value: 'soon',    label: 'Due Soon' },
-              { value: 'ok',      label: 'OK' },
+              { value: 'critical', label: 'Critical'  },
+              { value: 'overdue',  label: 'Overdue'   },
+              { value: 'due_soon', label: 'Due Soon'  },
+              { value: 'ok',       label: 'OK'        },
             ]}
             placeholder="All Statuses"
           />
@@ -1174,23 +1268,24 @@ function PMScheduleTab({ onCreateWO }) {
                 <th>LAST DONE</th>
                 <th>NEXT DUE</th>
                 <th>PRIORITY</th>
-                <th>STATUS</th>
+                <th>URGENCY</th>
+                <th style={{ minWidth: 110 }}>PROGRESS</th>
                 <th style={{ width: 130 }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>
+                  <td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>
                     <span className="material-icons" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>event_available</span>
                     No schedules match filters
                   </td>
                 </tr>
               )}
               {filtered.map(s => {
-                const st = scheduleStatus(s)
+                const urg = computeUrgency(s, assetMetrics)
                 return (
-                  <tr key={s.id} style={rowBorderStyle(st.urgency)}>
+                  <tr key={s.id} style={rowBorderStyle(urg.urgency)}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{assetLabel(s.asset_id)}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: .5 }}>
@@ -1229,7 +1324,23 @@ function PMScheduleTab({ onCreateWO }) {
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: st.color }}>{st.label}</span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                        background: `color-mix(in srgb,${urg.color} 15%,var(--surface2))`,
+                        color: urg.color,
+                      }}>
+                        {urg.urgency === 'critical' ? 'Critical' : urg.urgency === 'overdue' ? 'Overdue' : urg.urgency === 'due_soon' ? 'Due Soon' : urg.urgency === 'ok' ? 'OK' : '—'}
+                      </span>
+                    </td>
+                    <td>
+                      {urg.pct != null ? (
+                        <div>
+                          <div style={{ fontSize: 10, color: urg.color, fontWeight: 600, marginBottom: 2 }}>{urg.label}</div>
+                          <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.min(100, urg.pct)}%`, background: urg.color, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      ) : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{urg.label}</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

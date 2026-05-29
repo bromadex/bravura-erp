@@ -29,7 +29,7 @@ const TABS = [
 const BLANK_WO = {
   asset_id: '', task_name: '', task_category: 'engine', priority: 'medium',
   planned_start_date: today, planned_end_date: '', assigned_to: '', workshop: '',
-  description: '', estimated_cost: '', notes: '',
+  complaint_description: '', diagnosis_notes: '', description: '', estimated_cost: '', notes: '',
 }
 
 const BLANK_CLOSE = {
@@ -59,6 +59,8 @@ export default function WorkshopJobs() {
   const [itemSearch,     setItemSearch]     = useState('')
   const [itemResults,    setItemResults]    = useState([])
   const [itemSearching,  setItemSearching]  = useState(false)
+  const [labourEntries,  setLabourEntries]  = useState([])
+  const [labourLoading,  setLabourLoading]  = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -74,6 +76,13 @@ export default function WorkshopJobs() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const loadLabourEntries = useCallback(async (woId) => {
+    setLabourLoading(true)
+    const { data } = await supabase.from('wo_labour').select('*').eq('wo_id', woId).order('created_at')
+    setLabourEntries(data || [])
+    setLabourLoading(false)
+  }, [])
 
   const filtered = wos.filter(w => {
     if (tab !== 'all' && w.status !== tab) return false
@@ -112,11 +121,13 @@ export default function WorkshopJobs() {
         status:            'open',
         planned_start_date: newForm.planned_start_date || null,
         planned_end_date:  newForm.planned_end_date   || null,
-        assigned_to:       newForm.assigned_to        || null,
-        workshop:          newForm.workshop            || null,
-        description:       newForm.description        || null,
-        estimated_cost:    parseFloat(newForm.estimated_cost) || null,
-        notes:             newForm.notes              || null,
+        assigned_to:           newForm.assigned_to           || null,
+        workshop:              newForm.workshop              || null,
+        complaint_description: newForm.complaint_description || null,
+        diagnosis_notes:       newForm.diagnosis_notes       || null,
+        description:           newForm.description           || null,
+        estimated_cost:        parseFloat(newForm.estimated_cost) || null,
+        notes:                 newForm.notes                 || null,
         source:            'manual',
         created_by:        user?.id || '',
         created_at:        new Date().toISOString(),
@@ -380,8 +391,8 @@ export default function WorkshopJobs() {
                             <span className="material-icons" style={{ fontSize: 13 }}>close</span>
                           </button>
                         )}
-                        {w.status === 'closed' && w.findings && (
-                          <button className="btn btn-secondary btn-sm" title="View findings" onClick={() => { setSelected(w); setShowEditModal(true) }}>
+                        {w.status === 'closed' && (
+                          <button className="btn btn-secondary btn-sm" title="View details" onClick={() => { setSelected(w); setShowEditModal(true); loadLabourEntries(w.id) }}>
                             <span className="material-icons" style={{ fontSize: 13 }}>visibility</span>
                           </button>
                         )}
@@ -467,8 +478,20 @@ export default function WorkshopJobs() {
             </div>
           </div>
           <div className="form-group">
-            <label>Detailed Description / Instructions</label>
-            <textarea className="form-control" rows={3} value={newForm.description}
+            <label>Complaint / Problem Description</label>
+            <textarea className="form-control" rows={2} placeholder="What did the driver/operator report?"
+              value={newForm.complaint_description}
+              onChange={e => setNewForm(f => ({ ...f, complaint_description: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Diagnosis Notes</label>
+            <textarea className="form-control" rows={2} placeholder="Mechanic's initial assessment…"
+              value={newForm.diagnosis_notes}
+              onChange={e => setNewForm(f => ({ ...f, diagnosis_notes: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Work Instructions</label>
+            <textarea className="form-control" rows={2} value={newForm.description}
               onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))} />
           </div>
           <div className="form-group">
@@ -635,15 +658,34 @@ export default function WorkshopJobs() {
 
       {/* View findings modal */}
       {showEditModal && selected && (
-        <ModalDialog open onClose={() => { setShowEditModal(false); setSelected(null) }}
-          title={`WO Findings · ${selected.wo_number}`} size="md">
+        <ModalDialog open onClose={() => { setShowEditModal(false); setSelected(null); setLabourEntries([]) }}
+          title={`WO Details · ${selected.wo_number}`} size="lg">
           <div style={{ fontSize: 13 }}>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 700 }}>{selected.task_name}</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{selected.asset_name || ''} · {selected.task_category}</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{selected.task_name}</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{selected.asset_name || ''} · {selected.task_category} · {selected.priority}</div>
             </div>
+
+            {/* Complaint & Diagnosis */}
+            {(selected.complaint_description || selected.diagnosis_notes) && (
+              <div style={{ marginBottom: 12, padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, borderLeft: '3px solid var(--yellow)' }}>
+                {selected.complaint_description && (
+                  <div style={{ marginBottom: selected.diagnosis_notes ? 8 : 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 11, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 3 }}>Complaint</div>
+                    {selected.complaint_description}
+                  </div>
+                )}
+                {selected.diagnosis_notes && (
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 11, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: 1, marginBottom: 3 }}>Diagnosis</div>
+                    {selected.diagnosis_notes}
+                  </div>
+                )}
+              </div>
+            )}
+
             {selected.description && (
-              <div style={{ marginBottom: 10, padding: '8px 10px', background: 'var(--surface2)', borderRadius: 6, fontSize: 12 }}>
+              <div style={{ marginBottom: 10, padding: '8px 10px', background: 'var(--surface2)', borderRadius: 6 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>Instructions:</div>
                 {selected.description}
               </div>
@@ -658,17 +700,61 @@ export default function WorkshopJobs() {
                 {selected.completion_notes}
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 16px', marginTop: 12, fontSize: 12, color: 'var(--text-dim)' }}>
+
+            {/* Labour Entries from wo_labour */}
+            {labourEntries.length > 0 && (
+              <div style={{ marginBottom: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8 }}>Labour Entries</div>
+                <table style={{ width: '100%', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ padding: '4px 8px', textAlign: 'left' }}>Technician</th>
+                      <th style={{ padding: '4px 8px' }}>Date</th>
+                      <th style={{ padding: '4px 8px' }}>Hours</th>
+                      <th style={{ padding: '4px 8px' }}>Rate</th>
+                      <th style={{ padding: '4px 8px', textAlign: 'right' }}>Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labourEntries.map(l => (
+                      <tr key={l.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '4px 8px' }}>{l.technician_name || '—'}</td>
+                        <td style={{ padding: '4px 8px', color: 'var(--text-dim)' }}>{l.work_date || '—'}</td>
+                        <td style={{ padding: '4px 8px', fontFamily: 'var(--mono)' }}>{l.hours}</td>
+                        <td style={{ padding: '4px 8px', fontFamily: 'var(--mono)' }}>${Number(l.hourly_rate).toFixed(2)}</td>
+                        <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--teal)' }}>
+                          ${(Number(l.hours) * Number(l.hourly_rate)).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {labourLoading && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Loading labour entries…</div>}
+
+            {/* Cost Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 16px', marginTop: 12, fontSize: 12, color: 'var(--text-dim)', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
               <div>Labour: <strong style={{ color: 'var(--text)' }}>{selected.labour_hours ? `${selected.labour_hours} hrs` : '—'}</strong></div>
               <div>Labour Cost: <strong style={{ color: 'var(--text)' }}>{selected.labour_cost ? `$${Number(selected.labour_cost).toLocaleString()}` : '—'}</strong></div>
               <div>Parts Cost: <strong style={{ color: 'var(--text)' }}>{selected.parts_cost ? `$${Number(selected.parts_cost).toLocaleString()}` : '—'}</strong></div>
-              <div>Total Actual: <strong style={{ color: 'var(--teal)' }}>{selected.actual_cost ? `$${Number(selected.actual_cost).toLocaleString()}` : '—'}</strong></div>
+              <div>Total Actual: <strong style={{ color: 'var(--teal)', fontSize: 14 }}>{selected.actual_cost ? `$${Number(selected.actual_cost).toLocaleString()}` : '—'}</strong></div>
+              {selected.estimated_cost > 0 && (
+                <div>Estimated: <strong style={{ color: selected.actual_cost > selected.estimated_cost ? 'var(--red)' : 'var(--green)' }}>
+                  ${Number(selected.estimated_cost).toLocaleString()}
+                  {selected.actual_cost > 0 && selected.estimated_cost > 0 && (
+                    <span style={{ marginLeft: 6, fontSize: 11 }}>
+                      ({selected.actual_cost > selected.estimated_cost ? '+' : ''}{(((selected.actual_cost - selected.estimated_cost) / selected.estimated_cost) * 100).toFixed(0)}%)
+                    </span>
+                  )}
+                </strong></div>
+              )}
               <div>Invoice: <strong style={{ color: 'var(--text)' }}>{selected.invoice_number || '—'}</strong></div>
               <div>Closed: <strong style={{ color: 'var(--text)' }}>{selected.actual_end_date || '—'}</strong></div>
             </div>
           </div>
           <ModalActions>
-            <button className="btn btn-secondary" onClick={() => { setShowEditModal(false); setSelected(null) }}>Close</button>
+            <button className="btn btn-secondary" onClick={() => { setShowEditModal(false); setSelected(null); setLabourEntries([]) }}>Close</button>
           </ModalActions>
         </ModalDialog>
       )}

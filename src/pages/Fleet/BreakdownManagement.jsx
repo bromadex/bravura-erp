@@ -35,8 +35,17 @@ const TABS = [
 
 const BLANK_BD = {
   asset_id: '', reported_by: '', description: '', breakdown_category: 'mechanical',
-  reported_at: new Date().toISOString().slice(0, 16), estimated_cost: '',
+  reported_at: new Date().toISOString().slice(0, 16), estimated_cost: '', severity: 'medium',
 }
+
+const SEVERITIES = [
+  { value: 'low',      label: 'Low — minor, asset still operational' },
+  { value: 'medium',   label: 'Medium — asset degraded, needs repair soon' },
+  { value: 'high',     label: 'High — asset offline, immediate repair needed' },
+  { value: 'critical', label: 'Critical — safety risk or total failure' },
+]
+
+const SEVERITY_COLORS = { low: 'var(--green)', medium: 'var(--yellow)', high: 'var(--red)', critical: 'var(--red)' }
 const BLANK_RESOLVE = {
   root_cause: '', corrective_action: '', resolution_notes: '', downtime_hours: '',
   actual_cost: '', wo_number: '', resolved_by: '',
@@ -54,9 +63,11 @@ export default function BreakdownManagement() {
   const [showNewModal,     setShowNewModal]     = useState(false)
   const [showResolveModal, setShowResolveModal] = useState(false)
   const [showViewModal,    setShowViewModal]    = useState(false)
+  const [showWOModal,      setShowWOModal]      = useState(false)
   const [selected,         setSelected]         = useState(null)
   const [newForm,          setNewForm]          = useState(BLANK_BD)
   const [resolveForm,      setResolveForm]      = useState(BLANK_RESOLVE)
+  const [woForm,           setWoForm]           = useState({ task_name: '', planned_start_date: today, notes: '' })
   const [saving,           setSaving]           = useState(false)
   const [search,           setSearch]           = useState('')
 
@@ -111,6 +122,7 @@ export default function BreakdownManagement() {
         reported_by:        newForm.reported_by || user?.full_name || '',
         description:        newForm.description,
         breakdown_category: newForm.breakdown_category,
+        severity:           newForm.severity || 'medium',
         estimated_cost:     parseFloat(newForm.estimated_cost) || 0,
         status:             'open',
         created_by:         user?.id || '',
@@ -152,6 +164,53 @@ export default function BreakdownManagement() {
       fetchData()
     } catch (e) { toast.error(e.message) }
     setSaving(false)
+  }
+
+  const openCreateWO = (b) => {
+    setSelected(b)
+    setWoForm({ task_name: `Repair: ${b.description?.slice(0, 80) || 'Breakdown repair'}`, planned_start_date: today, notes: b.description || '' })
+    setShowWOModal(true)
+  }
+
+  const handleCreateWO = async () => {
+    if (!woForm.task_name.trim()) { toast.error('Task name required'); return }
+    setSaving(true)
+    try {
+      const { generateTxnCode } = await import('../../utils/txnCode')
+      let wo_number
+      try { wo_number = await generateTxnCode('WO') } catch { wo_number = `WO-${Date.now()}` }
+      const { error: woErr } = await supabase.from('maintenance_work_orders').insert({
+        wo_number,
+        asset_id:              selected.asset_id || null,
+        asset_name:            selected.asset_name || '',
+        asset_reg:             selected.asset_code || '',
+        task_name:             woForm.task_name,
+        task_category:         selected.breakdown_category || 'mechanical',
+        priority:              selected.severity === 'critical' ? 'critical' : selected.severity === 'high' ? 'high' : 'medium',
+        status:                'open',
+        linked_breakdown_id:   selected.id,
+        complaint_description: selected.description || null,
+        planned_start_date:    woForm.planned_start_date || null,
+        notes:                 woForm.notes || null,
+        source:                'breakdown',
+        source_ref:            selected.breakdown_no,
+        created_by:            user?.id || '',
+        created_at:            new Date().toISOString(),
+        updated_at:            new Date().toISOString(),
+      })
+      if (woErr) throw woErr
+      await supabase.from('breakdown_reports').update({ linked_wo_id: wo_number, updated_at: new Date().toISOString() }).eq('id', selected.id)
+      toast.success(`WO ${wo_number} created and linked to breakdown`)
+      setShowWOModal(false)
+      fetchData()
+    } catch (e) { toast.error(e.message) }
+    setSaving(false)
+  }
+
+  const elapsedHours = (reported_at) => {
+    if (!reported_at) return null
+    const diff = (Date.now() - new Date(reported_at).getTime()) / 3600000
+    return diff.toFixed(1)
   }
 
   const handleExport = () => {
@@ -224,18 +283,19 @@ export default function BreakdownManagement() {
                 <th>Asset</th>
                 <th>Reported</th>
                 <th>Category</th>
+                <th>Severity</th>
                 <th>Description</th>
                 <th>Downtime</th>
-                <th>Root Cause</th>
+                <th>Linked WO</th>
                 <th>Status</th>
                 {canEdit && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>Loading…</td></tr>
+                <tr><td colSpan="11" style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="9"><EmptyState icon="report_problem" message="No breakdowns recorded" /></td></tr>
+                <tr><td colSpan="11"><EmptyState icon="report_problem" message="No breakdowns recorded" /></td></tr>
               ) : filtered.map(b => (
                 <tr key={b.id}>
                   <td>{b.breakdown_no ? <TxnCodeBadge code={b.breakdown_no} /> : '—'}</td>
@@ -248,25 +308,42 @@ export default function BreakdownManagement() {
                     <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{b.reported_by || '—'}</div>
                   </td>
                   <td style={{ fontSize: 12 }}>{catLabel(b.breakdown_category)}</td>
-                  <td style={{ fontSize: 12, maxWidth: 200 }}>
+                  <td>
+                    {b.severity && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase',
+                        background: `color-mix(in srgb,${SEVERITY_COLORS[b.severity] || 'var(--text-dim)'} 15%,var(--surface2))`,
+                        color: SEVERITY_COLORS[b.severity] || 'var(--text-dim)',
+                      }}>{b.severity}</span>
+                    )}
+                  </td>
+                  <td style={{ fontSize: 12, maxWidth: 180 }}>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.description}>
                       {b.description}
                     </div>
                   </td>
-                  <td style={{ fontFamily: 'var(--mono)', fontSize: 12, color: b.downtime_hours > 0 ? 'var(--yellow)' : 'var(--text-dim)' }}>
-                    {b.downtime_hours ? `${b.downtime_hours} hrs` : '—'}
+                  <td style={{ fontFamily: 'var(--mono)', fontSize: 12, color: b.downtime_hours > 0 ? 'var(--yellow)' : b.status === 'open' ? 'var(--text-dim)' : 'var(--text-dim)' }}>
+                    {b.status === 'open' && !b.downtime_hours ? (
+                      <span style={{ color: 'var(--yellow)', fontSize: 11 }}>~{elapsedHours(b.reported_at)} hrs elapsed</span>
+                    ) : b.downtime_hours ? `${b.downtime_hours} hrs` : '—'}
                   </td>
-                  <td style={{ fontSize: 12, maxWidth: 160 }}>
-                    {b.root_cause ? (
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }} title={b.root_cause}>
-                        {b.root_cause}
+                  <td style={{ fontSize: 12 }}>
+                    {b.linked_wo_id ? (
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--gold)' }}>
+                        {b.linked_wo_id}
                       </span>
-                    ) : <span style={{ color: 'var(--text-dim)' }}>Pending RCA</span>}
+                    ) : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>None</span>}
                   </td>
                   <td><span className={`badge ${STATUS_BADGE[b.status] || 'badge-default'}`}>{b.status}</span></td>
                   {canEdit && (
                     <td className="td-actions">
                       <div className="btn-group-sm">
+                        {b.status === 'open' && !b.linked_wo_id && (
+                          <button className="btn btn-primary btn-sm" title="Create Work Order"
+                            onClick={() => openCreateWO(b)}>
+                            <span className="material-icons" style={{ fontSize: 13 }}>build</span>
+                          </button>
+                        )}
                         {b.status === 'open' && (
                           <button className="btn btn-success btn-sm" title="Resolve / RCA"
                             onClick={() => { setSelected(b); setResolveForm({ ...BLANK_RESOLVE, resolved_by: user?.full_name || '' }); setShowResolveModal(true) }}>
@@ -308,6 +385,13 @@ export default function BreakdownManagement() {
               <select className="form-control" value={newForm.breakdown_category}
                 onChange={e => setNewForm(f => ({ ...f, breakdown_category: e.target.value }))}>
                 {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Severity</label>
+              <select className="form-control" value={newForm.severity}
+                onChange={e => setNewForm(f => ({ ...f, severity: e.target.value }))}>
+                {SEVERITIES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
@@ -401,6 +485,35 @@ export default function BreakdownManagement() {
         </ModalDialog>
       )}
 
+      {/* Create WO from Breakdown Modal */}
+      {showWOModal && selected && (
+        <ModalDialog open onClose={() => setShowWOModal(false)} title={`Create WO — ${selected.breakdown_no}`} size="md">
+          <div style={{ padding: '8px 0 14px', borderBottom: '1px solid var(--border)', marginBottom: 14, fontSize: 13 }}>
+            <div style={{ fontWeight: 700 }}>{selected.asset_name}</div>
+            <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 2 }}>{catLabel(selected.breakdown_category)} · Reported {selected.reported_at?.slice(0, 16)}</div>
+            <div style={{ fontSize: 12, marginTop: 4, color: 'var(--text-mid)' }}>{selected.description}</div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>Task Name *</label>
+            <input className="form-control" value={woForm.task_name} onChange={e => setWoForm(f => ({ ...f, task_name: e.target.value }))} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label>Planned Start Date</label>
+            <input type="date" className="form-control" value={woForm.planned_start_date} onChange={e => setWoForm(f => ({ ...f, planned_start_date: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea className="form-control" rows={2} value={woForm.notes} onChange={e => setWoForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <ModalActions>
+            <button className="btn btn-secondary" onClick={() => setShowWOModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleCreateWO} disabled={saving}>
+              {saving ? 'Creating…' : 'Create Work Order'}
+            </button>
+          </ModalActions>
+        </ModalDialog>
+      )}
+
       {/* View details modal */}
       {showViewModal && selected && (
         <ModalDialog open onClose={() => { setShowViewModal(false); setSelected(null) }}
@@ -409,10 +522,12 @@ export default function BreakdownManagement() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginBottom: 14, color: 'var(--text-dim)' }}>
               <span>Asset: <strong style={{ color: 'var(--text)' }}>{selected.asset_name || '—'}</strong></span>
               <span>Category: <strong style={{ color: 'var(--text)' }}>{catLabel(selected.breakdown_category)}</strong></span>
+              <span>Severity: <strong style={{ color: SEVERITY_COLORS[selected.severity] || 'var(--text)' }}>{selected.severity || '—'}</strong></span>
               <span>Reported: <strong style={{ color: 'var(--text)' }}>{selected.reported_at?.slice(0, 16) || '—'}</strong></span>
               <span>By: <strong style={{ color: 'var(--text)' }}>{selected.reported_by || '—'}</strong></span>
               <span>Downtime: <strong style={{ color: 'var(--yellow)' }}>{selected.downtime_hours ? `${selected.downtime_hours} hrs` : '—'}</strong></span>
               <span>Cost: <strong style={{ color: 'var(--teal)' }}>{selected.actual_cost ? `$${Number(selected.actual_cost).toLocaleString()}` : '—'}</strong></span>
+              {selected.linked_wo_id && <span>Linked WO: <strong style={{ color: 'var(--gold)', fontFamily: 'var(--mono)' }}>{selected.linked_wo_id}</strong></span>}
             </div>
             <div style={{ padding: '8px 10px', background: 'var(--surface2)', borderRadius: 6, marginBottom: 8 }}>
               <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, textTransform: 'uppercase', color: 'var(--text-dim)' }}>Description</div>
