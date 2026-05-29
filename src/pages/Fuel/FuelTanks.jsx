@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useFuel } from '../../contexts/FuelContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
 import { exportMultiSheet } from '../../engine/reportingEngine'
-import { PageHeader, KPICard, EmptyState, TabNav, AlertBanner } from '../../components/ui'
+import { PageHeader, KPICard, EmptyState, TabNav, AlertBanner, ModalDialog, ModalActions } from '../../components/ui'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -62,15 +63,36 @@ function TankGauge({ tank, level, percentage }) {
   )
 }
 
+const BLANK_TRANSFER = { from_tank_id: '', to_tank_id: '', quantity: '', fuel_type: 'DIESEL', reason: '', notes: '' }
+
 export default function FuelTanks() {
   const {
-    tanks, issuances, deliveries, dipstickLog,
-    getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES,
+    tanks, issuances, deliveries, dipstickLog, transfers,
+    getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES, addTransfer,
     loading,
   } = useFuel()
+  const { user } = useAuth()
 
   const canEdit = useCanEdit('fuel', 'tanks')
   const [activeTab, setActiveTab] = useState('overview')
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferForm, setTransferForm]           = useState(BLANK_TRANSFER)
+  const [transferSaving, setTransferSaving]       = useState(false)
+
+  const handleTransfer = async () => {
+    if (!transferForm.from_tank_id || !transferForm.to_tank_id) { toast.error('Select both tanks'); return }
+    if (transferForm.from_tank_id === transferForm.to_tank_id) { toast.error('Source and destination must be different tanks'); return }
+    const qty = parseFloat(transferForm.quantity)
+    if (!qty || qty <= 0) { toast.error('Enter a valid quantity'); return }
+    setTransferSaving(true)
+    try {
+      const no = await addTransfer({ ...transferForm, quantity: qty, transferred_by: user?.email || user?.full_name || '' })
+      toast.success(`Transfer ${no} recorded`)
+      setShowTransferModal(false)
+      setTransferForm(BLANK_TRANSFER)
+    } catch (e) { toast.error(e.message) }
+    setTransferSaving(false)
+  }
 
   // Aggregate KPIs (all tanks combined)
   const totalIssued     = issuances.reduce((s, i) => s + (Number(i.amount) || 0), 0)
@@ -119,8 +141,9 @@ export default function FuelTanks() {
   }
 
   const TABS = [
-    { id: 'overview',  label: 'Overview',  icon: 'water'     },
-    { id: 'analytics', label: 'Analytics', icon: 'bar_chart' },
+    { id: 'overview',  label: 'Overview',   icon: 'water'      },
+    { id: 'analytics', label: 'Analytics',  icon: 'bar_chart'  },
+    { id: 'transfers', label: 'Transfers',  icon: 'swap_horiz' },
   ]
 
   return (
@@ -129,6 +152,11 @@ export default function FuelTanks() {
         <button className="btn btn-secondary" onClick={handleExport}>
           <span className="material-icons">table_chart</span> Export
         </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
+            <span className="material-icons">swap_horiz</span> Transfer
+          </button>
+        )}
       </PageHeader>
 
       {/* Critical alert banners */}
@@ -357,6 +385,125 @@ export default function FuelTanks() {
             </div>
           )}
         </>
+      )}
+
+      {activeTab === 'transfers' && (
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Tank-to-Tank Transfers</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Move fuel between tanks or bowsers</div>
+            </div>
+            {canEdit && (
+              <button className="btn btn-primary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
+                <span className="material-icons">add</span> New Transfer
+              </button>
+            )}
+          </div>
+          {(!transfers || transfers.length === 0) ? (
+            <EmptyState icon="swap_horiz" message="No transfers recorded yet" />
+          ) : (
+            <div className="table-wrap">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Transfer No</th><th>Date</th><th>From Tank</th><th>To Tank</th>
+                    <th>Fuel Type</th><th style={{ textAlign: 'right' }}>Qty (L)</th>
+                    <th>Reason</th><th>By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...transfers].sort((a, b) => new Date(b.transfer_date) - new Date(a.transfer_date)).map(t => {
+                    const fromTank = tanks.find(tk => tk.id === t.from_tank_id)
+                    const toTank   = tanks.find(tk => tk.id === t.to_tank_id)
+                    return (
+                      <tr key={t.id}>
+                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700 }}>{t.transfer_no || '—'}</td>
+                        <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{t.transfer_date}</td>
+                        <td style={{ color: 'var(--red)', fontSize: 12, fontWeight: 600 }}>{fromTank?.name || t.from_tank_id}</td>
+                        <td style={{ color: 'var(--green)', fontSize: 12, fontWeight: 600 }}>{toTank?.name || t.to_tank_id}</td>
+                        <td><span className="badge badge-yellow" style={{ fontSize: 10 }}>{t.fuel_type}</span></td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700 }}>{parseFloat(t.quantity).toLocaleString()}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.reason || '—'}</td>
+                        <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.transferred_by || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showTransferModal && (
+        <ModalDialog title="Tank-to-Tank Transfer" onClose={() => setShowTransferModal(false)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group">
+              <label>From Tank (Source) *</label>
+              <select className="form-control" value={transferForm.from_tank_id}
+                onChange={e => setTransferForm(f => ({ ...f, from_tank_id: e.target.value }))}>
+                <option value="">Select source tank</option>
+                {tanks.map(t => {
+                  const lvl = getCurrentTankLevel(t.id)
+                  return <option key={t.id} value={t.id}>{t.name} — {lvl.toLocaleString()}L avail</option>
+                })}
+              </select>
+              {transferForm.from_tank_id && (() => {
+                const lvl = getCurrentTankLevel(transferForm.from_tank_id)
+                const qty = parseFloat(transferForm.quantity) || 0
+                return (
+                  <div style={{ fontSize: 11, marginTop: 4, color: qty > lvl ? 'var(--red)' : 'var(--text-dim)' }}>
+                    Available: {lvl.toLocaleString()}L {qty > lvl ? '— Insufficient!' : ''}
+                  </div>
+                )
+              })()}
+            </div>
+            <div className="form-group">
+              <label>To Tank (Destination) *</label>
+              <select className="form-control" value={transferForm.to_tank_id}
+                onChange={e => setTransferForm(f => ({ ...f, to_tank_id: e.target.value }))}>
+                <option value="">Select destination tank</option>
+                {tanks.filter(t => t.id !== transferForm.from_tank_id).map(t => {
+                  const lvl = getCurrentTankLevel(t.id)
+                  const cap = t.capacity || 0
+                  const space = cap - lvl
+                  return <option key={t.id} value={t.id}>{t.name} — {space.toLocaleString()}L free</option>
+                })}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Quantity to Transfer (L) *</label>
+              <input className="form-control" type="number" min="1" step="0.1"
+                value={transferForm.quantity}
+                onChange={e => setTransferForm(f => ({ ...f, quantity: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Fuel Type</label>
+              <select className="form-control" value={transferForm.fuel_type}
+                onChange={e => setTransferForm(f => ({ ...f, fuel_type: e.target.value }))}>
+                {['DIESEL','PETROL','PARAFFIN','AVTUR'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Reason</label>
+              <input className="form-control" placeholder="Why is this transfer needed?"
+                value={transferForm.reason}
+                onChange={e => setTransferForm(f => ({ ...f, reason: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Notes</label>
+              <input className="form-control" value={transferForm.notes}
+                onChange={e => setTransferForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button className="btn btn-secondary" onClick={() => setShowTransferModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleTransfer} disabled={transferSaving}>
+              {transferSaving ? 'Transferring…' : 'Confirm Transfer'}
+            </button>
+          </ModalActions>
+        </ModalDialog>
       )}
     </div>
   )

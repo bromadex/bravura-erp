@@ -29,6 +29,7 @@ export default function FuelReports() {
     predictDaysUntilEmpty,
     getCurrentTankLevel,
     getTankPercentage,
+    getAnomalousIssuances,
     TANK_MAX_LITRES
   } = useFuel()
   const { user } = useAuth()
@@ -47,6 +48,7 @@ export default function FuelReports() {
   const issuanceByDay = getIssuanceByDay()
   const issuanceByVehicle = getIssuanceByVehicle()
   const tankTrend = getTankLevelTrend()
+  const anomalies = getAnomalousIssuances ? getAnomalousIssuances() : []
 
   const handleCreateRequisition = async () => {
     if (!reqForm.quantity || reqForm.quantity <= 0) {
@@ -216,6 +218,62 @@ export default function FuelReports() {
             }} options={chartOptions} />
           </div>
         ) : <div className="empty-state">No dipstick data – add dipstick records first</div>}
+      </div>
+
+      {/* ── Anomaly / Theft Detection ──────────────────────────────────── */}
+      <div className="card" style={{ padding: 20, marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>
+            <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6, color: anomalies.length > 0 ? 'var(--red)' : 'var(--text-dim)' }}>warning</span>
+            Anomalous Issuances
+            {anomalies.length > 0 && (
+              <span style={{ marginLeft: 8, background: 'var(--red)', color: '#fff', borderRadius: 10, padding: '1px 8px', fontSize: 11 }}>{anomalies.length}</span>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Statistically unusual fuel draws (≥ 2.5× vehicle average)</div>
+        </div>
+        {anomalies.length === 0 ? (
+          <div style={{ color: 'var(--text-dim)', fontSize: 13, padding: '16px 0' }}>
+            <span className="material-icons" style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6, color: 'var(--green)' }}>check_circle</span>
+            No anomalies detected — all issuances within normal range
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ marginTop: 12 }}>
+            <table className="stock-table">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Vehicle</th><th>Driver</th>
+                  <th style={{ textAlign: 'right' }}>Issued (L)</th>
+                  <th style={{ textAlign: 'right' }}>Vehicle Avg (L)</th>
+                  <th style={{ textAlign: 'right' }}>Excess (L)</th>
+                  <th>Purpose</th><th>Flag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {anomalies.map(a => (
+                  <tr key={a.id} style={{ background: 'rgba(248,113,113,.07)' }}>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{String(a.date).slice(0, 10)}</td>
+                    <td style={{ fontWeight: 600 }}>{a.vehicle || a.equipment_name || '—'}</td>
+                    <td style={{ fontSize: 12 }}>{a.driver || a.driver_operator || '—'}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--red)' }}>
+                      {Number(a.amount).toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>
+                      {a.avg?.toLocaleString() || '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--yellow)' }}>
+                      +{a.deviation?.toLocaleString() || '—'}
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.purpose || '—'}</td>
+                    <td>
+                      <span className="badge badge-red" style={{ fontSize: 9 }}>ANOMALY</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {showReqModal && (
