@@ -225,6 +225,8 @@ const ALL_MODULES = {
       ],
     }, {
       label: 'Maintenance', pages: [
+        { id: 'workshop-jobs',          label: 'Workshop Jobs',          icon: 'build'            },
+        { id: 'breakdowns',             label: 'Breakdown Management',   icon: 'report_problem'   },
         { id: 'preventive-maintenance', label: 'Preventive Maintenance', icon: 'event_available'  },
         { id: 'tyre-management',        label: 'Tyre Management',        icon: 'tire_repair'      },
       ],

@@ -429,8 +429,8 @@ export function FuelProvider({ children }) {
     // Update both tank levels
     const fromTank = getTankById(transfer.from_tank_id)
     const toTank   = getTankById(transfer.to_tank_id)
-    const newFromLevel = (fromTank?.current_level || 0) - qty
-    const newToLevel   = (toTank?.current_level   || 0) + qty
+    const newFromLevel = getCurrentTankLevel(transfer.from_tank_id) - qty
+    const newToLevel   = getCurrentTankLevel(transfer.to_tank_id)   + qty
 
     await Promise.all([
       supabase.from('fuel_tanks').update({ current_level: newFromLevel, updated_at: new Date().toISOString() }).eq('id', transfer.from_tank_id),
@@ -440,6 +440,35 @@ export function FuelProvider({ children }) {
     auditLog({ module: 'fuel', action: 'TRANSFER', entityType: 'fuel_transfer', entityId: id, entityName: transfer_no })
     await fetchAll()
     return transfer_no
+  }
+
+  // ── Add Tank ───────────────────────────────────────────────────────
+
+  const addTank = async (tank) => {
+    const id = newId()
+    let tank_code
+    try { tank_code = await generateTxnCode('TANK') } catch { tank_code = null }
+    if (!tank_code) tank_code = `TANK-${Date.now()}`
+    const { error } = await supabase.from('fuel_tanks').insert({
+      id, tank_code,
+      name:            tank.name,
+      fuel_type:       tank.fuel_type  || 'DIESEL',
+      capacity:        parseFloat(tank.capacity)        || 0,
+      current_level:   parseFloat(tank.current_level)   || 0,
+      location:        tank.location   || null,
+      unit_cost:       parseFloat(tank.unit_cost)       || 0,
+      alert_threshold: parseFloat(tank.alert_threshold) || 0,
+      is_bowser:       tank.is_bowser  || false,
+      tank_type:       tank.tank_type  || 'fixed',
+      is_active:       true,
+      notes:           tank.notes      || null,
+      created_at:      new Date().toISOString(),
+      updated_at:      new Date().toISOString(),
+    })
+    if (error) throw error
+    auditLog({ module: 'fuel', action: 'CREATE', entityType: 'fuel_tank', entityId: id, entityName: tank.name })
+    await fetchAll()
+    return tank_code
   }
 
   // ── Opening Balance ────────────────────────────────────────────────
@@ -597,6 +626,8 @@ export function FuelProvider({ children }) {
       addDipstick, updateDipstick, deleteDipstick,
       // Fuel requests
       addFuelRequest, updateFuelRequest, approveFuelRequest, rejectFuelRequest,
+      // Tank management
+      addTank,
       // Fuel transfers
       addTransfer,
       // Opening balance

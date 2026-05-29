@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '../../lib/supabase'
 import { useFuel }   from '../../contexts/FuelContext'
 import { useAuth }   from '../../contexts/AuthContext'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
@@ -57,6 +58,15 @@ export default function FuelRequests() {
   const [issueForm,   setIssueForm]   = useState(BLANK_ISSUE)
   const [rejectReason, setRejectReason] = useState('')
   const [submitting,  setSubmitting]  = useState(false)
+  const [drivers,     setDrivers]     = useState([])
+  const [assets,      setAssets]      = useState([])
+
+  useEffect(() => {
+    supabase.from('driver_profiles').select('id,full_name,department,employee_no').eq('status','active').order('full_name')
+      .then(({ data }) => setDrivers(data || []))
+    supabase.from('asset_registry').select('id,asset_name,asset_code,plate_number,asset_category').order('asset_name')
+      .then(({ data }) => setAssets(data || []))
+  }, [])
 
   const handleSearchChange = (v) => {
     setSearchInput(v)
@@ -402,8 +412,16 @@ export default function FuelRequests() {
             <div className="form-row">
               <div className="form-group">
                 <label>Requestor Name *</label>
-                <input className="form-control" required value={newForm.requester_name}
-                  onChange={e => setNewForm({ ...newForm, requester_name: e.target.value })} />
+                <input className="form-control" required list="driver-list" placeholder="Type to search…"
+                  value={newForm.requester_name}
+                  onChange={e => {
+                    const val = e.target.value
+                    const match = drivers.find(d => d.full_name === val)
+                    setNewForm(f => ({ ...f, requester_name: val, department: match?.department || f.department }))
+                  }} />
+                <datalist id="driver-list">
+                  {drivers.map(d => <option key={d.id} value={d.full_name}>{d.employee_no ? `${d.employee_no} — ${d.department || ''}` : d.department || ''}</option>)}
+                </datalist>
               </div>
               <div className="form-group">
                 <label>Department</label>
@@ -414,13 +432,24 @@ export default function FuelRequests() {
             <div className="form-row">
               <div className="form-group">
                 <label>Equipment Name</label>
-                <input className="form-control" placeholder="Vehicle reg / equipment ID" value={newForm.equipment_name}
+                <input className="form-control" list="asset-list" placeholder="Type reg / name to search…"
+                  value={newForm.equipment_name}
                   onChange={e => setNewForm({ ...newForm, equipment_name: e.target.value })} />
+                <datalist id="asset-list">
+                  {assets.map(a => (
+                    <option key={a.id} value={a.plate_number || a.asset_name}>
+                      {a.asset_name}{a.plate_number ? ` (${a.plate_number})` : ''} — {a.asset_category || ''}
+                    </option>
+                  ))}
+                </datalist>
               </div>
               <div className="form-group">
                 <label>Driver / Operator</label>
-                <input className="form-control" value={newForm.driver_operator}
+                <input className="form-control" list="driver-list2" value={newForm.driver_operator}
                   onChange={e => setNewForm({ ...newForm, driver_operator: e.target.value })} />
+                <datalist id="driver-list2">
+                  {drivers.map(d => <option key={d.id} value={d.full_name} />)}
+                </datalist>
               </div>
             </div>
             <div className="form-row">

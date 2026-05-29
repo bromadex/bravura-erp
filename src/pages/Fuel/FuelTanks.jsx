@@ -69,7 +69,7 @@ export default function FuelTanks() {
   const {
     tanks, issuances, deliveries, dipstickLog, transfers,
     getCurrentTankLevel, getTankPercentage, TANK_MAX_LITRES, addTransfer,
-    setOpeningFuelBalance, loading,
+    setOpeningFuelBalance, addTank, loading,
   } = useFuel()
   const { user } = useAuth()
 
@@ -81,6 +81,9 @@ export default function FuelTanks() {
   const [showOpeningModal, setShowOpeningModal]   = useState(false)
   const [openingForm, setOpeningForm]             = useState({ tank_id: '', level: '', date: today, notes: '' })
   const [openingSaving, setOpeningSaving]         = useState(false)
+  const [showTankModal, setShowTankModal]         = useState(false)
+  const [tankForm, setTankForm]                   = useState({ name: '', fuel_type: 'DIESEL', capacity: '', current_level: '', location: '', unit_cost: '', alert_threshold: '', is_bowser: false, tank_type: 'fixed', notes: '' })
+  const [tankSaving, setTankSaving]               = useState(false)
 
   const handleOpeningBalance = async () => {
     if (!openingForm.tank_id) { toast.error('Select a tank'); return }
@@ -96,6 +99,19 @@ export default function FuelTanks() {
       setOpeningForm({ tank_id: '', level: '', date: today, notes: '' })
     } catch (e) { toast.error(e.message) }
     setOpeningSaving(false)
+  }
+
+  const handleAddTank = async () => {
+    if (!tankForm.name.trim()) { toast.error('Tank name is required'); return }
+    if (!tankForm.capacity || parseFloat(tankForm.capacity) <= 0) { toast.error('Enter a valid capacity'); return }
+    setTankSaving(true)
+    try {
+      const code = await addTank(tankForm)
+      toast.success(`Tank ${code} created`)
+      setShowTankModal(false)
+      setTankForm({ name: '', fuel_type: 'DIESEL', capacity: '', current_level: '', location: '', unit_cost: '', alert_threshold: '', is_bowser: false, tank_type: 'fixed', notes: '' })
+    } catch (e) { toast.error(e.message) }
+    setTankSaving(false)
   }
 
   const handleTransfer = async () => {
@@ -176,8 +192,11 @@ export default function FuelTanks() {
             <button className="btn btn-secondary" onClick={() => { setOpeningForm({ tank_id: tanks[0]?.id || '', level: '', date: today, notes: '' }); setShowOpeningModal(true) }}>
               <span className="material-icons">inventory_2</span> Set Opening Balance
             </button>
-            <button className="btn btn-primary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
+            <button className="btn btn-secondary" onClick={() => { setTransferForm(BLANK_TRANSFER); setShowTransferModal(true) }}>
               <span className="material-icons">swap_horiz</span> Transfer
+            </button>
+            <button className="btn btn-primary" onClick={() => { setTankForm({ name: '', fuel_type: 'DIESEL', capacity: '', current_level: '', location: '', unit_cost: '', alert_threshold: '', is_bowser: false, tank_type: 'fixed', notes: '' }); setShowTankModal(true) }}>
+              <span className="material-icons">add</span> Add Tank
             </button>
           </>
         )}
@@ -503,6 +522,78 @@ export default function FuelTanks() {
             <button className="btn btn-secondary" onClick={() => setShowOpeningModal(false)}>Cancel</button>
             <button className="btn btn-primary" onClick={handleOpeningBalance} disabled={openingSaving}>
               {openingSaving ? 'Saving…' : 'Set Opening Balance'}
+            </button>
+          </ModalActions>
+        </ModalDialog>
+      )}
+
+      {showTankModal && (
+        <ModalDialog title="Add Fuel Tank / Storage" onClose={() => setShowTankModal(false)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Tank Name *</label>
+              <input className="form-control" placeholder="e.g. Workshop Tank, Drum 1, Site Bowser A"
+                value={tankForm.name} onChange={e => setTankForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Fuel Type *</label>
+              <select className="form-control" value={tankForm.fuel_type}
+                onChange={e => setTankForm(f => ({ ...f, fuel_type: e.target.value }))}>
+                {['DIESEL','PETROL','PARAFFIN','AVTUR','LUBRICANT'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Tank Type</label>
+              <select className="form-control" value={tankForm.tank_type}
+                onChange={e => setTankForm(f => ({ ...f, tank_type: e.target.value }))}>
+                <option value="fixed">Fixed Tank</option>
+                <option value="drum">Drum</option>
+                <option value="ibc">IBC / Tote</option>
+                <option value="bowser">Bowser / Mobile</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Capacity (Litres) *</label>
+              <input className="form-control" type="number" min="1" step="1"
+                value={tankForm.capacity} onChange={e => setTankForm(f => ({ ...f, capacity: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Current Level (Litres)</label>
+              <input className="form-control" type="number" min="0" step="1" placeholder="0"
+                value={tankForm.current_level} onChange={e => setTankForm(f => ({ ...f, current_level: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Location / Site</label>
+              <input className="form-control" placeholder="e.g. Workshop, Pit A, Camp Store"
+                value={tankForm.location} onChange={e => setTankForm(f => ({ ...f, location: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Unit Cost ($/L)</label>
+              <input className="form-control" type="number" min="0" step="0.001" placeholder="0.00"
+                value={tankForm.unit_cost} onChange={e => setTankForm(f => ({ ...f, unit_cost: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Alert Threshold (L)</label>
+              <input className="form-control" type="number" min="0" step="1" placeholder="0"
+                value={tankForm.alert_threshold} onChange={e => setTankForm(f => ({ ...f, alert_threshold: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" id="is_bowser_chk" checked={tankForm.is_bowser}
+                onChange={e => setTankForm(f => ({ ...f, is_bowser: e.target.checked, tank_type: e.target.checked ? 'bowser' : f.tank_type }))} />
+              <label htmlFor="is_bowser_chk" style={{ margin: 0, cursor: 'pointer' }}>
+                This is a mobile bowser (can be dispatched to sites)
+              </label>
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Notes</label>
+              <input className="form-control" value={tankForm.notes}
+                onChange={e => setTankForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <ModalActions>
+            <button className="btn btn-secondary" onClick={() => setShowTankModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleAddTank} disabled={tankSaving}>
+              {tankSaving ? 'Saving…' : 'Create Tank'}
             </button>
           </ModalActions>
         </ModalDialog>
