@@ -222,6 +222,8 @@ const ALL_MODULES = {
         { id: 'reclass-log',        label: 'Reclassification Log', icon: 'swap_horiz'         },
         { id: 'asset-import',       label: 'Import Assets',      icon: 'download'             },
         { id: 'category-config',    label: 'Category Config',    icon: 'tune'                 },
+        { id: 'depreciation',       label: 'Depreciation',       icon: 'trending_down'        },
+        { id: 'asset-verification', label: 'Asset Verification', icon: 'verified'             },
       ],
     }, {
       label: 'Maintenance', pages: [

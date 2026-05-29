@@ -361,6 +361,8 @@ const AssetRegistry       = lazy(() => import('./pages/Assets/AssetRegistry'))
 const CategoryConfig      = lazy(() => import('./pages/Assets/CategoryConfig'))
 const ReclassificationLog = lazy(() => import('./pages/Assets/ReclassificationLog'))
 const AssetImport         = lazy(() => import('./pages/Assets/AssetImport'))
+const AssetDepreciation   = lazy(() => import('./pages/Assets/AssetDepreciation'))
+const AssetVerification   = lazy(() => import('./pages/Assets/AssetVerification'))
 
 // Logistics
 const LogisticsDashboard  = lazy(() => import('./pages/Logistics/LogisticsDashboard'))
@@ -620,6 +622,8 @@ function AppRoutes() {
           <Route path="category-config"         element={<CategoryConfig />} />
           <Route path="reclass-log"             element={<ReclassificationLog />} />
           <Route path="asset-import"            element={<AssetImport />} />
+          <Route path="depreciation"            element={<AssetDepreciation />} />
+          <Route path="asset-verification"      element={<AssetVerification />} />
         </Route>
 
         {/* ── HR ───────────────────────────────────────────── */}
