@@ -57,13 +57,16 @@ export default function FuelRequests() {
   const [approveForm, setApproveForm] = useState(BLANK_APPROVE)
   const [issueForm,   setIssueForm]   = useState(BLANK_ISSUE)
   const [rejectReason, setRejectReason] = useState('')
-  const [submitting,  setSubmitting]  = useState(false)
-  const [employees,   setEmployees]   = useState([])
-  const [assets,      setAssets]      = useState([])
+  const [submitting,   setSubmitting]   = useState(false)
+  const [employees,    setEmployees]    = useState([])
+  const [departments,  setDepartments]  = useState([])
+  const [assets,       setAssets]       = useState([])
 
   useEffect(() => {
-    supabase.from('employees').select('id,name,dept,employee_number').eq('status','active').order('name')
+    supabase.from('employees').select('id,name,employee_number,department_id').neq('status','Terminated').order('name')
       .then(({ data }) => setEmployees(data || []))
+    supabase.from('departments').select('id,name').order('name')
+      .then(({ data }) => setDepartments(data || []))
     supabase.from('asset_registry').select('id,asset_name,asset_code,plate_number,asset_category').order('asset_name')
       .then(({ data }) => setAssets(data || []))
   }, [])
@@ -409,63 +412,59 @@ export default function FuelRequests() {
       {showNewModal && (
         <ModalDialog open onClose={() => setShowNewModal(false)} title="New Fuel Request" size="lg">
           <form onSubmit={handleNewSubmit}>
-            {(() => {
-              const depts = [...new Set(employees.map(e => e.dept).filter(Boolean))].sort()
-              return (
-                <>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Requestor Name *</label>
-                      <select className="form-control" required value={newForm.requester_name}
-                        onChange={e => {
-                          const match = employees.find(emp => emp.name === e.target.value)
-                          setNewForm(f => ({ ...f, requester_name: e.target.value, department: match?.dept || f.department }))
-                        }}>
-                        <option value="">— Select requestor —</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name}{emp.dept ? ` (${emp.dept})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Department</label>
-                      <select className="form-control" value={newForm.department}
-                        onChange={e => setNewForm({ ...newForm, department: e.target.value })}>
-                        <option value="">— Select department —</option>
-                        {depts.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Equipment Name</label>
-                      <input className="form-control" list="asset-list" placeholder="Type reg / name to search…"
-                        value={newForm.equipment_name}
-                        onChange={e => setNewForm({ ...newForm, equipment_name: e.target.value })} />
-                      <datalist id="asset-list">
-                        {assets.map(a => (
-                          <option key={a.id}
-                            value={a.plate_number || a.asset_name}
-                            label={`${a.asset_name}${a.plate_number ? ` (${a.plate_number})` : ''} — ${a.asset_category || ''}`} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div className="form-group">
-                      <label>Driver / Operator</label>
-                      <select className="form-control" value={newForm.driver_operator}
-                        onChange={e => setNewForm({ ...newForm, driver_operator: e.target.value })}>
-                        <option value="">— Select driver/operator —</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.name}>{emp.name}{emp.dept ? ` (${emp.dept})` : ''}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )
-            })()}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Requestor Name *</label>
+                <select className="form-control" required value={newForm.requester_name}
+                  onChange={e => {
+                    const emp = employees.find(x => x.name === e.target.value)
+                    const dept = emp ? (departments.find(d => d.id === emp.department_id)?.name || '') : ''
+                    setNewForm(f => ({ ...f, requester_name: e.target.value, department: dept || f.department }))
+                  }}>
+                  <option value="">— Select requestor —</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>
+                      {emp.name}{emp.employee_number ? ` (${emp.employee_number})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Department</label>
+                <select className="form-control" value={newForm.department}
+                  onChange={e => setNewForm({ ...newForm, department: e.target.value })}>
+                  <option value="">— Select department —</option>
+                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Equipment Name</label>
+                <input className="form-control" list="asset-list" placeholder="Type reg / name to search…"
+                  value={newForm.equipment_name}
+                  onChange={e => setNewForm({ ...newForm, equipment_name: e.target.value })} />
+                <datalist id="asset-list">
+                  {assets.map(a => (
+                    <option key={a.id}
+                      value={a.plate_number || a.asset_name}
+                      label={`${a.asset_name}${a.plate_number ? ` (${a.plate_number})` : ''} — ${a.asset_category || ''}`} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="form-group">
+                <label>Driver / Operator</label>
+                <select className="form-control" value={newForm.driver_operator}
+                  onChange={e => setNewForm({ ...newForm, driver_operator: e.target.value })}>
+                  <option value="">— Select driver/operator —</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.name}>
+                      {emp.name}{emp.employee_number ? ` (${emp.employee_number})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="form-row">
               <div className="form-group">
                 <label>Fuel Type *</label>
