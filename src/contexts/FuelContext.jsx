@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
 import { generateTxnCode } from '../utils/txnCode'
 import { postToGL, hasGLEntry } from '../engine/accountingEngine'
+import { pushNotificationFromTemplate, pushNotificationToRole } from '../engine/notificationEngine'
+import { startWorkflow } from '../engine/workflowEngine'
 
 const FuelContext = createContext(null)
 
@@ -296,6 +298,27 @@ export function FuelProvider({ children }) {
     }])
 
     auditLog({ module: 'fuel', action: 'LOG', entityType: 'fuel_issuance', entityId: id, entityName: issuance.vehicle || '' })
+
+    // Non-blocking notifications
+    pushNotificationFromTemplate('fuel_issued', {
+      quantity: qty,
+      fuel_type: issuance.fuel_type || 'DIESEL',
+      equipment_name: issuance.vehicle || issuance.equipment_name || '',
+    }, { role: 'role_fuel_manager' }).catch(() => {})
+
+    // Low-stock alert when tank drops below alert_threshold
+    if (tank) {
+      const newLevel = (tank.current_level || 0) - qty
+      const threshold = tank.alert_threshold || 0
+      if (threshold > 0 && newLevel < threshold) {
+        pushNotificationFromTemplate('fuel_low_stock', {
+          tank_name: tank.name || '',
+          current_level: Math.round(newLevel),
+          threshold,
+        }, { roles: ['role_fuel_manager', 'role_fleet_manager'] }).catch(() => {})
+      }
+    }
+
     await fetchAll()
   }
 
@@ -326,6 +349,19 @@ export function FuelProvider({ children }) {
     }
 
     auditLog({ module: 'fuel', action: 'LOG', entityType: 'fuel_delivery', entityId: id, entityName: delivery.supplier || delivery.delivered_by || '' })
+
+    // Delivery notification
+    pushNotificationFromTemplate('fuel_delivery_received', {
+      quantity: delivery.qty || delivery.litres_delivered || '',
+      supplier: delivery.supplier || '',
+    }, { role: 'role_fuel_manager' }).catch(() => {})
+
+    // Start approval workflow if delivery value exceeds threshold
+    if (delivery.actor && parseFloat(delivery.amount || 0) > 5000) {
+      startWorkflow('fuel_deliveries', id, delivery.actor).catch(e =>
+        console.warn('[workflow] fuel_delivery workflow:', e?.message))
+    }
+
     await fetchAll()
   }
 
@@ -373,6 +409,22 @@ export function FuelProvider({ children }) {
     }])
     if (error) throw error
     auditLog({ module: 'fuel', action: 'CREATE', entityType: 'fuel_request', entityId: id, entityName: request_no })
+
+    // Notify fuel manager of new request
+    pushNotificationFromTemplate('fuel_request_submitted', {
+      request_no,
+      requester_name: req.requester_name || req.requested_by || '',
+      requested_liters: parseFloat(req.requested_qty || req.requested_liters) || 0,
+    }, { role: 'role_fuel_manager' }).catch(() => {})
+
+    // Start approval workflow if quantity or value exceeds threshold
+    const qty = parseFloat(req.requested_qty || req.requested_liters) || 0
+    const val = qty * (parseFloat(req.unit_cost) || 0)
+    if (req.actor && (qty > 200 || val > 500)) {
+      startWorkflow('fuel_requests', id, req.actor).catch(e =>
+        console.warn('[workflow] fuel_request workflow:', e?.message))
+    }
+
     await fetchAll()
     return request_no
   }

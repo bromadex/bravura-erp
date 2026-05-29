@@ -90,52 +90,70 @@ async function getInstanceForEntity(entityType, entityId) {
 // ── Notification helpers ──────────────────────────────────────
 
 const ENTITY_LABEL = {
-  leave_requests:            'Leave Request',
-  travel_requests:           'Travel Request',
-  store_requisitions:        'Store Requisition',
-  purchase_requisitions:     'Purchase Requisition',
-  purchase_orders:           'Purchase Order',
-  contractor_usage_logs:     'Contractor Usage Log',
-  petty_cash_transactions:   'Petty Cash Transaction',
-  petty_cash_reconciliations:'PC Reconciliation',
-  employee_attendance:       'Attendance Record',
+  leave_requests:             'Leave Request',
+  travel_requests:            'Travel Request',
+  store_requisitions:         'Store Requisition',
+  purchase_requisitions:      'Purchase Requisition',
+  purchase_orders:            'Purchase Order',
+  contractor_usage_logs:      'Contractor Usage Log',
+  petty_cash_transactions:    'Petty Cash Transaction',
+  petty_cash_reconciliations: 'PC Reconciliation',
+  employee_attendance:        'Attendance Record',
+  // Fleet / Fuel / Asset
+  fuel_requests:              'Fuel Request',
+  maintenance_work_orders:    'Maintenance Work Order',
+  fuel_deliveries:            'Fuel Delivery',
+  asset_registry:             'Asset Acquisition',
 }
 
 const ENTITY_LINK = {
-  leave_requests:            '/module/hr/leave',
-  travel_requests:           '/module/hr/leave',
-  store_requisitions:        '/module/procurement/store-requisitions',
-  purchase_requisitions:     '/module/procurement/purchase-requisitions',
-  purchase_orders:           '/module/procurement/purchase-orders',
-  contractor_usage_logs:     '/module/fleet',
-  petty_cash_transactions:   '/module/accounting/petty-cash',
-  petty_cash_reconciliations:'/module/accounting/petty-cash',
-  employee_attendance:       '/module/hr/attendance',
+  leave_requests:             '/module/hr/leave',
+  travel_requests:            '/module/hr/leave',
+  store_requisitions:         '/module/procurement/store-requisitions',
+  purchase_requisitions:      '/module/procurement/purchase-requisitions',
+  purchase_orders:            '/module/procurement/purchase-orders',
+  contractor_usage_logs:      '/module/fleet',
+  petty_cash_transactions:    '/module/accounting/petty-cash',
+  petty_cash_reconciliations: '/module/accounting/petty-cash',
+  employee_attendance:        '/module/hr/attendance',
+  // Fleet / Fuel / Asset
+  fuel_requests:              '/module/fuel/requests',
+  maintenance_work_orders:    '/module/fleet/workshop',
+  fuel_deliveries:            '/module/fuel/deliveries',
+  asset_registry:             '/module/assets/registry',
 }
 
 const TABLE_MAP = {
-  leave_requests:            'leave_requests',
-  travel_requests:           'travel_requests',
-  employee_attendance:       'employee_attendance',
-  store_requisitions:        'store_requisitions',
-  purchase_requisitions:     'purchase_requisitions',
-  purchase_orders:           'purchase_orders',
-  contractor_usage_logs:     'contractor_usage_logs',
-  petty_cash_transactions:   'petty_cash_transactions',
-  petty_cash_reconciliations:'petty_cash_reconciliations',
+  leave_requests:             'leave_requests',
+  travel_requests:            'travel_requests',
+  employee_attendance:        'employee_attendance',
+  store_requisitions:         'store_requisitions',
+  purchase_requisitions:      'purchase_requisitions',
+  purchase_orders:            'purchase_orders',
+  contractor_usage_logs:      'contractor_usage_logs',
+  petty_cash_transactions:    'petty_cash_transactions',
+  petty_cash_reconciliations: 'petty_cash_reconciliations',
+  // Fleet / Fuel / Asset
+  fuel_requests:              'fuel_requests',
+  maintenance_work_orders:    'maintenance_work_orders',
+  fuel_deliveries:            'fuel_deliveries',
 }
 
 // Valid statuses per DB CHECK constraints (from schema analysis)
 const VALID_STATUSES = {
-  leave_requests:            ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
-  travel_requests:           ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
-  employee_attendance:       ['pending','approved','rejected','cancelled'],
-  store_requisitions:        ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
-  purchase_requisitions:     ['draft','submitted','pending','approved','rejected','cancelled'],
-  purchase_orders:           ['draft','pending','approved','rejected','cancelled','partially_received','received'],
-  contractor_usage_logs:     ['draft','submitted','pending','approved','rejected','cancelled'],
-  petty_cash_transactions:   ['draft','submitted','pending','approved','rejected','cancelled'],
-  petty_cash_reconciliations:['draft','submitted','pending','approved','rejected'],
+  leave_requests:             ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  travel_requests:            ['draft','pending','pending_supervisor','pending_hr','approved','rejected','cancelled'],
+  employee_attendance:        ['pending','approved','rejected','cancelled'],
+  store_requisitions:         ['draft','submitted','pending','approved','rejected','cancelled','fulfilled'],
+  purchase_requisitions:      ['draft','submitted','pending','approved','rejected','cancelled'],
+  purchase_orders:            ['draft','pending','approved','rejected','cancelled','partially_received','received'],
+  contractor_usage_logs:      ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_transactions:    ['draft','submitted','pending','approved','rejected','cancelled'],
+  petty_cash_reconciliations: ['draft','submitted','pending','approved','rejected'],
+  // Fleet / Fuel / Asset
+  fuel_requests:              ['pending','approved','rejected','cancelled'],
+  maintenance_work_orders:    ['pending','open','closed','cancelled','rejected'],
+  fuel_deliveries:            ['received','pending','approved','rejected'],
 }
 
 function validateStatus(entityType, status) {

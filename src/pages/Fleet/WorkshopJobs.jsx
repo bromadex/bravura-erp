@@ -55,6 +55,10 @@ export default function WorkshopJobs() {
   const [closeForm,      setCloseForm]      = useState(BLANK_CLOSE)
   const [saving,         setSaving]         = useState(false)
   const [search,         setSearch]         = useState('')
+  const [partsLines,     setPartsLines]     = useState([])
+  const [itemSearch,     setItemSearch]     = useState('')
+  const [itemResults,    setItemResults]    = useState([])
+  const [itemSearching,  setItemSearching]  = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -137,13 +141,48 @@ export default function WorkshopJobs() {
     } catch (e) { toast.error(e.message) }
   }
 
+  const searchInventoryItems = async (q) => {
+    if (!q.trim() || q.length < 2) { setItemResults([]); return }
+    setItemSearching(true)
+    const { data } = await supabase.from('items').select('id, item_code, name, balance, cost, unit')
+      .or(`name.ilike.%${q}%,item_code.ilike.%${q}%`).eq('is_active', true).limit(10)
+    setItemResults(data || [])
+    setItemSearching(false)
+  }
+
+  const addPartLine = (item) => {
+    setPartsLines(prev => [...prev, {
+      _id:      crypto.randomUUID(),
+      item_id:  item.id,
+      item_code: item.item_code || '',
+      part_name: item.name,
+      qty:       1,
+      unit_cost: item.cost || 0,
+      balance:   item.balance || 0,
+    }])
+    setItemSearch('')
+    setItemResults([])
+  }
+
+  const removePartLine = (uid) => setPartsLines(prev => prev.filter(p => p._id !== uid))
+
   const handleClose = async () => {
     if (!closeForm.findings.trim()) { toast.error('Findings are required'); return }
     setSaving(true)
     try {
       const labourCost = (parseFloat(closeForm.labour_hours) || 0) * (parseFloat(closeForm.labour_rate) || 0)
-      const partsCost  = parseFloat(closeForm.parts_cost) || 0
+      const invPartsCost = partsLines.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.unit_cost) || 0), 0)
+      const partsCost  = (parseFloat(closeForm.parts_cost) || 0) + invPartsCost
       const actualCost = labourCost + partsCost
+
+      const parts_used = partsLines.map(p => ({
+        item_id:   p.item_id,
+        item_code: p.item_code,
+        part_name: p.part_name,
+        qty:       Number(p.qty) || 0,
+        unit_cost: Number(p.unit_cost) || 0,
+        warehouse_id: null,
+      }))
 
       await supabase.from('maintenance_work_orders').update({
         status:            'closed',
@@ -154,15 +193,56 @@ export default function WorkshopJobs() {
         labour_cost:       labourCost || null,
         parts_cost:        partsCost  || null,
         actual_cost:       actualCost || null,
+        parts_used:        parts_used.length ? parts_used : null,
         invoice_number:    closeForm.invoice_number || null,
         actual_end_date:   closeForm.actual_end_date || today,
         updated_at:        new Date().toISOString(),
       }).eq('id', selected.id)
 
+      // Deduct inventory for each linked part (non-blocking on failure)
+      for (const p of partsLines) {
+        if (!p.item_id || !p.qty) continue
+        try {
+          const qty = Number(p.qty) || 0
+          const now = new Date().toISOString()
+          await supabase.from('stock_ledger_entries').insert({
+            id:                    crypto.randomUUID(),
+            item_id:               p.item_id,
+            warehouse_id:          p.warehouse_id || null,
+            posting_datetime:      now,
+            voucher_type:          'Maintenance WO',
+            voucher_no:            selected.wo_number,
+            actual_qty:            -qty,
+            outgoing_rate:         Number(p.unit_cost) || 0,
+            valuation_rate:        Number(p.unit_cost) || 0,
+            stock_value_difference:-(qty * (Number(p.unit_cost) || 0)),
+            transaction_type:      'issue',
+            created_by:            user?.id || '',
+            created_at:            now,
+          })
+          // Update items.balance + total_out
+          await supabase.from('items').update({
+            balance:   Math.max(0, (p.balance || 0) - qty),
+            total_out: supabase.rpc ? undefined : undefined,
+          }).eq('id', p.item_id)
+          // Use raw update for total_out increment
+          await supabase.rpc('increment_item_total_out', { item_id: p.item_id, qty_out: qty }).catch(() => {
+            // rpc might not exist — do a manual update fallback
+            supabase.from('items').select('total_out').eq('id', p.item_id).single()
+              .then(({ data: itm }) => {
+                if (itm) supabase.from('items').update({ total_out: (itm.total_out || 0) + qty }).eq('id', p.item_id)
+              }).catch(() => {})
+          })
+        } catch (invErr) {
+          console.warn('[inventory] part deduction failed:', invErr?.message)
+        }
+      }
+
       await auditLog({ module: 'fleet', action: 'CLOSE', entityType: 'work_order', entityId: selected.id, entityName: selected.wo_number })
       toast.success(`WO ${selected.wo_number} closed`)
       setShowCloseModal(false)
       setSelected(null)
+      setPartsLines([])
       fetchData()
     } catch (e) { toast.error(e.message) }
     setSaving(false)
@@ -472,8 +552,80 @@ export default function WorkshopJobs() {
             <textarea className="form-control" rows={2} value={closeForm.completion_notes}
               onChange={e => setCloseForm(f => ({ ...f, completion_notes: e.target.value }))} />
           </div>
+
+          {/* Parts from Inventory */}
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span className="material-icons" style={{ fontSize: 18, color: 'var(--yellow)' }}>inventory_2</span>
+              <strong style={{ fontSize: 13 }}>Parts from Inventory</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input className="form-control" placeholder="Search inventory items by name or code…"
+                value={itemSearch}
+                onChange={e => { setItemSearch(e.target.value); searchInventoryItems(e.target.value) }} />
+            </div>
+            {itemResults.length > 0 && (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8, maxHeight: 160, overflowY: 'auto' }}>
+                {itemResults.map(item => (
+                  <div key={item.id}
+                    style={{ padding: '7px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', fontSize: 13 }}
+                    onClick={() => addPartLine(item)}>
+                    <span><strong>{item.item_code}</strong> — {item.name}</span>
+                    <span className="text-muted">Stock: {item.balance ?? 0} {item.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {partsLines.length > 0 && (
+              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '4px 8px', textAlign: 'left' }}>Part</th>
+                    <th style={{ padding: '4px 8px', width: 80 }}>Qty</th>
+                    <th style={{ padding: '4px 8px', width: 100 }}>Unit Cost</th>
+                    <th style={{ padding: '4px 8px', width: 90 }}>Total</th>
+                    <th style={{ width: 32 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partsLines.map(p => (
+                    <tr key={p._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '4px 8px' }}>{p.part_name}</td>
+                      <td style={{ padding: '4px 8px' }}>
+                        <input type="number" className="form-control" style={{ padding: '2px 6px', fontSize: 13 }}
+                          min="0.01" step="0.01" value={p.qty}
+                          onChange={e => setPartsLines(prev => prev.map(x => x._id === p._id ? { ...x, qty: e.target.value } : x))} />
+                      </td>
+                      <td style={{ padding: '4px 8px' }}>
+                        <input type="number" className="form-control" style={{ padding: '2px 6px', fontSize: 13 }}
+                          min="0" step="0.01" value={p.unit_cost}
+                          onChange={e => setPartsLines(prev => prev.map(x => x._id === p._id ? { ...x, unit_cost: e.target.value } : x))} />
+                      </td>
+                      <td style={{ padding: '4px 8px', color: 'var(--teal)' }}>
+                        ${((Number(p.qty) || 0) * (Number(p.unit_cost) || 0)).toFixed(2)}
+                      </td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" onClick={() => removePartLine(p._id)}
+                          style={{ padding: '2px 4px', color: 'var(--red)' }}>
+                          <span className="material-icons" style={{ fontSize: 16 }}>close</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>Parts Total:</td>
+                    <td style={{ padding: '4px 8px', color: 'var(--teal)', fontWeight: 700 }}>
+                      ${partsLines.reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.unit_cost) || 0), 0).toFixed(2)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <ModalActions>
-            <button className="btn btn-secondary" onClick={() => { setShowCloseModal(false); setSelected(null) }}>Cancel</button>
+            <button className="btn btn-secondary" onClick={() => { setShowCloseModal(false); setSelected(null); setPartsLines([]) }}>Cancel</button>
             <button className="btn btn-success" onClick={handleClose} disabled={saving}>
               {saving ? 'Closing…' : 'Close Work Order'}
             </button>

@@ -237,6 +237,11 @@ const ALL_MODULES = {
         { id: 'downtime-analytics', label: 'Downtime Analytics',  icon: 'timer_off'            },
         { id: 'cost-analysis',      label: 'Cost Analysis (TCO)', icon: 'price_check'          },
       ],
+    }, {
+      label: 'Configuration', pages: [
+        { id: 'gl-config', label: 'GL Account Mapping', icon: 'account_tree'               },
+        { id: 'settings',  label: 'Fleet Settings',     icon: 'settings'                   },
+      ],
     }],
   },
   hr: {

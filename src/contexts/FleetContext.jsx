@@ -9,7 +9,9 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
 import { generateTxnCode } from '../engine/transactionEngine'
-import { postToGL } from '../engine/accountingEngine'
+import { postToGL, hasGLEntry } from '../engine/accountingEngine'
+import { pushNotificationFromTemplate, pushNotificationToRole } from '../engine/notificationEngine'
+import { startWorkflow } from '../engine/workflowEngine'
 
 const FleetContext = createContext(null)
 
@@ -627,6 +629,20 @@ export function FleetProvider({ children }) {
     const { error } = await supabase.from('downtime_logs').insert([{ id, ...log, created_at: new Date().toISOString() }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'LOG', entityType: 'downtime', entityId: id, entityName: log.asset_id || '' })
+
+    // Notify fleet manager immediately on critical/major breakdowns
+    const severity = (log.severity || '').toLowerCase()
+    if (['critical', 'major'].includes(severity)) {
+      const assetName = [...vehicles, ...generators, ...earthMovers].find(a => a.id === log.asset_id)?.reg ||
+                        [...vehicles, ...generators, ...earthMovers].find(a => a.id === log.asset_id)?.gen_name ||
+                        log.asset_id || ''
+      pushNotificationFromTemplate('breakdown_reported', {
+        asset_name: assetName,
+        severity: log.severity,
+        location: log.location || 'Unknown',
+      }, { roles: ['role_fleet_manager', 'role_operations_manager'] }).catch(() => {})
+    }
+
     await fetchAll()
   }
 
@@ -674,11 +690,29 @@ export function FleetProvider({ children }) {
   const createWorkOrder = async (wo) => {
     const id = generateId()
     const wo_number = await generateTxnCode('WO').catch(() => `WO-${Date.now()}`)
+    const estimatedCost = parseFloat(wo.estimated_cost) || 0
+    // High-cost WOs start as 'pending' (workflow approval needed); others start as 'open'
+    const initialStatus = (wo.actor && estimatedCost > 1000) ? 'pending' : (wo.status || 'open')
     const { error } = await supabase.from('maintenance_work_orders').insert([{
-      id, wo_number, ...wo, status: wo.status || 'open', created_at: new Date().toISOString(),
+      id, wo_number, ...wo, status: initialStatus, created_at: new Date().toISOString(),
     }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'work_order', entityId: id, entityName: wo_number })
+
+    // Notify assigned technician + workshop supervisor
+    pushNotificationFromTemplate('work_order_created', {
+      wo_number,
+      asset_name: wo.asset_name || wo.asset_reg || '',
+      task_name: wo.task_name || '',
+      assigned_to: wo.assigned_to || 'Unassigned',
+    }, { roles: ['role_workshop_supervisor'] }).catch(() => {})
+
+    // Start approval workflow if estimated cost exceeds threshold
+    if (wo.actor && estimatedCost > 1000) {
+      startWorkflow('maintenance_work_orders', id, wo.actor).catch(e =>
+        console.warn('[workflow] work_order workflow:', e?.message))
+    }
+
     await fetchAll()
     return id
   }
@@ -732,6 +766,42 @@ export function FleetProvider({ children }) {
       }
     }
     auditLog({ module: 'fleet', action: 'CLOSE', entityType: 'work_order', entityId: id, entityName: wo?.wo_number || id })
+
+    // Non-blocking GL posting — only if fleet_gl_config accounts are set
+    ;(async () => {
+      try {
+        const { data: glCfg } = await supabase.from('fleet_gl_config').select('config_key, config_value')
+        const gl = {}
+        glCfg?.forEach(c => { if (c.config_value) gl[c.config_key] = c.config_value })
+        const cost = parseFloat(actual_cost) || 0
+        if (gl.maintenance_expense_account && gl.maintenance_payable_account && cost > 0) {
+          const alreadyPosted = await hasGLEntry(`WO-${id}`)
+          if (!alreadyPosted.exists) {
+            await postToGL({
+              sourceModule: 'fleet', sourceType: 'maintenance_work_order', sourceId: id,
+              entryDate: actual_end_date || new Date().toISOString().split('T')[0],
+              description: `Maintenance WO ${wo?.wo_number || id}: ${completion_notes || 'Maintenance completed'}`,
+              reference: `WO-${id}`,
+              lines: [
+                { account_code: gl.maintenance_expense_account, debit: cost, credit: 0, description: 'Maintenance expense' },
+                { account_code: gl.maintenance_payable_account, debit: 0, credit: cost, description: 'Accounts payable / cash' },
+              ],
+              postedBy: 'Fleet',
+            })
+          }
+        }
+      } catch (glErr) {
+        console.warn('[GL] WO posting skipped:', glErr?.message)
+      }
+    })()
+
+    // Notify fleet manager that WO is closed
+    pushNotificationFromTemplate('work_order_closed', {
+      wo_number: wo?.wo_number || id,
+      asset_name: wo?.asset_name || wo?.asset_reg || '',
+      actual_cost: parseFloat(actual_cost || 0).toFixed(2),
+    }, { role: 'role_fleet_manager' }).catch(() => {})
+
     await fetchAll()
   }
 
@@ -772,6 +842,15 @@ export function FleetProvider({ children }) {
     }])
     if (error) throw error
     auditLog({ module: 'fleet', action: 'CREATE', entityType: 'accident_report', entityId: id, entityName: report_number })
+
+    // Immediately notify fleet manager + HR + finance of accident
+    pushNotificationFromTemplate('accident_reported', {
+      report_number,
+      vehicle_reg: report.vehicle_reg || report.asset_reg || '',
+      incident_date: report.incident_date || '',
+      driver: report.driver_operator || report.driver_name || '',
+    }, { roles: ['role_fleet_manager', 'role_hr_manager'] }).catch(() => {})
+
     await fetchAll()
     return report_number
   }
@@ -895,6 +974,17 @@ export function FleetProvider({ children }) {
     }
     if (movement.event_type === 'fit') tyreUpdates.fitted_odometer = movement.km_at_event
     await safe(supabase.from('tyre_inventory').update(tyreUpdates).eq('id', movement.tyre_id))
+
+    // Notify fleet manager when a tyre is scrapped
+    if (movement.event_type === 'scrap') {
+      const tyre = tyreInventory.find(t => t.id === movement.tyre_id)
+      pushNotificationFromTemplate('tyre_scrapped', {
+        tyre_code: tyre?.tyre_code || movement.tyre_id,
+        vehicle: movement.vehicle_id || '',
+        km_accumulated: tyre?.km_accumulated || 0,
+      }, { role: 'role_fleet_manager' }).catch(() => {})
+    }
+
     await fetchAll()
   }
 
