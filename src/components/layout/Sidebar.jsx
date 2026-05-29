@@ -212,8 +212,11 @@ const ALL_MODULES = {
         { id: 'drivers',            label: 'Driver Management',  icon: 'badge'                },
         { id: 'inspections',        label: 'Inspections',        icon: 'fact_check'           },
         { id: 'allocation',         label: 'Equipment Allocation', icon: 'place'              },
-        { id: 'maintenance-alerts', label: 'Maintenance Alerts', icon: 'notifications_active' },
-        { id: 'asset-issues',       label: 'Asset Issues',       icon: 'bug_report'           },
+        { id: 'maintenance-alerts',     label: 'Maintenance Alerts',   icon: 'notifications_active' },
+        { id: 'asset-issues',           label: 'Asset Issues',         icon: 'bug_report'           },
+        { id: 'meter-readings',         label: 'Meter Readings',       icon: 'speed'                },
+        { id: 'operator-assignments',   label: 'Operator Assignments', icon: 'engineering'          },
+        { id: 'compliance',             label: 'Fleet Compliance',     icon: 'verified_user'        },
       ],
     }, {
       label: 'Asset Registry', pages: [

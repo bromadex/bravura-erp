@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useFleet } from '../../contexts/FleetContext'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCanEdit, useCanDelete } from '../../hooks/usePermission'
 import toast from 'react-hot-toast'
@@ -52,6 +53,7 @@ export default function Vehicles() {
     reclassifyFleetAsset, categoryConfigs, loading, fetchAll,
     getAssetExpiryWarnings,
   } = useFleet()
+  const navigate  = useNavigate()
   const canEdit   = useCanEdit('fleet', 'vehicles')
   const canDelete = useCanDelete('fleet', 'vehicles')
 
@@ -274,6 +276,10 @@ export default function Vehicles() {
                 </div>
 
                 <div className="btn-group-sm" style={{ justifyContent: 'flex-end', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  <button className="btn btn-secondary btn-sm" title="View Detail"
+                    onClick={() => navigate(`/module/fleet/vehicle/${v.id}`)}>
+                    <span className="material-icons">open_in_new</span>
+                  </button>
                   {canEdit && (
                     <button className="btn btn-secondary btn-sm" title="Reclassify"
                       onClick={() => { setReclassAsset(v); setReclassForm({ newCategory: '', reason: '' }) }}>

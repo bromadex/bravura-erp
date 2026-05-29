@@ -183,6 +183,10 @@ const WorkshopJobs          = lazy(() => import('./pages/Fleet/WorkshopJobs'))
 const BreakdownManagement   = lazy(() => import('./pages/Fleet/BreakdownManagement'))
 const FleetGLConfig         = lazy(() => import('./pages/Fleet/FleetGLConfig'))
 const FleetSettings         = lazy(() => import('./pages/Fleet/FleetSettings'))
+const VehicleDetail         = lazy(() => import('./pages/Fleet/VehicleDetail'))
+const MeterReadings         = lazy(() => import('./pages/Fleet/MeterReadings'))
+const OperatorAssignments   = lazy(() => import('./pages/Fleet/OperatorAssignments'))
+const FleetCompliance       = lazy(() => import('./pages/Fleet/FleetCompliance'))
 
 // HR
 const HRDashboard        = lazy(() => import('./pages/HR/HRDashboard'))
@@ -620,6 +624,10 @@ function AppRoutes() {
           <Route path="breakdowns"            element={<BreakdownManagement />} />
           <Route path="gl-config"             element={<FleetGLConfig />}       />
           <Route path="settings"              element={<FleetSettings />}       />
+          <Route path="vehicle/:id"           element={<VehicleDetail />}       />
+          <Route path="meter-readings"        element={<MeterReadings />}       />
+          <Route path="operator-assignments"  element={<OperatorAssignments />} />
+          <Route path="compliance"            element={<FleetCompliance />}     />
           {/* Asset Registry — unified asset master */}
           <Route path="asset-registry"          element={<AssetDashboard />} />
           <Route path="registry"                element={<AssetRegistry />} />
