@@ -182,9 +182,10 @@ const ALL_MODULES = {
     sections: [{
       label: 'Operations', pages: [
         { id: 'tanks',           label: 'Fuel Tanks',       icon: 'water'              },
-        { id: 'dipstick',        label: 'Dipstick Log',     icon: 'straighten'         },
+        { id: 'requests',        label: 'Fuel Requests',    icon: 'assignment'         },
         { id: 'issuance',        label: 'Fuel Issuance',    icon: 'local_gas_station'  },
         { id: 'deliveries',      label: 'Deliveries',       icon: 'local_shipping'     },
+        { id: 'dipstick',        label: 'Dipstick Log',     icon: 'straighten'         },
       ],
     }, {
       label: 'Analytics', pages: [

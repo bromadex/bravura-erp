@@ -158,6 +158,7 @@ const FuelReports        = lazy(() => import('./pages/Fuel/FuelReports'))
 const TankReconciliation = lazy(() => import('./pages/Fuel/TankReconciliation'))
 const VehicleConsumption = lazy(() => import('./pages/Fuel/VehicleConsumption'))
 const FuelForecasting    = lazy(() => import('./pages/Fuel/FuelForecasting'))
+const FuelRequests       = lazy(() => import('./pages/Fuel/FuelRequests'))
 
 // Fleet
 const FleetDashboard        = lazy(() => import('./pages/Fleet/FleetDashboard'))
@@ -568,6 +569,7 @@ function AppRoutes() {
           <Route path="consumption"    element={<VehicleConsumption />} />
           <Route path="forecasting"    element={<FuelForecasting />}    />
           <Route path="reports"        element={<FuelReports />}        />
+          <Route path="requests"       element={<FuelRequests />}       />
         </Route>
 
         {/* ── FLEET & ASSET REGISTRY ───────────────────────── */}

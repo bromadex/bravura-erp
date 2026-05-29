@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { auditLog } from '../engine/auditEngine'
 import { generateTxnCode } from '../utils/txnCode'
+import { postToGL, hasGLEntry } from '../engine/accountingEngine'
 
 const FuelContext = createContext(null)
 
@@ -57,12 +58,13 @@ export function FuelProvider({ children }) {
   const [dipstickLog,  setDipstickLog]  = useState([])
   const [fuelRequests, setFuelRequests] = useState([])
   const [calibrations, setCalibrations] = useState({}) // { tankId: [[cm,litres],...] }
+  const [transfers,    setTransfers]    = useState([])
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [tanksRes, issuanceRes, fuelLogRes, delRes, dipRes, reqRes, calRes] = await Promise.all([
+      const [tanksRes, issuanceRes, fuelLogRes, delRes, dipRes, reqRes, calRes, transfersRes] = await Promise.all([
         supabase.from('fuel_tanks').select('*').order('name'),
         supabase.from('fuel_issuance').select('*').order('date', { ascending: false }).limit(500),
         supabase.from('fuel_log').select('*').order('date', { ascending: false }).limit(500),
@@ -70,6 +72,7 @@ export function FuelProvider({ children }) {
         supabase.from('dipstick_log').select('*').order('date', { ascending: false }),
         supabase.from('fuel_requests').select('*').order('request_date', { ascending: false }).limit(200),
         supabase.from('fuel_calibration').select('*'),
+        supabase.from('fuel_transfers').select('*').order('transfer_date', { ascending: false }).limit(200),
       ])
 
       setTanks(safe(tanksRes))
@@ -86,6 +89,7 @@ export function FuelProvider({ children }) {
       setDeliveries(safe(delRes))
       setDipstickLog(safe(dipRes))
       setFuelRequests(safe(reqRes))
+      setTransfers(safe(transfersRes))
 
       // Build per-tank calibration map
       const calData = safe(calRes)
@@ -212,8 +216,14 @@ export function FuelProvider({ children }) {
       ? tanks.find(t => t.id === issuance.tank_id)
       : tanks[0] || null
 
-    // Write to fuel_issuance (primary going forward)
+    // Negative stock guard
+    const currentLevel = getCurrentTankLevel(issuance.tank_id || tanks[0]?.id)
     const qty = parseFloat(issuance.amount) || 0
+    if (qty > 0 && currentLevel < qty) {
+      throw new Error(`Insufficient fuel: tank has ${currentLevel.toLocaleString()}L, requested ${qty}L`)
+    }
+
+    // Write to fuel_issuance (primary going forward)
     const { error } = await supabase.from('fuel_issuance').insert([{
       id,
       tank_id:          tank?.id || null,
@@ -239,6 +249,27 @@ export function FuelProvider({ children }) {
       approval_status:  'approved',
     }])
     if (error) throw error
+
+    // Optional GL posting — only if tank has GL accounts configured
+    if (tank?.gl_expense_account && tank?.gl_asset_account) {
+      try {
+        await postToGL({
+          sourceModule: 'fuel',
+          sourceType:   'fuel_issuance',
+          sourceId:     id,
+          entryDate:    issuance.date,
+          description:  `Fuel issue: ${qty}L to ${issuance.vehicle || issuance.equipment_name || ''}`,
+          reference:    `FI-${id}`,
+          lines: [
+            { account_code: tank.gl_expense_account, debit: parseFloat(issuance.total_cost) || (qty * (parseFloat(issuance.unit_cost) || 0)), credit: 0, description: 'Fuel consumption expense' },
+            { account_code: tank.gl_asset_account,   debit: 0, credit: parseFloat(issuance.total_cost) || (qty * (parseFloat(issuance.unit_cost) || 0)), description: 'Fuel inventory reduction' },
+          ],
+          postedBy: issuance.user_name || '',
+        })
+      } catch (glErr) {
+        console.warn('GL posting skipped:', glErr.message)
+      }
+    }
 
     // Bridge-write to fuel_log so existing direct-query pages continue to work
     await supabase.from('fuel_log').insert([{
@@ -266,6 +297,28 @@ export function FuelProvider({ children }) {
     const id = newId()
     const { error } = await supabase.from('fuel_deliveries').insert([{ id, ...delivery, created_at: new Date().toISOString() }])
     if (error) throw error
+
+    // Optional GL posting — only if delivery has GL accounts configured
+    if (delivery.gl_asset_account && delivery.gl_payable_account) {
+      try {
+        await postToGL({
+          sourceModule: 'fuel',
+          sourceType:   'fuel_delivery',
+          sourceId:     id,
+          entryDate:    delivery.date,
+          description:  `Fuel delivery: ${delivery.quantity || delivery.litres_delivered}L from ${delivery.supplier || ''}`,
+          reference:    `FD-${id}`,
+          lines: [
+            { account_code: delivery.gl_asset_account,   debit: parseFloat(delivery.total_cost || delivery.amount) || 0, credit: 0, description: 'Fuel inventory increase' },
+            { account_code: delivery.gl_payable_account, debit: 0, credit: parseFloat(delivery.total_cost || delivery.amount) || 0, description: 'Accounts payable / cash' },
+          ],
+          postedBy: delivery.created_by || '',
+        })
+      } catch (glErr) {
+        console.warn('GL posting skipped:', glErr.message)
+      }
+    }
+
     auditLog({ module: 'fuel', action: 'LOG', entityType: 'fuel_delivery', entityId: id, entityName: delivery.supplier || delivery.delivered_by || '' })
     await fetchAll()
   }
@@ -340,10 +393,77 @@ export function FuelProvider({ children }) {
     await fetchAll()
   }
 
+  // ── Fuel Transfers ─────────────────────────────────────────────────
+
+  const addTransfer = async (transfer) => {
+    const id = newId()
+    let transfer_no
+    try { transfer_no = await generateTxnCode('FTR') } catch { transfer_no = `FTR-${Date.now()}` }
+
+    // Validate source tank has enough stock
+    const srcLevel = getCurrentTankLevel(transfer.from_tank_id)
+    const qty = parseFloat(transfer.quantity) || 0
+    if (qty <= 0) throw new Error('Transfer quantity must be positive')
+    if (srcLevel < qty) throw new Error(`Insufficient fuel in source tank: ${srcLevel.toLocaleString()}L available, ${qty}L requested`)
+
+    const { error } = await supabase.from('fuel_transfers').insert([{
+      id, transfer_no,
+      from_tank_id:   transfer.from_tank_id,
+      to_tank_id:     transfer.to_tank_id,
+      transfer_date:  transfer.transfer_date || new Date().toISOString().split('T')[0],
+      quantity:       qty,
+      fuel_type:      transfer.fuel_type || 'DIESEL',
+      reason:         transfer.reason || '',
+      transferred_by: transfer.transferred_by || '',
+      notes:          transfer.notes || null,
+      created_at:     new Date().toISOString(),
+    }])
+    if (error) throw error
+
+    // Update both tank levels
+    const fromTank = getTankById(transfer.from_tank_id)
+    const toTank   = getTankById(transfer.to_tank_id)
+    const newFromLevel = (fromTank?.current_level || 0) - qty
+    const newToLevel   = (toTank?.current_level   || 0) + qty
+
+    await Promise.all([
+      supabase.from('fuel_tanks').update({ current_level: newFromLevel, updated_at: new Date().toISOString() }).eq('id', transfer.from_tank_id),
+      supabase.from('fuel_tanks').update({ current_level: newToLevel,   updated_at: new Date().toISOString() }).eq('id', transfer.to_tank_id),
+    ])
+
+    auditLog({ module: 'fuel', action: 'TRANSFER', entityType: 'fuel_transfer', entityId: id, entityName: transfer_no })
+    await fetchAll()
+    return transfer_no
+  }
+
+  // ── Anomaly Detection ──────────────────────────────────────────────
+
+  const getAnomalousIssuances = (thresholdMultiplier = 2.5) => {
+    if (issuances.length < 5) return []
+    const byVehicle = {}
+    issuances.forEach(i => {
+      const key = i.vehicle || i.equipment_name || 'unknown'
+      if (!byVehicle[key]) byVehicle[key] = []
+      byVehicle[key].push(Number(i.amount) || 0)
+    })
+    const anomalies = []
+    Object.entries(byVehicle).forEach(([vehicle, amounts]) => {
+      if (amounts.length < 3) return
+      const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length
+      const variance = amounts.reduce((s, a) => s + Math.pow(a - avg, 2), 0) / amounts.length
+      const stdDev = Math.sqrt(variance)
+      const threshold = avg + thresholdMultiplier * stdDev
+      issuances
+        .filter(i => (i.vehicle || i.equipment_name || 'unknown') === vehicle && Number(i.amount) > threshold)
+        .forEach(i => anomalies.push({ ...i, avg: Math.round(avg), threshold: Math.round(threshold), deviation: Math.round(Number(i.amount) - avg) }))
+    })
+    return anomalies.sort((a, b) => b.deviation - a.deviation)
+  }
+
   return (
     <FuelContext.Provider value={{
       // State
-      tanks, issuances, deliveries, dipstickLog, fuelRequests, calibrations, loading,
+      tanks, issuances, deliveries, dipstickLog, fuelRequests, calibrations, transfers, loading,
       // Backward-compat constant
       TANK_MAX_LITRES,
       // Tank helpers
@@ -356,11 +476,14 @@ export function FuelProvider({ children }) {
       getIssuanceByVehicle,
       getTankLevelTrend,
       predictDaysUntilEmpty,
+      getAnomalousIssuances,
       // Issuance CRUD
       addIssuance, addDelivery,
       addDipstick, updateDipstick, deleteDipstick,
       // Fuel requests
       addFuelRequest, updateFuelRequest, approveFuelRequest, rejectFuelRequest,
+      // Fuel transfers
+      addTransfer,
       fetchAll,
     }}>
       {children}

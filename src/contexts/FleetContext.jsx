@@ -551,6 +551,14 @@ export function FleetProvider({ children }) {
   const addVehicleTrip = async (trip) => {
     const id = generateId()
     const vehicle = vehicles.find(v => v.id === trip.vehicle_id)
+    // Meter regression guard
+    const currentOdo = vehicle?.odometer_km || 0
+    if (trip.start_odometer && currentOdo > 0 && parseFloat(trip.start_odometer) < currentOdo - 50) {
+      throw new Error(`Start odometer (${trip.start_odometer}) is below current reading (${currentOdo}). Check value.`)
+    }
+    if (trip.end_odometer && trip.start_odometer && parseFloat(trip.end_odometer) < parseFloat(trip.start_odometer)) {
+      throw new Error('End odometer cannot be less than start odometer.')
+    }
     if (vehicle && trip.end_odometer > (vehicle.odometer_km || 0)) {
       if (vehicle._legacy) {
         await supabase.from('fleet').update({ odometer_km: trip.end_odometer }).eq('id', trip.vehicle_id)
