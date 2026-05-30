@@ -216,6 +216,7 @@ const ALL_MODULES = {
       ],
     }, {
       label: 'Operations', pages: [
+        { id: 'dispatch',             label: 'Dispatch Board',        icon: 'grid_view'      },
         { id: 'trips',                label: 'Trip Management',       icon: 'route'          },
         { id: 'drivers',              label: 'Driver Management',     icon: 'badge'          },
         { id: 'allocation',           label: 'Equipment Allocation',  icon: 'place'          },

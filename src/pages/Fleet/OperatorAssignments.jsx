@@ -77,8 +77,42 @@ export default function OperatorAssignments() {
     return a ? (a.plate_number || a.asset_name) : id
   }
 
-  const todayAssigned = new Set(assignments.filter(a => !a.assigned_to).map(a => a.operator_id)).size
+  const todayAssigned  = new Set(assignments.filter(a => !a.assigned_to).map(a => a.operator_id)).size
   const assetsDeployed = new Set(assignments.filter(a => !a.assigned_to).map(a => a.asset_id)).size
+
+  // ── Utilization per operator (this month) ────────────────────────────────
+  const monthStart = today.slice(0, 7) + '-01'
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
+  const workingDays = Math.round(daysInMonth * (5 / 7)) // approximate
+
+  const utilizationMap = {}
+  assignments
+    .filter(a => a.assigned_from && a.assigned_from.slice(0, 10) >= monthStart)
+    .forEach(a => {
+      const opId = a.operator_id
+      if (!utilizationMap[opId]) utilizationMap[opId] = { name: a.operator_name, daysSet: new Set(), totalHours: 0 }
+      // Count each unique day assigned as 1 working day
+      const fromDate2 = new Date(a.assigned_from)
+      const toDate2   = a.assigned_to ? new Date(a.assigned_to) : new Date()
+      // Walk each day in the range
+      let d = new Date(fromDate2)
+      while (d <= toDate2) {
+        const dayStr = d.toISOString().slice(0, 10)
+        if (dayStr >= monthStart && d.getDay() !== 0 && d.getDay() !== 6) {
+          utilizationMap[opId].daysSet.add(dayStr)
+        }
+        d.setDate(d.getDate() + 1)
+      }
+      if (a.hours_logged) utilizationMap[opId].totalHours += parseFloat(a.hours_logged)
+    })
+
+  const utilizationList = Object.entries(utilizationMap).map(([id, v]) => ({
+    operator_id:   id,
+    operator_name: v.name,
+    daysAssigned:  v.daysSet.size,
+    totalHours:    v.totalHours,
+    utilPct:       workingDays > 0 ? Math.min(100, Math.round((v.daysSet.size / workingDays) * 100)) : 0,
+  })).sort((a, b) => b.utilPct - a.utilPct)
 
   const handleAssign = async () => {
     if (!form.asset_id)    return toast.error('Select an asset')
@@ -159,7 +193,7 @@ export default function OperatorAssignments() {
 
       {/* Tabs */}
       <div style={{ display:'flex', gap:2, marginBottom:20, borderBottom:'1px solid var(--border)' }}>
-        {[['current','Current Assignments'],['history','Assignment History']].map(([k,l]) => (
+        {[['current','Current Assignments'],['history','Assignment History'],['utilization','Utilization']].map(([k,l]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             background:'none', border:'none', cursor:'pointer', padding:'7px 16px',
             fontSize:13, fontWeight: tab===k ? 700 : 500,
@@ -253,6 +287,41 @@ export default function OperatorAssignments() {
               </div>
             )
           }
+        </div>
+      )}
+
+      {/* ── Utilization Tab ── */}
+      {tab === 'utilization' && (
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
+            Operator utilization this month ({today.slice(0, 7)}) · Approx. working days: {workingDays}
+          </div>
+          {utilizationList.length === 0 ? (
+            <EmptyState icon="people" message="No assignment data for this month" />
+          ) : (
+            <div className="card" style={{ padding: 16 }}>
+              {utilizationList.map(u => (
+                <div key={u.operator_id} style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{u.operator_name}</span>
+                    <span style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+                      <span style={{ color: 'var(--text-dim)' }}>{u.daysAssigned} day{u.daysAssigned !== 1 ? 's' : ''}</span>
+                      {u.totalHours > 0 && <span style={{ color: 'var(--teal)' }}>{u.totalHours.toFixed(1)} h</span>}
+                      <span style={{ fontWeight: 700, color: u.utilPct >= 80 ? 'var(--green)' : u.utilPct >= 50 ? 'var(--yellow)' : 'var(--text-dim)' }}>
+                        {u.utilPct}%
+                      </span>
+                    </span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--surface2)', borderRadius: 6, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${u.utilPct}%`, height: '100%', borderRadius: 6, transition: 'width .5s ease',
+                      background: u.utilPct >= 80 ? 'var(--green)' : u.utilPct >= 50 ? 'var(--yellow)' : 'var(--text-dim)',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

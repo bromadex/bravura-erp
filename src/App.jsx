@@ -187,6 +187,7 @@ const VehicleDetail         = lazy(() => import('./pages/Fleet/VehicleDetail'))
 const MeterReadings         = lazy(() => import('./pages/Fleet/MeterReadings'))
 const OperatorAssignments   = lazy(() => import('./pages/Fleet/OperatorAssignments'))
 const FleetCompliance       = lazy(() => import('./pages/Fleet/FleetCompliance'))
+const DispatchBoard         = lazy(() => import('./pages/Fleet/DispatchBoard'))
 
 // HR
 const HRDashboard        = lazy(() => import('./pages/HR/HRDashboard'))
@@ -628,6 +629,7 @@ function AppRoutes() {
           <Route path="meter-readings"        element={<MeterReadings />}       />
           <Route path="operator-assignments"  element={<OperatorAssignments />} />
           <Route path="compliance"            element={<FleetCompliance />}     />
+          <Route path="dispatch"              element={<DispatchBoard />}       />
           {/* Asset Registry — unified asset master */}
           <Route path="asset-registry"          element={<AssetDashboard />} />
           <Route path="registry"                element={<AssetRegistry />} />

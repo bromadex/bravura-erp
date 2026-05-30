@@ -18,6 +18,7 @@ const FUEL_PRICE = 1.50 // K per litre default estimate
 const PURPOSE_CATS = ['operations', 'transport', 'delivery', 'site_visit', 'personal', 'other']
 const TRIP_TYPES   = ['outward', 'return', 'round_trip']
 const APPROVAL_ST  = ['draft', 'submitted', 'approved', 'rejected']
+const TRIP_STATUSES = ['planned', 'in_progress', 'completed', 'cancelled']
 
 const BLANK = {
   date: today,
@@ -36,8 +37,20 @@ const BLANK = {
   passenger_count: 0,
   project_id: '',
   cost_center: '',
+  cargo_description: '',
+  trip_status: 'completed',
   notes: '',
   approval_status: 'approved',
+}
+
+function tripStatusPill(s) {
+  const cfg = {
+    planned:     { color: 'var(--blue)',   cls: 'badge-blue'   },
+    in_progress: { color: 'var(--green)',  cls: 'badge-green'  },
+    completed:   { color: 'var(--teal)',   cls: 'badge-teal'   },
+    cancelled:   { color: 'var(--red)',    cls: 'badge-red'    },
+  }[s] || { color: 'var(--text-dim)', cls: '' }
+  return <span className={`badge ${cfg.cls}`} style={{ fontSize: 9 }}>{s || '—'}</span>
 }
 
 export default function TripManagement() {
@@ -65,6 +78,9 @@ export default function TripManagement() {
   const [driverStats,  setDriverStats]  = useState([])
   const [driverLoading, setDriverLoading] = useState(false)
   const [driverPeriod, setDriverPeriod] = useState('month')
+  const [routeData,    setRouteData]    = useState([])
+  const [routeLoading, setRouteLoading] = useState(false)
+  const [tripFuel,     setTripFuel]     = useState([]) // fuel records for detail modal
 
   // Load reference data
   useEffect(() => {
@@ -124,9 +140,17 @@ export default function TripManagement() {
     setDriverLoading(false)
   }, [driverPeriod])
 
+  const loadRoutePerformance = useCallback(async () => {
+    setRouteLoading(true)
+    const { data, error } = await supabase.from('fleet_route_performance').select('*')
+    if (!error) setRouteData(data || [])
+    setRouteLoading(false)
+  }, [])
+
   useEffect(() => {
     if (activeTab === 'drivers') loadDriverStats()
-  }, [activeTab, loadDriverStats])
+    if (activeTab === 'routes')  loadRoutePerformance()
+  }, [activeTab, loadDriverStats, loadRoutePerformance])
 
   const fetchPage = useCallback(async (p = 0) => {
     setTableLoading(true)
@@ -161,29 +185,42 @@ export default function TripManagement() {
     ? Math.max(0, parseFloat(form.end_odometer) - parseFloat(form.start_odometer))
     : 0
 
-  const openNew  = () => { setEditRecord(null); setForm(BLANK); setShowModal(true) }
+  const openNew  = () => { setEditRecord(null); setForm(BLANK); setTripFuel([]); setShowModal(true) }
   const openEdit = (r) => {
     setEditRecord(r)
     setForm({
-      date:             r.date || today,
-      asset_id:         r.asset_id || '',
-      vehicle_id:       r.vehicle_id || '',
-      driver_id:        r.driver_id || '',
-      driver_name:      r.driver_name || '',
-      start_odometer:   r.start_odometer ?? '',
-      end_odometer:     r.end_odometer ?? '',
-      fuel_used:        r.fuel_used ?? '',
-      route_from:       r.route_from || '',
-      route_to:         r.route_to || '',
-      purpose:          r.purpose || '',
-      purpose_category: r.purpose_category || 'operations',
-      trip_type:        r.trip_type || 'outward',
-      passenger_count:  r.passenger_count || 0,
-      project_id:       r.project_id || '',
-      cost_center:      r.cost_center || '',
-      notes:            r.notes || '',
-      approval_status:  r.approval_status || 'approved',
+      date:              r.date || today,
+      asset_id:          r.asset_id || '',
+      vehicle_id:        r.vehicle_id || '',
+      driver_id:         r.driver_id || '',
+      driver_name:       r.driver_name || '',
+      start_odometer:    r.start_odometer ?? '',
+      end_odometer:      r.end_odometer ?? '',
+      fuel_used:         r.fuel_used ?? '',
+      route_from:        r.route_from || '',
+      route_to:          r.route_to || '',
+      purpose:           r.purpose || '',
+      purpose_category:  r.purpose_category || 'operations',
+      trip_type:         r.trip_type || 'outward',
+      passenger_count:   r.passenger_count || 0,
+      project_id:        r.project_id || '',
+      cost_center:       r.cost_center || '',
+      cargo_description: r.cargo_description || '',
+      trip_status:       r.trip_status || 'completed',
+      notes:             r.notes || '',
+      approval_status:   r.approval_status || 'approved',
     })
+    // Load fuel issuance for this trip (by asset_id + date)
+    if (r.asset_id && r.date) {
+      supabase.from('fuel_issuance')
+        .select('id,date,quantity,unit_cost,total_cost,driver_operator')
+        .eq('asset_id', r.asset_id)
+        .eq('date', r.date)
+        .catch(() => ({ data: [] }))
+        .then(({ data }) => setTripFuel(data || []))
+    } else {
+      setTripFuel([])
+    }
     setShowModal(true)
   }
 
@@ -202,12 +239,14 @@ export default function TripManagement() {
 
     const payload = {
       ...form,
-      start_odometer:  parseFloat(form.start_odometer),
-      end_odometer:    parseFloat(form.end_odometer),
-      distance:        distance,
-      fuel_used:       form.fuel_used ? parseFloat(form.fuel_used) : null,
-      passenger_count: parseInt(form.passenger_count) || 0,
-      created_by:      user?.full_name || user?.username || '',
+      start_odometer:    parseFloat(form.start_odometer),
+      end_odometer:      parseFloat(form.end_odometer),
+      distance:          distance,
+      fuel_used:         form.fuel_used ? parseFloat(form.fuel_used) : null,
+      passenger_count:   parseInt(form.passenger_count) || 0,
+      cargo_description: form.cargo_description || null,
+      trip_status:       form.trip_status || 'completed',
+      created_by:        user?.full_name || user?.username || '',
     }
 
     try {
@@ -280,8 +319,9 @@ export default function TripManagement() {
         <KPICard label="Total Distance" value={`${kpiData.distance.toLocaleString()} km`} sub="all time"  color="yellow" />
       </div>
 
-      <TabNav tabs={['Trips', 'Driver Performance']} active={activeTab === 'trips' ? 0 : 1}
-        onChange={i => setActiveTab(i === 0 ? 'trips' : 'drivers')} />
+      <TabNav tabs={['Trips', 'Driver Performance', 'Route Performance']}
+        active={activeTab === 'trips' ? 0 : activeTab === 'drivers' ? 1 : 2}
+        onChange={i => setActiveTab(i === 0 ? 'trips' : i === 1 ? 'drivers' : 'routes')} />
 
       {activeTab === 'drivers' && (
         <div className="card" style={{ padding: 16, marginBottom: 16 }}>
@@ -352,6 +392,87 @@ export default function TripManagement() {
         </div>
       )}
 
+      {activeTab === 'routes' && (
+        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>
+              <span className="material-icons" style={{ fontSize: 14, verticalAlign: 'middle', marginRight: 6, color: 'var(--teal)' }}>map</span>
+              Route Performance
+            </span>
+            <button className="btn btn-secondary btn-sm" onClick={loadRoutePerformance}>
+              <span className="material-icons" style={{ fontSize: 12 }}>refresh</span>
+            </button>
+          </div>
+          {routeLoading ? (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>Loading…</div>
+          ) : routeData.length === 0 ? (
+            <EmptyState icon="map" message="No route data yet — record trips with origin and destination to see route analysis" />
+          ) : (
+            <div className="table-wrap">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Route</th>
+                    <th style={{ textAlign: 'right' }}>Trips</th>
+                    <th style={{ textAlign: 'right' }}>Avg Distance</th>
+                    <th style={{ textAlign: 'right' }}>Avg Fuel (L)</th>
+                    <th style={{ textAlign: 'right' }}>Avg Cost</th>
+                    <th style={{ textAlign: 'right' }}>Drivers</th>
+                    <th style={{ textAlign: 'right' }}>Assets</th>
+                    <th>Last Trip</th>
+                    <th>Flag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {routeData.map((r, i) => {
+                    // Benchmark: avg fuel / (avg_distance/100) = L/100km; flag if > 15 L/100km (generic benchmark)
+                    const l100km = r.avg_distance_km > 0 && r.avg_fuel_used > 0
+                      ? (r.avg_fuel_used / r.avg_distance_km * 100)
+                      : null
+                    const isHighConsumption = l100km !== null && l100km > 15
+                    const avgCost = r.avg_fuel_used > 0 ? (r.avg_fuel_used * FUEL_PRICE) : (r.avg_distance_km > 0 ? (r.avg_distance_km * 15 / 100 * FUEL_PRICE) : 0)
+                    return (
+                      <tr key={i} style={{ background: isHighConsumption ? 'color-mix(in srgb,var(--red) 5%,var(--surface))' : '' }}>
+                        <td style={{ fontWeight: 600 }}>
+                          <span style={{ fontSize: 12 }}>{r.origin}</span>
+                          <span className="material-icons" style={{ fontSize: 11, verticalAlign: 'middle', margin: '0 4px', color: 'var(--teal)' }}>arrow_forward</span>
+                          <span style={{ fontSize: 12, color: 'var(--teal)' }}>{r.destination}</span>
+                        </td>
+                        <td className="td-mono" style={{ textAlign: 'right', fontWeight: 700 }}>{r.total_trips}</td>
+                        <td className="td-mono" style={{ textAlign: 'right', color: 'var(--teal)' }}>
+                          {r.avg_distance_km > 0 ? `${r.avg_distance_km} km` : '—'}
+                        </td>
+                        <td className="td-mono" style={{ textAlign: 'right', color: 'var(--yellow)' }}>
+                          {r.avg_fuel_used > 0 ? `${r.avg_fuel_used} L` : '—'}
+                          {l100km !== null && (
+                            <span style={{ fontSize: 9, color: 'var(--text-dim)', display: 'block' }}>
+                              {l100km.toFixed(1)} L/100km
+                            </span>
+                          )}
+                        </td>
+                        <td className="td-mono" style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 600 }}>
+                          K{avgCost.toFixed(2)}
+                        </td>
+                        <td className="td-mono" style={{ textAlign: 'right', color: 'var(--text-dim)' }}>{r.unique_drivers}</td>
+                        <td className="td-mono" style={{ textAlign: 'right', color: 'var(--text-dim)' }}>{r.unique_assets}</td>
+                        <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{r.last_trip || '—'}</td>
+                        <td>
+                          {isHighConsumption && (
+                            <span title="High fuel consumption route" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--red)', fontWeight: 700 }}>
+                              <span className="material-icons" style={{ fontSize: 12 }}>local_gas_station</span> High
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'trips' && <>
       {/* Filters */}
       <div className="card" style={{ padding: 14, marginBottom: 16 }}>
@@ -395,15 +516,15 @@ export default function TripManagement() {
             <thead>
               <tr>
                 <th>Trip No</th><th>Date</th><th>Asset</th><th>Driver</th>
-                <th>From → To</th><th>Distance</th><th>Fuel (L)</th><th>Est. Cost</th><th>Purpose</th><th>Status</th>
+                <th>From → To</th><th>Distance</th><th>Fuel (L)</th><th>Est. Cost</th><th>Purpose</th><th>Trip Status</th><th>Approval</th>
                 {(canEdit || canDelete) && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
-                <tr><td colSpan="11" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                <tr><td colSpan="12" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan="11"><EmptyState icon="route" message="No trips found" /></td></tr>
+                <tr><td colSpan="12"><EmptyState icon="route" message="No trips found" /></td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
                   <td>{r.trip_no ? <TxnCodeBadge code={r.trip_no} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
@@ -423,6 +544,7 @@ export default function TripManagement() {
                       : '—'}
                   </td>
                   <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{r.purpose || '—'}</td>
+                  <td>{r.trip_status ? tripStatusPill(r.trip_status) : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>—</span>}</td>
                   <td>
                     <span className={`badge ${r.approval_status === 'approved' ? 'badge-green' : r.approval_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{ fontSize: 9 }}>
                       {r.approval_status || 'approved'}
@@ -549,6 +671,13 @@ export default function TripManagement() {
                   onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} />
               </div>
               <div className="form-group">
+                <label>Trip Status</label>
+                <select className="form-control" value={form.trip_status}
+                  onChange={e => setForm(f => ({ ...f, trip_status: e.target.value }))}>
+                  {TRIP_STATUSES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
                 <label>Project</label>
                 <input className="form-control" placeholder="Project ID / code" value={form.project_id}
                   onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))} />
@@ -560,11 +689,37 @@ export default function TripManagement() {
               </div>
             </div>
 
+            <div className="form-row">
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>Cargo / Load Description</label>
+                <input className="form-control" placeholder="Describe cargo or load carried" value={form.cargo_description}
+                  onChange={e => setForm(f => ({ ...f, cargo_description: e.target.value }))} />
+              </div>
+            </div>
+
             <div className="form-group">
               <label>Notes</label>
               <textarea className="form-control" rows={2} value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
+
+            {/* Fuel issued on this day for this asset */}
+            {tripFuel.length > 0 && (
+              <div style={{ padding: '10px 14px', background: 'color-mix(in srgb,var(--yellow) 8%,var(--surface2))', border: '1px solid color-mix(in srgb,var(--yellow) 25%,transparent)', borderRadius: 8, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--yellow)', marginBottom: 6 }}>
+                  <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 4 }}>local_gas_station</span>
+                  Fuel Issued (same asset, same date)
+                </div>
+                {tripFuel.map(f => (
+                  <div key={f.id} style={{ fontSize: 11, display: 'flex', gap: 16 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--yellow)' }}>{f.quantity} L</span>
+                    {f.unit_cost > 0 && <span style={{ color: 'var(--text-dim)' }}>@ K{f.unit_cost}/L</span>}
+                    {f.total_cost > 0 && <span style={{ fontWeight: 700, color: 'var(--gold)' }}>K{f.total_cost}</span>}
+                    {f.driver_operator && <span style={{ color: 'var(--text-dim)' }}>{f.driver_operator}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <ModalActions>
               <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditRecord(null) }}>Cancel</button>
