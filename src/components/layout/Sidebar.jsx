@@ -180,21 +180,24 @@ const ALL_MODULES = {
   fuel: {
     label: 'Fuel Management', icon: 'local_gas_station', color: '#fbbf24',
     sections: [{
-      label: 'Operations', pages: [
-        { id: 'tanks',           label: 'Fuel Tanks',       icon: 'water'              },
-        { id: 'requests',        label: 'Fuel Requests',    icon: 'assignment'         },
-        { id: 'issuance',        label: 'Fuel Issuance',    icon: 'local_gas_station'  },
-        { id: 'shifts',          label: 'Fuel Shifts',      icon: 'schedule'           },
-        { id: 'deliveries',      label: 'Deliveries',       icon: 'local_shipping'     },
-        { id: 'dipstick',        label: 'Dipstick Log',     icon: 'straighten'         },
-        { id: 'bowser',          label: 'Bowser Dispatch',  icon: 'local_shipping'     },
+      label: 'Tank Management', pages: [
+        { id: 'tanks',      label: 'Fuel Tanks',   icon: 'water'         },
+        { id: 'deliveries', label: 'Deliveries',   icon: 'local_shipping'},
+        { id: 'dipstick',   label: 'Dipstick Log', icon: 'straighten'    },
       ],
     }, {
-      label: 'Analytics', pages: [
-        { id: 'reconciliation',  label: 'Reconciliation',   icon: 'balance'            },
-        { id: 'consumption',     label: 'Vehicle Consumption', icon: 'speed'            },
-        { id: 'forecasting',     label: 'Forecasting',      icon: 'trending_up'        },
-        { id: 'reports',         label: 'Fuel Reports',     icon: 'bar_chart'          },
+      label: 'Fuel Operations', pages: [
+        { id: 'requests',  label: 'Fuel Requests',  icon: 'assignment'        },
+        { id: 'issuance',  label: 'Fuel Issuance',  icon: 'local_gas_station' },
+        { id: 'shifts',    label: 'Fuel Shifts',    icon: 'schedule'          },
+        { id: 'bowser',    label: 'Bowser Dispatch', icon: 'rv_hookup'        },
+      ],
+    }, {
+      label: 'Analytics & Reports', pages: [
+        { id: 'reconciliation', label: 'Reconciliation',      icon: 'balance'     },
+        { id: 'consumption',    label: 'Vehicle Consumption',  icon: 'speed'       },
+        { id: 'forecasting',    label: 'Forecasting',          icon: 'trending_up' },
+        { id: 'reports',        label: 'Fuel Reports',         icon: 'bar_chart'   },
       ],
     }],
   },
