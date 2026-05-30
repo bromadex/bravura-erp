@@ -1,5 +1,6 @@
 // src/pages/Fuel/VehicleConsumption.jsx
-// Per-vehicle fuel efficiency analytics with abnormal usage detection and benchmarking.
+// Per-vehicle fuel efficiency analytics with abnormal usage detection, benchmarking,
+// economy analytics, fleet trend, and anomaly detection.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -42,6 +43,16 @@ export default function VehicleConsumption() {
   const [editBenchId,     setEditBenchId]     = useState(null)
   const [benchSaving,     setBenchSaving]     = useState(false)
 
+  // ── Economy / Anomaly state ───────────────────────────────────────────────
+  const [econIssuances,  setEconIssuances]  = useState([])
+  const [econTrips,      setEconTrips]      = useState([])
+  const [econAssets,     setEconAssets]     = useState([])
+  const [econLoading,    setEconLoading]    = useState(false)
+  const [econSortCol,    setEconSortCol]    = useState('total_litres')
+  const [econSortDir,    setEconSortDir]    = useState('desc')
+  const [anomalyFilter,  setAnomalyFilter]  = useState('all')   // 'all'|'Critical'|'Warning'
+  const [anomalyAsset,   setAnomalyAsset]   = useState('')
+
   // ── fetch benchmarks ─────────────────────────────────────────────────────
   const fetchBenchmarks = useCallback(() => {
     setBLoading(true)
@@ -51,6 +62,38 @@ export default function VehicleConsumption() {
   }, [])
 
   useEffect(() => { fetchBenchmarks() }, [fetchBenchmarks])
+
+  // ── fetch economy data (issuances + trips + assets) ──────────────────────
+  const fetchEconomyData = useCallback(async () => {
+    setEconLoading(true)
+    try {
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      const cutoff = sixMonthsAgo.toISOString().split('T')[0]
+
+      const [issRes, tripRes, assetRes] = await Promise.all([
+        supabase.from('fuel_issuance')
+          .select('id, date, quantity, amount, equipment_name, asset_id, tank_id, driver_operator, created_at')
+          .gte('date', cutoff)
+          .order('date', { ascending: false }),
+        supabase.from('vehicle_trips')
+          .select('id, vehicle_id, asset_id, date, distance, driver_name, start_odometer, end_odometer')
+          .gte('date', cutoff),
+        supabase.from('asset_registry')
+          .select('id, asset_name, asset_code, vehicle_type, asset_category, fuel_tank_capacity, benchmark_consumption, current_engine_hours'),
+      ])
+      setEconIssuances(issRes.data || [])
+      setEconTrips(tripRes.data || [])
+      setEconAssets(assetRes.data || [])
+    } catch (e) {
+      console.error('economy data fetch error', e)
+    }
+    setEconLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'economy' || activeTab === 'anomalies') fetchEconomyData()
+  }, [activeTab, fetchEconomyData])
 
   // ── fetch fuel log ─────────────────────────────────────────────────────────
   useEffect(() => {
