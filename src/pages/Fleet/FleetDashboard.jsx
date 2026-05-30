@@ -37,6 +37,10 @@ export default function FleetDashboard() {
   const [recentTrips,    setRecentTrips]    = useState([])
   const [openAccidents,  setOpenAccidents]  = useState(0)
   const [docWarnings,    setDocWarnings]    = useState([])
+  const [statusCounts,   setStatusCounts]   = useState({})
+  const [openBreakdowns, setOpenBreakdowns] = useState(0)
+  const [urgentAlerts,   setUrgentAlerts]   = useState([])
+  const [recentActivity, setRecentActivity] = useState([])
 
   useEffect(() => {
     // Fetch supplementary data not in FleetContext
@@ -66,6 +70,47 @@ export default function FleetDashboard() {
     }
   }, [getExpiringDocuments])
 
+  useEffect(() => {
+    supabase.from('asset_registry').select('operational_status')
+      .then(({ data }) => {
+        const counts = {}
+        ;(data || []).forEach(a => {
+          const s = (a.operational_status || 'unknown').toLowerCase()
+          counts[s] = (counts[s] || 0) + 1
+        })
+        setStatusCounts(counts)
+      }).catch(console.error)
+
+    supabase.from('breakdown_reports').select('id', { count: 'exact' }).eq('status', 'open')
+      .then(({ count }) => setOpenBreakdowns(count || 0)).catch(console.error)
+
+    supabase.from('maintenance_pm_urgency').select('asset_name,asset_reg,task_name,urgency')
+      .in('urgency', ['critical', 'overdue']).limit(8)
+      .then(({ data }) => setUrgentAlerts(data || [])).catch(console.error)
+
+    Promise.all([
+      supabase.from('maintenance_work_orders').select('id,wo_number,asset_name,updated_at,task_name').eq('status', 'closed').order('updated_at', { ascending: false }).limit(4),
+      supabase.from('breakdown_reports').select('id,breakdown_no,asset_name,reported_at,severity').order('reported_at', { ascending: false }).limit(4),
+      supabase.from('meter_readings').select('id,reading_date,reading_type,reading_value,created_at').order('created_at', { ascending: false }).limit(4),
+    ]).then(([woRes, brRes, mrRes]) => {
+      const items = [
+        ...(woRes.data || []).map(w => ({ icon: 'build', color: 'var(--green)', ts: w.updated_at, label: `WO ${w.wo_number || '—'} closed`, sub: w.asset_name || '' })),
+        ...(brRes.data || []).map(b => ({ icon: 'report_problem', color: 'var(--red)', ts: b.reported_at, label: `Breakdown: ${b.asset_name || '—'}`, sub: b.severity || '' })),
+        ...(mrRes.data || []).map(m => ({ icon: 'speed', color: 'var(--blue)', ts: m.created_at, label: 'Meter reading', sub: `${m.reading_type || 'odometer'}: ${m.reading_value != null ? Number(m.reading_value).toLocaleString() : ''}` })),
+      ]
+      items.sort((a, b) => new Date(b.ts) - new Date(a.ts))
+      setRecentActivity(items.slice(0, 10))
+    }).catch(console.error)
+  }, [])
+
+  const STATUS_TILES = [
+    { key: 'active',       label: 'Active',       icon: 'check_circle',   color: 'var(--green)'  },
+    { key: 'in_workshop',  label: 'In Workshop',  icon: 'engineering',    color: 'var(--blue)'   },
+    { key: 'broken_down',  label: 'Broken Down',  icon: 'report_problem', color: 'var(--red)'    },
+    { key: 'idle',         label: 'Idle',         icon: 'pause_circle',   color: 'var(--yellow)' },
+    { key: 'available',    label: 'Available',    icon: 'local_parking',  color: 'var(--teal)'   },
+  ]
+
   const alerts = getOverdueAlerts()
 
   const totalFleet    = vehicles.length + generators.length + earthMovers.length
@@ -83,6 +128,11 @@ export default function FleetDashboard() {
 
   const criticalHealth = [...vehicles, ...generators, ...earthMovers]
     .filter(a => getHealthScore(a, a.reg ? 'vehicle' : 'generator') < 40).length
+
+  const totalFleetAssets = Object.values(statusCounts).reduce((s, v) => s + v, 0) || totalFleet
+  const availabilityPct  = totalFleetAssets > 0
+    ? Math.round(((totalFleetAssets - openBreakdowns) / totalFleetAssets) * 100)
+    : 100
 
   return (
     <div>
@@ -105,13 +155,60 @@ export default function FleetDashboard() {
         } />
       )}
 
+      {/* Live Fleet Status Grid */}
+      {Object.keys(statusCounts).length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: 12, marginBottom: 20 }}>
+          {STATUS_TILES.map(tile => {
+            const count = statusCounts[tile.key] || 0
+            return (
+              <div key={tile.key} style={{
+                background: count > 0 ? `color-mix(in srgb,${tile.color} 10%,var(--surface))` : 'var(--surface)',
+                border: `1px solid ${count > 0 ? `color-mix(in srgb,${tile.color} 30%,transparent)` : 'var(--border)'}`,
+                borderRadius: 10, padding: '14px 12px', textAlign: 'center',
+              }}>
+                <span className="material-icons" style={{ color: count > 0 ? tile.color : 'var(--text-dim)', fontSize: 24, display: 'block', marginBottom: 4 }}>{tile.icon}</span>
+                <div style={{ fontSize: 26, fontWeight: 800, color: count > 0 ? tile.color : 'var(--text-dim)', lineHeight: 1.1 }}>{count}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textTransform: 'uppercase', letterSpacing: .5 }}>{tile.label}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Main KPIs */}
       <div className="kpi-grid">
         <KPICard label="Total Fleet Assets" value={totalFleet}          sub={`Vehicles: ${activeVehicles} active`} icon="directions_car" color="gold" />
         <KPICard label="Generators"         value={generators.length}   sub={`Heavy Equipment: ${earthMovers.length}`} icon="bolt" color="yellow" />
         <KPICard label="Avg Fuel Efficiency" value={`${avgEfficiency.toFixed(1)} km/L`} sub="Fleet average" icon="local_gas_station" color="teal" />
         <KPICard label="Critical Health"    value={criticalHealth}      sub="Assets below 40% health" icon="warning" color="red" />
+        <KPICard label="Availability"       value={`${availabilityPct}%`} sub={`${openBreakdowns} broken down`} icon="verified" color={availabilityPct >= 90 ? 'green' : availabilityPct >= 70 ? 'yellow' : 'red'} />
       </div>
+
+      {/* Critical Alert Strip */}
+      {urgentAlerts.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+            <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4, color: 'var(--red)' }}>notifications_active</span>
+            Critical / Overdue PM Alerts
+          </div>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {urgentAlerts.map((a, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                borderRadius: 20, flexShrink: 0, fontSize: 12,
+                background: a.urgency === 'critical' ? 'color-mix(in srgb,var(--red) 12%,var(--surface))' : 'color-mix(in srgb,var(--yellow) 12%,var(--surface))',
+                border: `1px solid ${a.urgency === 'critical' ? 'color-mix(in srgb,var(--red) 30%,transparent)' : 'color-mix(in srgb,var(--yellow) 30%,transparent)'}`,
+              }}>
+                <span className="material-icons" style={{ fontSize: 14, color: a.urgency === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
+                  {a.urgency === 'critical' ? 'error' : 'warning'}
+                </span>
+                <span style={{ fontWeight: 600 }}>{a.asset_name || a.asset_reg || '—'}</span>
+                <span style={{ color: 'var(--text-dim)' }}>— {a.task_name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Compliance + Fuel row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
@@ -253,6 +350,27 @@ export default function FleetDashboard() {
           </div>
         )}
       </div>
+
+      {/* Recent Activity Feed */}
+      {recentActivity.length > 0 && (
+        <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Recent Activity</h3>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {recentActivity.map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: i < recentActivity.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <span className="material-icons" style={{ color: item.color, fontSize: 18, marginTop: 1, flexShrink: 0 }}>{item.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                  {item.sub && <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'capitalize' }}>{item.sub}</div>}
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>
+                  {item.ts ? new Date(item.ts).toLocaleDateString() : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="card" style={{ padding: 16 }}>

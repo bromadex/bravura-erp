@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { useFleet } from '../../contexts/FleetContext'
+import { supabase } from '../../lib/supabase'
 import {
   PageHeader, KPICard, TabNav, EmptyState, Spinner,
 } from '../../components/ui'
@@ -58,6 +59,8 @@ export default function FleetCostAnalysis() {
 
   const [tab, setTab] = useState(0)
   const [expandedRow, setExpandedRow] = useState(null)
+  const [tcoData,     setTcoData]     = useState([])
+  const [tcoLoading,  setTcoLoading]  = useState(false)
 
   // ── Budget state – localStorage keyed by year ──────────
   const budgetKey = `fleet_cost_budget_${thisYear}`
@@ -210,7 +213,15 @@ export default function FleetCostAnalysis() {
     [tyreInventory, thisYear]
   )
 
-  const tabs = ['Fleet Overview', 'Per-Vehicle TCO', 'Cost Benchmarking', 'Budget vs Actual']
+  useEffect(() => {
+    if (tab !== 4) return
+    setTcoLoading(true)
+    supabase.from('fleet_asset_tco').select('*').order('tco_tracked', { ascending: false })
+      .then(({ data }) => { setTcoData(data || []); setTcoLoading(false) })
+      .catch(() => setTcoLoading(false))
+  }, [tab])
+
+  const tabs = ['Fleet Overview', 'Per-Vehicle TCO', 'Cost Benchmarking', 'Budget vs Actual', 'Asset TCO (DB)']
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><Spinner /></div>
 
@@ -687,6 +698,103 @@ export default function FleetCostAnalysis() {
             <span className="material-icons" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 4 }}>info</span>
             Enter budget values in the Budgeted column. Values are saved automatically to your browser. Tyre cost reflects year-to-date purchase costs from tyre inventory.
           </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          TAB 5 — ASSET TCO (DIRECT FROM DB)
+      ════════════════════════════════════════════════ */}
+      {tab === 4 && (
+        <div>
+          {tcoLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spinner /></div>
+          ) : tcoData.length === 0 ? (
+            <EmptyState icon="payments" message="No TCO data available — work orders and breakdown costs needed" />
+          ) : (
+            <>
+              {/* Top 5 highest-cost assets */}
+              {tcoData.filter(a => a.tco_tracked > 0).length > 0 && (
+                <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Top 5 Assets by Tracked TCO</div>
+                  {tcoData.filter(a => a.tco_tracked > 0).slice(0, 5).map((a, i) => {
+                    const maxTco = tcoData.find(x => x.tco_tracked > 0)?.tco_tracked || 1
+                    return (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: ASSET_COLORS[i], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#0b0f1a', flexShrink: 0 }}>{i + 1}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>{a.asset_name || a.asset_code || a.plate_number || '—'}</span>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--gold)' }}>{fmtMoney(a.tco_tracked)}</span>
+                          </div>
+                          <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 5, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${(a.tco_tracked / maxTco * 100).toFixed(1)}%`, background: ASSET_COLORS[i], borderRadius: 5 }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 11, color: 'var(--text-dim)' }}>
+                            <span>Maint: <span style={{ color: 'var(--blue)' }}>{fmtMoney(a.maintenance_cost)}</span></span>
+                            <span>Breakdown: <span style={{ color: 'var(--red)' }}>{fmtMoney(a.breakdown_cost)}</span></span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Full table */}
+              <div className="table-wrap">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Category</th>
+                      <th style={{ textAlign: 'right' }}>Maint. Cost</th>
+                      <th style={{ textAlign: 'right' }}>Breakdown Cost</th>
+                      <th style={{ textAlign: 'right' }}>Total TCO</th>
+                      <th style={{ textAlign: 'right' }}>Cost/km</th>
+                      <th style={{ textAlign: 'right' }}>Cost/hr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tcoData.map(a => (
+                      <tr key={a.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{a.asset_name || a.asset_code || '—'}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{a.plate_number || a.fleet_number || ''}</div>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-mid)', textTransform: 'capitalize' }}>{a.asset_category || a.vehicle_type || '—'}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: a.maintenance_cost > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>
+                          {a.maintenance_cost > 0 ? fmtMoney(a.maintenance_cost) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: a.breakdown_cost > 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                          {a.breakdown_cost > 0 ? fmtMoney(a.breakdown_cost) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: a.tco_tracked > 0 ? 'var(--gold)' : 'var(--text-dim)' }}>
+                          {a.tco_tracked > 0 ? fmtMoney(a.tco_tracked) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-mid)' }}>
+                          {a.tco_tracked > 0 && a.current_odometer > 0
+                            ? `K${(a.tco_tracked / a.current_odometer).toFixed(3)}/km`
+                            : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-mid)' }}>
+                          {a.tco_tracked > 0 && a.current_engine_hours > 0
+                            ? `K${(a.tco_tracked / a.current_engine_hours).toFixed(3)}/hr`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
+                      <td colSpan={2} style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)', letterSpacing: 1 }}>TOTAL</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--blue)' }}>{fmtMoney(tcoData.reduce((s, a) => s + (a.maintenance_cost || 0), 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--red)' }}>{fmtMoney(tcoData.reduce((s, a) => s + (a.breakdown_cost || 0), 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{fmtMoney(tcoData.reduce((s, a) => s + (a.tco_tracked || 0), 0))}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

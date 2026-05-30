@@ -49,6 +49,19 @@ function computeOverallResult(items) {
   return 'pass'
 }
 
+function computeScore(items) {
+  const checkable = items.filter(i => i.result !== 'N/A')
+  if (checkable.length === 0) return null
+  const passed = checkable.filter(i => i.result === 'pass').length
+  return Math.round((passed / checkable.length) * 100)
+}
+
+function scoreBadge(score) {
+  if (score == null) return <span className="text-gray-400 text-xs">—</span>
+  const cls = score >= 90 ? 'bg-green-100 text-green-700' : score >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{score}%</span>
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FleetInspections() {
@@ -154,6 +167,8 @@ export default function FleetInspections() {
       if (!inspection_no) inspection_no = `INSP-${Date.now()}`
       const assetObj = assets.find(a => a.id === form.asset_id)
 
+      const inspectionScore = computeScore(form.items)
+
       const { data, error } = await supabase.from('vehicle_inspections').insert({
         inspection_no,
         asset_id:         form.asset_id,
@@ -166,6 +181,7 @@ export default function FleetInspections() {
         odometer_reading: form.odometer_reading ? Number(form.odometer_reading) : null,
         hour_meter:       form.hour_meter ? Number(form.hour_meter) : null,
         overall_result:   overallResult,
+        overall_score:    inspectionScore,
         defects_found:    defectsCount,
         items:            form.items,
         defect_notes:     form.defect_notes || null,
@@ -328,7 +344,7 @@ export default function FleetInspections() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                       <tr>
-                        {['Insp No','Date','Asset','Type','Inspector','Driver/Operator','Odometer','Result','Defects','WO',''].map(h => (
+                        {['Insp No','Date','Asset','Type','Inspector','Driver/Operator','Odometer','Score','Result','Defects','WO',''].map(h => (
                           <th key={h} className="px-3 py-2 text-left whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -343,6 +359,7 @@ export default function FleetInspections() {
                           <td className="px-3 py-2">{i.inspector_name || '—'}</td>
                           <td className="px-3 py-2">{i.driver_operator || '—'}</td>
                           <td className="px-3 py-2 text-right">{i.odometer_reading ?? '—'}</td>
+                          <td className="px-3 py-2">{scoreBadge(i.overall_score)}</td>
                           <td className="px-3 py-2">{resultBadge(i.overall_result)}</td>
                           <td className="px-3 py-2 text-center">{i.defects_found || 0}</td>
                           <td className="px-3 py-2 font-mono text-xs">{i.wo_created || '—'}</td>
@@ -562,6 +579,7 @@ export default function FleetInspections() {
                 {overallResult.toUpperCase()}
               </span>
               {defectsCount > 0 && <span className="text-sm text-red-600">{defectsCount} item(s) failed</span>}
+              {form && <span className="text-sm text-gray-500 ml-2">Score: <strong>{computeScore(form.items) ?? '—'}%</strong></span>}
             </div>
 
             {/* Defect notes */}

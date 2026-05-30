@@ -9,10 +9,11 @@ import TxnCodeBadge from '../../components/TxnCodeBadge'
 import { exportXLSX } from '../../engine/reportingEngine'
 import { auditLog } from '../../engine/auditEngine'
 import toast from 'react-hot-toast'
-import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions, Pagination } from '../../components/ui'
+import { PageHeader, KPICard, EmptyState, ModalDialog, ModalActions, Pagination, TabNav } from '../../components/ui'
 
-const today    = new Date().toISOString().split('T')[0]
-const PAGE_SIZE = 50
+const today      = new Date().toISOString().split('T')[0]
+const PAGE_SIZE  = 50
+const FUEL_PRICE = 1.50 // K per litre default estimate
 
 const PURPOSE_CATS = ['operations', 'transport', 'delivery', 'site_visit', 'personal', 'other']
 const TRIP_TYPES   = ['outward', 'return', 'round_trip']
@@ -59,7 +60,11 @@ export default function TripManagement() {
   const [dateFrom,     setDateFrom]     = useState('')
   const [dateTo,       setDateTo]       = useState('')
   const [assetFilter,  setAssetFilter]  = useState('')
-  const debounceRef = useRef(null)
+  const debounceRef    = useRef(null)
+  const [activeTab,    setActiveTab]    = useState('trips')
+  const [driverStats,  setDriverStats]  = useState([])
+  const [driverLoading, setDriverLoading] = useState(false)
+  const [driverPeriod, setDriverPeriod] = useState('month')
 
   // Load reference data
   useEffect(() => {
@@ -89,6 +94,39 @@ export default function TripManagement() {
       })
     }).catch(console.error)
   }, [])
+
+  const loadDriverStats = useCallback(async () => {
+    setDriverLoading(true)
+    const monthStart = today.slice(0, 7) + '-01'
+    const qm = Math.floor(new Date().getMonth() / 3) * 3
+    const quarterStart = `${today.slice(0, 4)}-${String(qm + 1).padStart(2, '0')}-01`
+    const start = driverPeriod === 'month' ? monthStart : quarterStart
+
+    const { data } = await supabase
+      .from('vehicle_trips')
+      .select('driver_name,driver_id,asset_id,distance,fuel_used')
+      .gte('date', start).lte('date', today)
+
+    const map = {}
+    ;(data || []).forEach(r => {
+      const key = r.driver_name || r.driver_id || 'Unknown'
+      if (!map[key]) map[key] = { driver: key, trips: 0, totalKm: 0, totalFuel: 0, estFuelCost: 0 }
+      map[key].trips++
+      map[key].totalKm += r.distance || 0
+      map[key].totalFuel += r.fuel_used || 0
+      if ((r.fuel_used || 0) > 0) {
+        map[key].estFuelCost += r.fuel_used * FUEL_PRICE
+      } else if ((r.distance || 0) > 0) {
+        map[key].estFuelCost += (r.distance * 15 / 100) * FUEL_PRICE
+      }
+    })
+    setDriverStats(Object.values(map).sort((a, b) => b.totalKm - a.totalKm))
+    setDriverLoading(false)
+  }, [driverPeriod])
+
+  useEffect(() => {
+    if (activeTab === 'drivers') loadDriverStats()
+  }, [activeTab, loadDriverStats])
 
   const fetchPage = useCallback(async (p = 0) => {
     setTableLoading(true)
@@ -242,6 +280,79 @@ export default function TripManagement() {
         <KPICard label="Total Distance" value={`${kpiData.distance.toLocaleString()} km`} sub="all time"  color="yellow" />
       </div>
 
+      <TabNav tabs={['Trips', 'Driver Performance']} active={activeTab === 'trips' ? 0 : 1}
+        onChange={i => setActiveTab(i === 0 ? 'trips' : 'drivers')} />
+
+      {activeTab === 'drivers' && (
+        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Driver Performance</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={`btn btn-sm ${driverPeriod === 'month' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setDriverPeriod('month')}>This Month</button>
+              <button className={`btn btn-sm ${driverPeriod === 'quarter' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setDriverPeriod('quarter')}>This Quarter</button>
+            </div>
+          </div>
+          {driverLoading ? (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>Loading…</div>
+          ) : driverStats.length === 0 ? (
+            <EmptyState icon="person" message="No trip data for the selected period" />
+          ) : (
+            <div className="table-wrap">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Driver</th>
+                    <th style={{ textAlign: 'right' }}>Trips</th>
+                    <th style={{ textAlign: 'right' }}>Total KM</th>
+                    <th style={{ textAlign: 'right' }}>Avg KM/Trip</th>
+                    <th style={{ textAlign: 'right' }}>Fuel Used (L)</th>
+                    <th style={{ textAlign: 'right' }}>Est. Fuel Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverStats.map((d, i) => (
+                    <tr key={d.driver}>
+                      <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{i + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{d.driver}</td>
+                      <td className="td-mono" style={{ textAlign: 'right' }}>{d.trips}</td>
+                      <td className="td-mono" style={{ textAlign: 'right', color: 'var(--teal)' }}>
+                        {d.totalKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} km
+                      </td>
+                      <td className="td-mono" style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
+                        {d.trips > 0 ? (d.totalKm / d.trips).toFixed(1) : '—'} km
+                      </td>
+                      <td className="td-mono" style={{ textAlign: 'right', color: 'var(--yellow)' }}>
+                        {d.totalFuel > 0 ? `${d.totalFuel.toFixed(1)} L` : '—'}
+                      </td>
+                      <td className="td-mono" style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 600 }}>
+                        K{d.estFuelCost.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
+                    <td colSpan={2} style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: 1 }}>TOTAL</td>
+                    <td className="td-mono" style={{ textAlign: 'right' }}>{driverStats.reduce((s, d) => s + d.trips, 0)}</td>
+                    <td className="td-mono" style={{ textAlign: 'right', color: 'var(--teal)' }}>
+                      {driverStats.reduce((s, d) => s + d.totalKm, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} km
+                    </td>
+                    <td />
+                    <td className="td-mono" style={{ textAlign: 'right', color: 'var(--yellow)' }}>
+                      {driverStats.reduce((s, d) => s + d.totalFuel, 0).toFixed(1)} L
+                    </td>
+                    <td className="td-mono" style={{ textAlign: 'right', color: 'var(--gold)' }}>
+                      K{driverStats.reduce((s, d) => s + d.estFuelCost, 0).toFixed(2)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'trips' && <>
       {/* Filters */}
       <div className="card" style={{ padding: 14, marginBottom: 16 }}>
         <div className="form-row">
@@ -284,15 +395,15 @@ export default function TripManagement() {
             <thead>
               <tr>
                 <th>Trip No</th><th>Date</th><th>Asset</th><th>Driver</th>
-                <th>From → To</th><th>Distance</th><th>Fuel (L)</th><th>Purpose</th><th>Status</th>
+                <th>From → To</th><th>Distance</th><th>Fuel (L)</th><th>Est. Cost</th><th>Purpose</th><th>Status</th>
                 {(canEdit || canDelete) && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
-                <tr><td colSpan="10" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                <tr><td colSpan="11" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan="10"><EmptyState icon="route" message="No trips found" /></td></tr>
+                <tr><td colSpan="11"><EmptyState icon="route" message="No trips found" /></td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
                   <td>{r.trip_no ? <TxnCodeBadge code={r.trip_no} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
@@ -304,6 +415,13 @@ export default function TripManagement() {
                   </td>
                   <td className="td-mono" style={{ color: 'var(--teal)' }}>{r.distance ? `${r.distance} km` : '—'}</td>
                   <td className="td-mono" style={{ color: 'var(--yellow)' }}>{r.fuel_used ? `${r.fuel_used} L` : '—'}</td>
+                  <td className="td-mono" style={{ fontSize: 12, color: 'var(--teal)' }}>
+                    {r.fuel_used > 0
+                      ? `K${(r.fuel_used * FUEL_PRICE).toFixed(2)}`
+                      : r.distance > 0
+                      ? `~K${(r.distance * 15 / 100 * FUEL_PRICE).toFixed(2)}`
+                      : '—'}
+                  </td>
                   <td style={{ fontSize: 11, color: 'var(--text-dim)' }}>{r.purpose || '—'}</td>
                   <td>
                     <span className={`badge ${r.approval_status === 'approved' ? 'badge-green' : r.approval_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{ fontSize: 9 }}>
@@ -325,6 +443,7 @@ export default function TripManagement() {
         </div>
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={fetchPage} />
       </div>
+      </>}
 
       {/* Modal */}
       {showModal && (

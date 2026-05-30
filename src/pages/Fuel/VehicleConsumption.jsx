@@ -71,6 +71,9 @@ export default function VehicleConsumption() {
     return () => { cancelled = true }
   }, [from, to])
 
+  // ── type-level benchmark defaults ─────────────────────────────────────────
+  const TYPE_BENCHMARKS = { truck: 35, pickup: 15, generator_kva: 8, excavator: 25, grader: 20, bus: 30 }
+
   // ── per-vehicle analytics ──────────────────────────────────────────────────
   const vehicleData = useMemo(() => {
     // Group by vehicle
@@ -148,6 +151,50 @@ export default function VehicleConsumption() {
 
     return result.sort((a, b) => b.totalLitres - a.totalLitres)
   }, [rows])
+
+  // ── efficiency ranking (benchmark vs actual) ──────────────────────────────
+  const rankData = useMemo(() => {
+    return vehicleData
+      .filter(v => v.avgL100 != null)
+      .map(v => {
+        const bench = benchmarks.find(b => b.vehicle === v.vehicle)
+        const benchL100 = bench?.target_l_per_100km ? parseFloat(bench.target_l_per_100km) : null
+        const deviation = benchL100 ? ((v.avgL100 - benchL100) / benchL100 * 100) : null
+        const effColor = deviation == null
+          ? 'var(--text-dim)'
+          : deviation <= 10 ? 'var(--green)'
+          : deviation <= 25 ? 'var(--yellow)'
+          : 'var(--red)'
+        return { ...v, benchL100, deviation, effColor }
+      })
+      .sort((a, b) => {
+        if (a.deviation != null && b.deviation != null) return a.deviation - b.deviation
+        if (a.deviation != null) return -1
+        if (b.deviation != null) return 1
+        return (a.avgL100 || 0) - (b.avgL100 || 0)
+      })
+  }, [vehicleData, benchmarks])
+
+  // ── monthly trend per vehicle ──────────────────────────────────────────────
+  function monthlyTrend(fills) {
+    const map = {}
+    fills.forEach(f => {
+      if (!f.date) return
+      const mk = f.date.slice(0, 7)
+      if (!map[mk]) map[mk] = { litres: 0, fills: 0, l100vals: [] }
+      map[mk].litres += f.amount || 0
+      map[mk].fills++
+      if (f.l100 != null) map[mk].l100vals.push(f.l100)
+    })
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([mk, m]) => ({
+        month: new Date(mk + '-01').toLocaleString('default', { month: 'short', year: '2-digit' }),
+        litres: m.litres,
+        avgL100: m.l100vals.length ? m.l100vals.reduce((s, v) => s + v, 0) / m.l100vals.length : null,
+      }))
+  }
 
   // ── filtered vehicles ──────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -293,13 +340,17 @@ export default function VehicleConsumption() {
             <span className="material-icons">add</span> Add Benchmark
           </button>
         )}
+        {activeTab === 'ranking' && (
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Ranked by deviation from benchmark — best first</span>
+        )}
       </PageHeader>
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
         {[
-          { id: 'analytics',   label: 'Consumption Analytics', icon: 'speed'      },
-          { id: 'benchmarks',  label: 'Benchmarks',            icon: 'flag'       },
+          { id: 'analytics',  label: 'Consumption Analytics', icon: 'speed'        },
+          { id: 'benchmarks', label: 'Benchmarks',            icon: 'flag'         },
+          { id: 'ranking',    label: 'Efficiency Ranking',    icon: 'emoji_events' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             style={{
@@ -602,6 +653,122 @@ export default function VehicleConsumption() {
       )}
 
         </> // end analytics tab
+      )}
+
+      {activeTab === 'ranking' && (
+        <div>
+          {rankData.length === 0 ? (
+            <EmptyState icon="emoji_events" message="No vehicle consumption data with odometer readings for ranking" />
+          ) : (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Rank', 'Vehicle', 'Actual L/100km', 'Benchmark', 'Deviation', 'Rating', 'Fills', 'Abnormal'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Rank' || h === 'Rating' || h === 'Fills' || h === 'Abnormal' ? 'center' : h === 'Actual L/100km' || h === 'Benchmark' || h === 'Deviation' ? 'right' : 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid var(--border2)', color: 'var(--text-dim)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankData.map((v, i) => (
+                      <tr key={v.vehicle} style={{ borderBottom: '1px solid var(--border)', background: i === 0 && v.deviation != null && v.deviation <= 0 ? 'color-mix(in srgb,var(--green) 5%,transparent)' : 'transparent' }}>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          {i < 3 ? (
+                            <span style={{ fontSize: 16 }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>{i + 1}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontWeight: 600 }}>
+                          {v.vehicle}
+                          {v.abnormalCount > 0 && <span className="badge badge-red" style={{ fontSize: 10, marginLeft: 6 }}>{v.abnormalCount} ⚠</span>}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13, color: v.effColor, fontWeight: 600 }}>
+                          {fmtNum(v.avgL100)}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-dim)' }}>
+                          {v.benchL100 != null ? fmtNum(v.benchL100) : '—'}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: v.effColor }}>
+                          {v.deviation != null
+                            ? `${v.deviation > 0 ? '+' : ''}${v.deviation.toFixed(1)}%`
+                            : <span style={{ color: 'var(--text-dim)' }}>no benchmark</span>}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          {v.deviation == null ? (
+                            <span className="badge" style={{ fontSize: 10, background: 'var(--surface2)', color: 'var(--text-dim)' }}>No bench</span>
+                          ) : v.deviation <= 10 ? (
+                            <span className="badge badge-green" style={{ fontSize: 10 }}>Efficient</span>
+                          ) : v.deviation <= 25 ? (
+                            <span className="badge badge-yellow" style={{ fontSize: 10 }}>High</span>
+                          ) : (
+                            <span className="badge badge-red" style={{ fontSize: 10 }}>Excessive</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 13 }}>{v.count}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          {v.abnormalCount > 0
+                            ? <span style={{ color: 'var(--red)', fontWeight: 700, fontFamily: 'var(--mono)' }}>{v.abnormalCount}</span>
+                            : <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>0</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Monthly trend for top vehicles */}
+          {rankData.slice(0, 3).filter(v => v.fills.length >= 2).map(v => {
+            const trend = monthlyTrend(v.fills)
+            if (trend.length < 2) return null
+            const maxL = Math.max(...trend.map(t => t.avgL100 || 0)) || 1
+            return (
+              <div key={v.vehicle} className="card" style={{ padding: 16, marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: v.effColor }}>
+                  {v.vehicle} — Monthly L/100km Trend
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {['Month', 'Litres', 'Avg L/100km', 'vs Benchmark', 'Trend'].map(h => (
+                          <th key={h} style={{ padding: '6px 10px', textAlign: 'left', borderBottom: '1px solid var(--border2)', color: 'var(--text-dim)', fontSize: 10, textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trend.map(t => {
+                        const diff = v.benchL100 && t.avgL100 != null ? t.avgL100 - v.benchL100 : null
+                        const barW = t.avgL100 != null ? Math.min(100, (t.avgL100 / maxL) * 100) : 0
+                        const barColor = diff == null ? 'var(--teal)' : diff <= 0 ? 'var(--green)' : diff <= v.benchL100 * 0.25 ? 'var(--yellow)' : 'var(--red)'
+                        return (
+                          <tr key={t.month} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '8px 10px', fontFamily: 'var(--mono)' }}>{t.month}</td>
+                            <td style={{ padding: '8px 10px', fontFamily: 'var(--mono)' }}>{fmtNum(t.litres)} L</td>
+                            <td style={{ padding: '8px 10px', fontFamily: 'var(--mono)', color: barColor, fontWeight: 600 }}>
+                              {t.avgL100 != null ? fmtNum(t.avgL100) : '—'}
+                            </td>
+                            <td style={{ padding: '8px 10px', fontFamily: 'var(--mono)', color: diff == null ? 'var(--text-dim)' : diff > 0 ? 'var(--red)' : 'var(--green)', fontWeight: diff != null ? 600 : 400 }}>
+                              {diff != null ? `${diff > 0 ? '+' : ''}${diff.toFixed(1)}` : '—'}
+                            </td>
+                            <td style={{ padding: '8px 10px' }}>
+                              <div style={{ width: 80, height: 8, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${barW}%`, background: barColor, borderRadius: 4 }} />
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )
