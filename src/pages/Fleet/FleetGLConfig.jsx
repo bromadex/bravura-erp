@@ -101,6 +101,24 @@ const ACCOUNT_GROUPS = [
       },
     ],
   },
+  {
+    id:          'disposal',
+    title:       'Asset Disposal',
+    icon:        'delete_forever',
+    color:       'var(--red)',
+    description: 'Account for recording gain or loss when a fleet asset is disposed or written off',
+    flow:        'Disposal Gain: CR Gain on Disposal\nDisposal Loss: DR Loss on Disposal',
+    accounts: [
+      {
+        key:       'disposal_gain_loss_account',
+        label:     'Asset Disposal Gain / Loss Account',
+        direction: 'DR / CR',
+        dirColor:  'var(--text-dim)',
+        hint:      'Debited on disposal loss, Credited on disposal gain',
+        example:   'e.g. 5400 — Loss on Disposal / 4200 — Gain on Disposal',
+      },
+    ],
+  },
 ]
 
 const ALL_KEYS = ACCOUNT_GROUPS.flatMap(g => g.accounts.map(a => a.key))
