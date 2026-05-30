@@ -201,49 +201,58 @@ const ALL_MODULES = {
   fleet: {
     label: 'Fleet & Assets', icon: 'directions_car', color: '#34d399',
     sections: [{
-      label: 'Operations', pages: [
-        { id: 'contractor-equipment', label: 'Contractor Equipment', icon: 'handshake'        },
-        { id: 'dashboard',          label: 'Fleet Dashboard',    icon: 'dashboard'            },
-        { id: 'vehicles',           label: 'Vehicles',           icon: 'directions_car'       },
-        { id: 'generators',         label: 'Generators',         icon: 'bolt'                 },
-        { id: 'heavy-equipment',    label: 'Heavy Equipment',    icon: 'construction'         },
-        { id: 'trips',              label: 'Trip Management',    icon: 'route'                },
-        { id: 'accidents',          label: 'Accident Reports',   icon: 'car_crash'            },
-        { id: 'drivers',            label: 'Driver Management',  icon: 'badge'                },
-        { id: 'inspections',        label: 'Inspections',        icon: 'fact_check'           },
-        { id: 'allocation',         label: 'Equipment Allocation', icon: 'place'              },
-        { id: 'maintenance-alerts',     label: 'Maintenance Alerts',   icon: 'notifications_active' },
-        { id: 'asset-issues',           label: 'Asset Issues',         icon: 'bug_report'           },
-        { id: 'meter-readings',         label: 'Meter Readings',       icon: 'speed'                },
-        { id: 'operator-assignments',   label: 'Operator Assignments', icon: 'engineering'          },
-        { id: 'compliance',             label: 'Fleet Compliance',     icon: 'verified_user'        },
+      label: 'Overview', pages: [
+        { id: 'dashboard', label: 'Fleet Dashboard', icon: 'dashboard' },
       ],
     }, {
-      label: 'Asset Registry', pages: [
-        { id: 'asset-registry',     label: 'Asset Dashboard',    icon: 'inventory_2'          },
-        { id: 'registry',           label: 'All Assets',         icon: 'list_alt'             },
-        { id: 'reclass-log',        label: 'Reclassification Log', icon: 'swap_horiz'         },
-        { id: 'asset-import',       label: 'Import Assets',      icon: 'download'             },
-        { id: 'category-config',    label: 'Category Config',    icon: 'tune'                 },
-        { id: 'depreciation',       label: 'Depreciation',       icon: 'trending_down'        },
-        { id: 'asset-verification', label: 'Asset Verification', icon: 'verified'             },
+      label: 'Fleet Assets', pages: [
+        { id: 'vehicles',             label: 'Vehicles',              icon: 'directions_car' },
+        { id: 'generators',           label: 'Generators',            icon: 'bolt'           },
+        { id: 'heavy-equipment',      label: 'Heavy Equipment',       icon: 'construction'   },
+        { id: 'contractor-equipment', label: 'Contractor Equipment',  icon: 'handshake'      },
+      ],
+    }, {
+      label: 'Operations', pages: [
+        { id: 'trips',                label: 'Trip Management',       icon: 'route'          },
+        { id: 'drivers',              label: 'Driver Management',     icon: 'badge'          },
+        { id: 'allocation',           label: 'Equipment Allocation',  icon: 'place'          },
+        { id: 'operator-assignments', label: 'Operator Assignments',  icon: 'engineering'    },
+        { id: 'meter-readings',       label: 'Meter Readings',        icon: 'speed'          },
       ],
     }, {
       label: 'Maintenance', pages: [
-        { id: 'workshop-jobs',          label: 'Workshop Jobs',          icon: 'build'            },
-        { id: 'breakdowns',             label: 'Breakdown Management',   icon: 'report_problem'   },
-        { id: 'preventive-maintenance', label: 'Preventive Maintenance', icon: 'event_available'  },
-        { id: 'tyre-management',        label: 'Tyre Management',        icon: 'tire_repair'      },
+        { id: 'workshop-jobs',          label: 'Workshop Jobs',          icon: 'build'                },
+        { id: 'breakdowns',             label: 'Breakdown Management',   icon: 'report_problem'       },
+        { id: 'preventive-maintenance', label: 'Preventive Maintenance', icon: 'event_available'      },
+        { id: 'maintenance-alerts',     label: 'Maintenance Alerts',     icon: 'notifications_active' },
+        { id: 'asset-issues',           label: 'Asset Issues',           icon: 'bug_report'           },
+        { id: 'tyre-management',        label: 'Tyre Management',        icon: 'tire_repair'          },
+      ],
+    }, {
+      label: 'Safety & Compliance', pages: [
+        { id: 'inspections', label: 'Inspections',     icon: 'fact_check'    },
+        { id: 'accidents',   label: 'Accident Reports', icon: 'car_crash'    },
+        { id: 'compliance',  label: 'Fleet Compliance', icon: 'verified_user'},
+      ],
+    }, {
+      label: 'Asset Registry', pages: [
+        { id: 'asset-registry',     label: 'Asset Dashboard',      icon: 'inventory_2'   },
+        { id: 'registry',           label: 'All Assets',           icon: 'list_alt'      },
+        { id: 'depreciation',       label: 'Depreciation',         icon: 'trending_down' },
+        { id: 'asset-verification', label: 'Asset Verification',   icon: 'verified'      },
+        { id: 'reclass-log',        label: 'Reclassification Log', icon: 'swap_horiz'    },
+        { id: 'asset-import',       label: 'Import Assets',        icon: 'download'      },
+        { id: 'category-config',    label: 'Category Config',      icon: 'tune'          },
       ],
     }, {
       label: 'Analytics', pages: [
-        { id: 'downtime-analytics', label: 'Downtime Analytics',  icon: 'timer_off'            },
-        { id: 'cost-analysis',      label: 'Cost Analysis (TCO)', icon: 'price_check'          },
+        { id: 'downtime-analytics', label: 'Downtime Analytics',  icon: 'timer_off'  },
+        { id: 'cost-analysis',      label: 'Cost Analysis (TCO)', icon: 'price_check'},
       ],
     }, {
       label: 'Configuration', pages: [
-        { id: 'gl-config', label: 'GL Account Mapping', icon: 'account_tree'               },
-        { id: 'settings',  label: 'Fleet Settings',     icon: 'settings'                   },
+        { id: 'gl-config', label: 'GL Account Mapping', icon: 'account_tree' },
+        { id: 'settings',  label: 'Fleet Settings',     icon: 'settings'     },
       ],
     }],
   },
