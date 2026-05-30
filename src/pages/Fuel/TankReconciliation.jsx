@@ -2,7 +2,7 @@
 // Per-period reconciliation: opening balance + deliveries − issuances = theoretical close.
 // Variance = theoretical vs actual dipstick reading.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { exportXLSX, exportCSV, fmtNum, dateTag } from '../../engine/reportingEngine'
 import { PageHeader, KPICard, EmptyState } from '../../components/ui'
@@ -93,11 +93,64 @@ function StatusBadge({ pct, noDip }) {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export default function TankReconciliation() {
+  const [activeTab,  setActiveTab]  = useState('reconciliation')
   const [dateFrom,   setDateFrom]   = useState(firstOfMonth)
   const [dateTo,     setDateTo]     = useState(today)
   const [grouping,   setGrouping]   = useState('Daily')
   const [rows,       setRows]       = useState(null)   // null = not yet fetched
   const [loading,    setLoading]    = useState(false)
+
+  // ── Variance Log state ───────────────────────────────────────────────────
+  const [varRows,    setVarRows]    = useState([])
+  const [varLoading, setVarLoading] = useState(false)
+  const [varFrom,    setVarFrom]    = useState(firstOfMonth)
+  const [varTo,      setVarTo]      = useState(today)
+  const [varTankFilter, setVarTankFilter] = useState('')
+  const [varTanks,   setVarTanks]   = useState([])
+
+  const fetchVarianceLog = useCallback(async () => {
+    setVarLoading(true)
+    try {
+      let q = supabase
+        .from('fuel_variance_log')
+        .select('*')
+        .gte('date', varFrom)
+        .lte('date', varTo)
+        .order('date', { ascending: false })
+      if (varTankFilter) q = q.eq('tank_id', varTankFilter)
+      const { data, error } = await q
+      if (error) throw error
+      setVarRows(data || [])
+    } catch (err) {
+      toast.error('Failed to load variance log: ' + (err.message || err))
+    } finally {
+      setVarLoading(false)
+    }
+  }, [varFrom, varTo, varTankFilter])
+
+  // Fetch tank list for filter
+  useEffect(() => {
+    supabase.from('fuel_tanks').select('id, name').eq('is_active', true).order('name')
+      .then(({ data }) => setVarTanks(data || []))
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'variance') fetchVarianceLog()
+  }, [activeTab, fetchVarianceLog])
+
+  // Variance summary
+  const varSummary = {
+    totalVariance: varRows.reduce((s, r) => s + Number(r.variance_litres || 0), 0),
+    totalCost: varRows.reduce((s, r) => s + (Number(r.variance_litres || 0) * Number(r.unit_cost || 0)), 0),
+    worstDay: varRows.length ? varRows.reduce((worst, r) => Math.abs(Number(r.variance_litres || 0)) > Math.abs(Number(worst.variance_litres || 0)) ? r : worst, varRows[0]) : null,
+  }
+
+  function varRowColor(pct) {
+    const abs = Math.abs(Number(pct || 0))
+    if (abs < 1) return 'var(--green)'
+    if (abs <= 3) return 'var(--yellow)'
+    return 'var(--red)'
+  }
 
   // ── fetch & compute ────────────────────────────────────────────────────────
 
@@ -280,13 +333,164 @@ export default function TankReconciliation() {
         title="Tank Reconciliation"
         subtitle="Opening balance + deliveries − issuances = closing. Variance = theoretical vs actual dipstick."
       >
-        <button className="btn btn-secondary" onClick={handleExcelExport} disabled={!hasData}>
-          <span className="material-icons">table_view</span> Export Excel
-        </button>
-        <button className="btn btn-secondary" onClick={handleCSVExport} disabled={!hasData}>
-          <span className="material-icons">download</span> Export CSV
-        </button>
+        {activeTab === 'reconciliation' && (
+          <>
+            <button className="btn btn-secondary" onClick={handleExcelExport} disabled={!hasData}>
+              <span className="material-icons">table_view</span> Export Excel
+            </button>
+            <button className="btn btn-secondary" onClick={handleCSVExport} disabled={!hasData}>
+              <span className="material-icons">download</span> Export CSV
+            </button>
+          </>
+        )}
+        {activeTab === 'variance' && (
+          <button className="btn btn-secondary" onClick={fetchVarianceLog} disabled={varLoading}>
+            <span className="material-icons">refresh</span> Refresh
+          </button>
+        )}
       </PageHeader>
+
+      {/* ── Tab bar ── */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+        {[
+          { id: 'reconciliation', label: 'Reconciliation',  icon: 'balance'          },
+          { id: 'variance',       label: 'Daily Variance Log', icon: 'monitor_heart' },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 13, fontWeight: 600,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: activeTab === tab.id ? 'var(--gold)' : 'var(--text-dim)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--gold)' : '2px solid transparent',
+              marginBottom: -1,
+            }}>
+            <span className="material-icons" style={{ fontSize: 16 }}>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Variance Log Tab ── */}
+      {activeTab === 'variance' && (
+        <div>
+          {/* KPI cards */}
+          <div className="kpi-grid" style={{ marginBottom: 20 }}>
+            <KPICard
+              label="Total Variance This Period"
+              value={`${varRows.length ? (varSummary.totalVariance >= 0 ? '+' : '') + fmtNum(varSummary.totalVariance) : '—'} L`}
+              icon="water_drop"
+              color={Math.abs(varSummary.totalVariance) > 100 ? 'red' : 'green'}
+            />
+            <KPICard
+              label="Total Variance Cost"
+              value={varRows.length ? `$${fmtNum(Math.abs(varSummary.totalCost))}` : '—'}
+              icon="attach_money"
+              color={Math.abs(varSummary.totalCost) > 500 ? 'red' : ''}
+            />
+            <KPICard
+              label="Worst Day Variance"
+              value={varSummary.worstDay ? `${fmtNum(Math.abs(Number(varSummary.worstDay.variance_litres)))} L` : '—'}
+              icon="priority_high"
+              sub={varSummary.worstDay?.date || ''}
+              color={varSummary.worstDay && Math.abs(Number(varSummary.worstDay.variance_litres)) > 50 ? 'red' : ''}
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>From</label>
+                <input type="date" className="form-control" value={varFrom} onChange={e => setVarFrom(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>To</label>
+                <input type="date" className="form-control" value={varTo} onChange={e => setVarTo(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Tank</label>
+                <select className="form-control" value={varTankFilter} onChange={e => setVarTankFilter(e.target.value)}>
+                  <option value="">All Tanks</option>
+                  {varTanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <button className="btn btn-primary" onClick={fetchVarianceLog} disabled={varLoading} style={{ alignSelf: 'flex-end' }}>
+                {varLoading
+                  ? <><span className="material-icons" style={{ animation: 'spin 1s linear infinite', fontSize: 16 }}>refresh</span> Loading…</>
+                  : <><span className="material-icons">play_arrow</span> Run</>
+                }
+              </button>
+            </div>
+          </div>
+
+          {/* Variance table */}
+          {varLoading ? (
+            <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-dim)' }}>
+              <span className="material-icons" style={{ fontSize: 40, opacity: 0.3 }}>hourglass_empty</span>
+              <p>Loading variance data…</p>
+            </div>
+          ) : varRows.length === 0 ? (
+            <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+              <span className="material-icons" style={{ fontSize: 48, opacity: 0.2 }}>monitor_heart</span>
+              <p style={{ marginTop: 12, color: 'var(--text-dim)' }}>
+                No dipstick records found for this period. Add dipstick readings to see variance analysis.
+              </p>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Date', 'Tank', 'Opening (L)', 'Deliveries (L)', 'Issued (L)', 'Expected (L)', 'Actual (L)', 'Variance (L)', 'Var %'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Date' || h === 'Tank' ? 'left' : 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid var(--border2)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {varRows.map(r => {
+                      const pct = Number(r.variance_pct || 0)
+                      const varL = Number(r.variance_litres || 0)
+                      const col = varRowColor(pct)
+                      const rowBg = Math.abs(pct) > 3 ? 'rgba(248,113,113,.04)' : Math.abs(pct) > 1 ? 'rgba(234,179,8,.04)' : 'transparent'
+                      return (
+                        <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', background: rowBg }}>
+                          <td style={{ padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 600 }}>{r.date}</td>
+                          <td style={{ padding: '10px 14px', fontSize: 13 }}>{r.tank_name || r.tank_id}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>{fmtNum(r.opening_litres)}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13, color: Number(r.deliveries_received) > 0 ? 'var(--teal)' : 'var(--text-dim)' }}>
+                            {Number(r.deliveries_received) > 0 ? `+${fmtNum(r.deliveries_received)}` : '0'}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13, color: Number(r.total_issued) > 0 ? 'var(--gold)' : 'var(--text-dim)' }}>
+                            {Number(r.total_issued) > 0 ? `−${fmtNum(r.total_issued)}` : '0'}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>{fmtNum(r.expected_closing)}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13 }}>{fmtNum(r.actual_closing)}</td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: col }}>
+                            {varL >= 0 ? '+' : ''}{fmtNum(varL)}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                              background: `${col}18`, color: col, border: `1px solid ${col}44`,
+                            }}>
+                              {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Reconciliation Tab ── */}
+      {activeTab === 'reconciliation' && (
+      <>
 
       {/* ── filter bar ── */}
       <div className="card" style={{ padding: 16, marginBottom: 20 }}>
@@ -457,6 +661,8 @@ export default function TankReconciliation() {
             )}
           </table>
         </div>
+      )}
+      </> // end reconciliation tab fragment
       )}
     </div>
   )

@@ -60,12 +60,18 @@ export default function FuelIssuance() {
   const [kpiMonth,   setKpiMonth]   = useState(0)
 
   // ── Filters ───────────────────────────────────────────────────
-  const [searchInput, setSearchInput] = useState('')
-  const [searchTerm,  setSearchTerm]  = useState('')
-  const [dateFrom,    setDateFrom]    = useState('')
-  const [dateTo,      setDateTo]      = useState('')
-  const [fuelFilter,  setFuelFilter]  = useState('ALL')
+  const [searchInput,    setSearchInput]    = useState('')
+  const [searchTerm,     setSearchTerm]     = useState('')
+  const [dateFrom,       setDateFrom]       = useState('')
+  const [dateTo,         setDateTo]         = useState('')
+  const [fuelFilter,     setFuelFilter]     = useState('ALL')
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false)
   const debounceRef = useRef(null)
+
+  // ── Flag state ────────────────────────────────────────────────
+  const [pendingFlags,   setPendingFlags]   = useState([])   // [{rule, message}]
+  const [showFlagModal,  setShowFlagModal]  = useState(false)
+  const [pendingPayload, setPendingPayload] = useState(null)  // form payload awaiting confirmation
 
   // Debounce search input → searchTerm
   const handleSearchChange = (v) => {
@@ -101,10 +107,11 @@ export default function FuelIssuance() {
       .order('created_at', { ascending: false })
       .range(from, to)
 
-    if (dateFrom)           q = q.gte('date', dateFrom)
-    if (dateTo)             q = q.lte('date', dateTo)
+    if (dateFrom)             q = q.gte('date', dateFrom)
+    if (dateTo)               q = q.lte('date', dateTo)
     if (fuelFilter !== 'ALL') q = q.eq('fuel_type', fuelFilter)
-    if (searchTerm.trim())  q = q.or(`vehicle.ilike.%${searchTerm}%,driver.ilike.%${searchTerm}%,purpose.ilike.%${searchTerm}%`)
+    if (searchTerm.trim())    q = q.or(`vehicle.ilike.%${searchTerm}%,driver.ilike.%${searchTerm}%,purpose.ilike.%${searchTerm}%`)
+    if (showFlaggedOnly)      q = q.eq('is_flagged', true)
 
     const { data, count, error } = await q
     if (!error) {
@@ -113,7 +120,7 @@ export default function FuelIssuance() {
       setPage(p)
     }
     setTableLoading(false)
-  }, [dateFrom, dateTo, fuelFilter, searchTerm])
+  }, [dateFrom, dateTo, fuelFilter, searchTerm, showFlaggedOnly])
 
   useEffect(() => { fetchPage(0) }, [fetchPage])
 
@@ -140,6 +147,38 @@ export default function FuelIssuance() {
   const selectedDriver = employees.find(e => e.id === form.driver)
   const driverOnLeave  = form.driver && isOnLeave(form.driver)
 
+  // ── Flag rule checks (run before insert) ─────────────────────
+  const runFlagChecks = async (qty, vehicleName) => {
+    const flags = []
+    const nowHour = new Date().getHours()
+    const amount = parseFloat(qty) || 0
+
+    // Rule 1: Overfill — need asset capacity. We look at vehicles/generators by name heuristic or skip.
+    // Skip capacity check for now unless we have an asset_id (see F4.4 note)
+    // We will still flag if amount > 800 as a generic overfill guard when no capacity info
+    if (amount > 800) {
+      flags.push({ rule: 'overfill', message: `${amount} L is very large — possible overfill. Verify tank capacity.` })
+    }
+
+    // Rule 3: Duplicate fill-up — same vehicle within last 4 hours
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+    const { data: recentFills } = await supabase.from('fuel_log')
+      .select('id, created_at, amount')
+      .ilike('vehicle', vehicleName)
+      .gte('created_at', fourHoursAgo)
+      .limit(5)
+    if (recentFills?.length > 0) {
+      flags.push({ rule: 'duplicate_fill', message: `${vehicleName} was already fuelled within the last 4 hours (${recentFills.length} fill-up${recentFills.length > 1 ? 's' : ''} found).` })
+    }
+
+    // Rule 4: After-hours (22:00–05:00)
+    if (nowHour >= 22 || nowHour < 5) {
+      flags.push({ rule: 'after_hours', message: `Current time is ${nowHour}:00 — issuance outside normal hours (22:00–05:00).` })
+    }
+
+    return flags
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.amount || parseFloat(form.amount) <= 0) return toast.error('Enter a valid amount')
@@ -147,23 +186,52 @@ export default function FuelIssuance() {
     if (driverOnLeave) { toast.error(`${selectedDriver?.name} is currently on leave`); return }
 
     const driverName = selectedDriver?.name || form.driver
-    const payload    = { ...form, amount: parseFloat(form.amount), flowmeter: parseFloat(form.flowmeter) || 0, odometer: form.odometer ? parseFloat(form.odometer) : null, user_name: user?.full_name || user?.username, driver: driverName }
+    const basePayload = { ...form, amount: parseFloat(form.amount), flowmeter: parseFloat(form.flowmeter) || 0, odometer: form.odometer ? parseFloat(form.odometer) : null, user_name: user?.full_name || user?.username, driver: driverName }
 
-    try {
-      if (editRecord) {
-        const { error } = await supabase.from('fuel_log').update(payload).eq('id', editRecord.id)
+    // For edits, skip flag checks
+    if (editRecord) {
+      try {
+        const { error } = await supabase.from('fuel_log').update(basePayload).eq('id', editRecord.id)
         if (error) throw error
         toast.success('Record updated')
         await fetchPage(page)
-      } else {
-        const txnCode = await generateTxnCode('FI')
-        await addIssuance({ ...payload, txn_code: txnCode })
-        toast.success(`Issued ${form.amount} L — ${txnCode}`)
-        await fetchPage(0)
-      }
+        setShowModal(false)
+        setForm(BLANK)
+        setEditRecord(null)
+      } catch (err) { toast.error(err.message) }
+      return
+    }
+
+    // Run flag checks for new issuances
+    const flags = await runFlagChecks(form.amount, form.vehicle)
+    if (flags.length > 0) {
+      // Warn via toasts
+      flags.forEach(f => toast(`Warning: ${f.message}`, { icon: '⚠️', duration: 5000 }))
+      // Determine combined flag reason
+      const flagReason = flags.map(f => f.rule).join(',')
+      const payload = { ...basePayload, is_flagged: true, flag_reason: flagReason }
+      setPendingFlags(flags)
+      setPendingPayload(payload)
+      setShowFlagModal(true)
+      return
+    }
+
+    // No flags — proceed directly
+    await doIssuanceInsert(basePayload)
+  }
+
+  const doIssuanceInsert = async (payload) => {
+    try {
+      const txnCode = await generateTxnCode('FI')
+      await addIssuance({ ...payload, txn_code: txnCode })
+      toast.success(`Issued ${payload.amount} L — ${txnCode}${payload.is_flagged ? ' (flagged)' : ''}`)
+      await fetchPage(0)
       setShowModal(false)
       setForm(BLANK)
       setEditRecord(null)
+      setShowFlagModal(false)
+      setPendingFlags([])
+      setPendingPayload(null)
     } catch (err) { toast.error(err.message) }
   }
 
@@ -188,7 +256,7 @@ export default function FuelIssuance() {
     toast.success(`Exported ${data.length} records`)
   }
 
-  const clearFilters = () => { setSearchInput(''); setSearchTerm(''); setDateFrom(''); setDateTo(''); setFuelFilter('ALL') }
+  const clearFilters = () => { setSearchInput(''); setSearchTerm(''); setDateFrom(''); setDateTo(''); setFuelFilter('ALL'); setShowFlaggedOnly(false) }
 
   return (
     <div>
@@ -233,6 +301,13 @@ export default function FuelIssuance() {
               <option>DIESEL</option><option>PETROL</option><option>PARAFFIN</option>
             </select>
           </div>
+          <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={showFlaggedOnly} onChange={e => setShowFlaggedOnly(e.target.checked)} />
+              <span className="material-icons" style={{ fontSize: 14, color: 'var(--yellow)' }}>flag</span>
+              Flagged only
+            </label>
+          </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
             <button className="btn btn-secondary" onClick={clearFilters}>
               <span className="material-icons">clear</span>
@@ -253,27 +328,50 @@ export default function FuelIssuance() {
               <tr>
                 <th>Code</th><th>Date</th><th>Time</th><th>Type</th><th>Vehicle / Equipment</th>
                 <th>Amount (L)</th><th>Driver</th><th>Odometer</th><th>Purpose</th>
-                <th>Authorised By</th>
+                <th>Authorised By</th><th>Flag</th>
                 {(canEdit || canDelete) && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {tableLoading ? (
-                <tr><td colSpan="11" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
+                <tr><td colSpan="12" style={{ textAlign: 'center', padding: 32 }}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan="11"><EmptyState icon="local_gas_station" message="No records match your filters" /></td></tr>
+                <tr><td colSpan="12"><EmptyState icon="local_gas_station" message="No records match your filters" /></td></tr>
               ) : rows.map(r => (
-                <tr key={r.id}>
+                <tr key={r.id} style={{ background: r.is_flagged ? 'rgba(234,179,8,.04)' : undefined }}>
                   <td>{r.txn_code ? <TxnCodeBadge code={r.txn_code} /> : <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
                   <td style={{ color: 'var(--text-dim)' }}>{r.time || '—'}</td>
                   <td><span className={`badge ${FUEL_COLORS[r.fuel_type] || 'badge-gold'}`}>{r.fuel_type}</span></td>
                   <td style={{ fontWeight: 600 }}>{r.vehicle || '—'}</td>
-                  <td className="td-mono" style={{ color: 'var(--yellow)' }}>{r.amount} L</td>
+                  <td className="td-mono" style={{ color: 'var(--yellow)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {r.amount} L
+                      {r.is_flagged && (
+                        <span title={r.flag_reason || 'Flagged'} style={{ cursor: 'help' }}>
+                          <span className="material-icons" style={{ fontSize: 13, color: 'var(--yellow)', verticalAlign: 'middle' }}>warning_amber</span>
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td>{r.driver || '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)', color: 'var(--text-dim)' }}>{r.odometer ? `${r.odometer} km` : '—'}</td>
                   <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{r.purpose || '—'}</td>
                   <td style={{ color: 'var(--text-dim)', fontSize: 12 }}>{r.authorized_by || '—'}</td>
+                  <td>
+                    {r.is_flagged ? (
+                      <span title={r.flag_reason || 'Flagged'} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700,
+                        padding: '2px 7px', borderRadius: 10, background: 'rgba(234,179,8,.15)',
+                        color: 'var(--yellow)', border: '1px solid rgba(234,179,8,.4)', cursor: 'help',
+                      }}>
+                        <span className="material-icons" style={{ fontSize: 11 }}>flag</span>
+                        {r.flag_reason ? r.flag_reason.split(',')[0].replace(/_/g,' ') : 'flagged'}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>
+                    )}
+                  </td>
                   {(canEdit || canDelete) && (
                     <td className="td-actions">
                       <div className="btn-group-sm">
@@ -289,6 +387,45 @@ export default function FuelIssuance() {
         </div>
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={fetchPage} />
       </div>
+
+      {/* Flag Confirmation Modal */}
+      {showFlagModal && pendingFlags.length > 0 && (
+        <div className="overlay" onClick={() => { setShowFlagModal(false); setPendingFlags([]); setPendingPayload(null) }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-title" style={{ color: 'var(--yellow)' }}>
+              <span className="material-icons" style={{ fontSize: 20, marginRight: 8, verticalAlign: 'middle' }}>warning_amber</span>
+              Issuance Flag Warning
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+              The following issues were detected. Do you want to proceed with the issuance?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {pendingFlags.map((f, i) => (
+                <div key={i} style={{
+                  padding: '8px 12px', borderRadius: 6, fontSize: 13,
+                  background: 'rgba(234,179,8,.10)', border: '1px solid rgba(234,179,8,.3)',
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                }}>
+                  <span className="material-icons" style={{ fontSize: 14, color: 'var(--yellow)', marginTop: 1 }}>flag</span>
+                  <span><strong style={{ textTransform: 'capitalize' }}>{f.rule.replace(/_/g, ' ')}</strong>: {f.message}</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Proceeding will mark this issuance as <strong>flagged</strong> for review.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => { setShowFlagModal(false); setPendingFlags([]); setPendingPayload(null) }}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" style={{ background: 'var(--yellow)', color: '#000' }}
+                onClick={() => doIssuanceInsert(pendingPayload)}>
+                <span className="material-icons" style={{ fontSize: 16 }}>check</span> Proceed Anyway (Flagged)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
