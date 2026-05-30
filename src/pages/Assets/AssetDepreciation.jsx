@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCanEdit } from '../../hooks/usePermission'
 import { PageHeader, KPICard, EmptyState, TabNav, ModalDialog, ModalActions, AlertBanner } from '../../components/ui'
-import { runMonthlyDepreciation, runBatchDepreciation, buildProjectedSchedule } from '../../engine/depreciationEngine'
+import { runMonthlyDepreciation, runBatchDepreciation, buildProjectedSchedule, computeAssetDepreciation } from '../../engine/depreciationEngine'
 import { exportXLSX } from '../../engine/reportingEngine'
 import toast from 'react-hot-toast'
 
@@ -14,8 +14,9 @@ const today = new Date().toISOString().split('T')[0]
 const currentPeriod = today.slice(0, 7)
 
 const METHODS = [
-  { value: 'straight_line',      label: 'Straight Line'      },
-  { value: 'reducing_balance',   label: 'Reducing Balance'   },
+  { value: 'straight_line',    label: 'Straight Line'    },
+  { value: 'reducing_balance', label: 'Reducing Balance' },
+  { value: 'usage_based',      label: 'Usage-Based'      },
 ]
 
 const STATUS_BADGE = {
@@ -28,9 +29,10 @@ const STATUS_BADGE = {
 const ENTRY_BADGE = { Draft: 'badge-yellow', Posted: 'badge-green', Cancelled: 'badge-default' }
 
 const TABS = [
-  { id: 'schedules', label: 'Schedules'  },
-  { id: 'entries',   label: 'Entries'    },
+  { id: 'schedules', label: 'Schedules'        },
+  { id: 'entries',   label: 'Entries'          },
   { id: 'run',       label: 'Run Depreciation' },
+  { id: 'fleet',     label: 'Fleet Schedule'   },
 ]
 
 const BLANK_SCHED = {
@@ -61,6 +63,12 @@ export default function AssetDepreciation() {
   const [saving,  setSaving]  = useState(false)
   const [batchResult, setBatchResult] = useState(null)
 
+  // Fleet Schedule tab state
+  const [fleetAssets,       setFleetAssets]       = useState([])
+  const [fleetAssetsLoading, setFleetAssetsLoading] = useState(false)
+  const [fleetSearch,       setFleetSearch]       = useState('')
+  const [fleetMethodFilter, setFleetMethodFilter] = useState('')
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [schedRes, entryRes, assetRes] = await Promise.all([
@@ -75,6 +83,18 @@ export default function AssetDepreciation() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Load fleet assets for Fleet Schedule tab
+  useEffect(() => {
+    if (tab !== 'fleet') return
+    setFleetAssetsLoading(true)
+    supabase.from('asset_registry')
+      .select('id,asset_code,asset_name,asset_category,fleet_number,purchase_cost,purchase_date,disposal_value,salvage_value,useful_life_years,depreciation_method,depreciation_rate,current_book_value,expected_lifetime_km,current_odometer,status')
+      .neq('status', 'Disposed')
+      .order('asset_name')
+      .then(({ data }) => { setFleetAssets(data || []); setFleetAssetsLoading(false) })
+      .catch(() => setFleetAssetsLoading(false))
+  }, [tab])
 
   const filteredSchedules = schedules.filter(s =>
     !search || s.asset_code?.toLowerCase().includes(search.toLowerCase())
@@ -381,6 +401,132 @@ export default function AssetDepreciation() {
         </div>
       )}
 
+      {/* ── Fleet Schedule tab ── */}
+      {tab === 'fleet' && (
+        <div>
+          {/* Filters */}
+          <div className="card" style={{ padding: '12px 16px', marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: 180, margin: 0 }}>
+                <input className="form-control" placeholder="Search asset name or code…"
+                  value={fleetSearch} onChange={e => setFleetSearch(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ minWidth: 160, margin: 0 }}>
+                <select className="form-control" value={fleetMethodFilter} onChange={e => setFleetMethodFilter(e.target.value)}>
+                  <option value="">All Methods</option>
+                  {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {fleetAssetsLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>Loading fleet assets…</div>
+          ) : (
+            <div className="card">
+              <div className="table-wrap">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>Asset</th>
+                      <th>Category</th>
+                      <th>Method</th>
+                      <th style={{ textAlign: 'right' }}>Purchase Cost</th>
+                      <th style={{ textAlign: 'right' }}>Disposal Value</th>
+                      <th style={{ textAlign: 'right' }}>Life (yrs)</th>
+                      <th style={{ textAlign: 'right' }}>Monthly Dep</th>
+                      <th style={{ textAlign: 'right' }}>Accumulated</th>
+                      <th style={{ textAlign: 'right' }}>Book Value</th>
+                      <th style={{ textAlign: 'right' }}>% Remaining</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fleetAssets
+                      .filter(a => {
+                        const q = fleetSearch.toLowerCase()
+                        if (q && !(a.asset_name?.toLowerCase().includes(q) || a.asset_code?.toLowerCase().includes(q))) return false
+                        if (fleetMethodFilter && (a.depreciation_method || 'straight_line') !== fleetMethodFilter) return false
+                        return true
+                      })
+                      .map(a => {
+                        const dep = computeAssetDepreciation(a)
+                        const cost = parseFloat(a.purchase_cost || 0)
+                        const hasData = cost > 0 && (a.useful_life_years > 0 || a.depreciation_method === 'usage_based')
+                        return (
+                          <tr key={a.id}>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{a.asset_name || '—'}</div>
+                              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{a.asset_code || ''}{a.fleet_number ? ` · ${a.fleet_number}` : ''}</div>
+                            </td>
+                            <td style={{ fontSize: 12, color: 'var(--text-mid)' }}>{a.asset_category || '—'}</td>
+                            <td style={{ fontSize: 12 }}>
+                              {METHODS.find(m => m.value === (a.depreciation_method || 'straight_line'))?.label || a.depreciation_method}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12 }}>
+                              {cost > 0 ? cost.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12 }}>
+                              {parseFloat(a.disposal_value || a.salvage_value || 0) > 0
+                                ? parseFloat(a.disposal_value || a.salvage_value).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>{a.useful_life_years || '—'}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: hasData ? 'var(--red)' : 'var(--text-dim)' }}>
+                              {hasData && dep.monthlyDep > 0
+                                ? dep.monthlyDep.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12 }}>
+                              {hasData && dep.accumulated > 0
+                                ? dep.accumulated.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, color: hasData ? dep.color : 'var(--text-dim)' }}>
+                              {cost > 0
+                                ? dep.bookValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              {hasData ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div style={{ flex: 1, height: 8, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden', minWidth: 50 }}>
+                                    <div style={{ height: '100%', width: `${Math.min(100, dep.remainingLifePct).toFixed(1)}%`, background: dep.color, borderRadius: 4 }} />
+                                  </div>
+                                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: dep.color, fontWeight: 600, flexShrink: 0 }}>
+                                    {dep.remainingLifePct.toFixed(0)}%
+                                  </span>
+                                </div>
+                              ) : '—'}
+                            </td>
+                            <td>
+                              <span style={{
+                                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
+                                background: dep.remainingLifePct > 50
+                                  ? 'rgba(34,197,94,.12)' : dep.remainingLifePct > 25
+                                  ? 'rgba(234,179,8,.12)' : 'rgba(239,68,68,.12)',
+                                color: dep.color,
+                              }}>
+                                {!hasData ? 'No data'
+                                  : dep.remainingLifePct > 50 ? 'Healthy'
+                                  : dep.remainingLifePct > 25 ? 'Aging'
+                                  : 'Near EOL'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    {fleetAssets.length === 0 && (
+                      <tr><td colSpan={11}><EmptyState icon="trending_down" message="No fleet assets found" /></td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* New Schedule Modal */}
       {showNewSched && (
         <ModalDialog open onClose={() => setShowNewSched(false)} title="New Depreciation Schedule" size="lg">
@@ -420,6 +566,15 @@ export default function AssetDepreciation() {
                 onChange={e => setNewSchedForm(f => ({ ...f, useful_life_years: e.target.value }))} />
             </div>
           </div>
+          {newSchedForm.depreciation_method === 'usage_based' && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Expected Lifetime KM</label>
+                <input type="number" className="form-control" min="1" step="1" value={newSchedForm.expected_lifetime_km || ''}
+                  onChange={e => setNewSchedForm(f => ({ ...f, expected_lifetime_km: e.target.value }))} />
+              </div>
+            </div>
+          )}
           {newSchedForm.depreciation_method === 'reducing_balance' && (
             <div className="form-row">
               <div className="form-group">

@@ -19,6 +19,54 @@ export function calcReducingBalance(bookValue, annualRatePct) {
   return (bookValue || 0) * ((annualRatePct || 0) / 100) / 12
 }
 
+/**
+ * Usage-based depreciation per km driven in a period.
+ * depPerKm = (cost - salvage) / expectedLifetimeKm
+ * periodDep = depPerKm * kmDrivenThisPeriod
+ */
+export function calcUsageBased(cost, salvage, expectedLifetimeKm, kmDrivenThisPeriod) {
+  const depreciable = Math.max(0, (cost || 0) - (salvage || 0))
+  const depPerKm = expectedLifetimeKm > 0 ? depreciable / expectedLifetimeKm : 0
+  return depPerKm * (kmDrivenThisPeriod || 0)
+}
+
+/**
+ * Compute depreciation for a single asset from asset_registry fields (client-side).
+ * Returns { monthlyDep, annualDep, pctDepreciated, remainingLifePct, bookValue, accumulated }
+ */
+export function computeAssetDepreciation(asset) {
+  const cost    = parseFloat(asset.purchase_cost   || 0)
+  const salvage = parseFloat(asset.disposal_value  || asset.salvage_value || 0)
+  const life    = parseFloat(asset.useful_life_years || 0)
+  const method  = asset.depreciation_method || 'straight_line'
+  const rate    = parseFloat(asset.depreciation_rate || 20)
+  const bv      = asset.current_book_value != null ? parseFloat(asset.current_book_value) : cost
+
+  let monthlyDep = 0
+  if (method === 'straight_line' && cost > 0 && life > 0) {
+    monthlyDep = calcStraightLine(cost, salvage, life)
+  } else if (method === 'reducing_balance' && bv > 0) {
+    monthlyDep = calcReducingBalance(bv, rate)
+  }
+  // usage_based monthly dep = 0 (computed per period from km)
+
+  const accumulated    = Math.max(0, cost - bv)
+  const depreciable    = Math.max(0, cost - salvage)
+  const pctDepreciated = depreciable > 0 ? Math.min(100, (accumulated / depreciable) * 100) : 0
+  const remainingLifePct = 100 - pctDepreciated
+
+  return {
+    method,
+    monthlyDep,
+    annualDep:       monthlyDep * 12,
+    accumulated,
+    bookValue:       bv,
+    pctDepreciated,
+    remainingLifePct,
+    color: remainingLifePct > 50 ? 'var(--green)' : remainingLifePct > 25 ? 'var(--yellow)' : 'var(--red)',
+  }
+}
+
 /** Build a full projected schedule as an array of {period, amount, bookValue}. */
 export function buildProjectedSchedule(sched) {
   const rows   = []
