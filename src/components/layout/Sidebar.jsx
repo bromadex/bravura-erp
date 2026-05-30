@@ -250,6 +250,7 @@ const ALL_MODULES = {
       ],
     }, {
       label: 'Analytics', pages: [
+        { id: 'analytics',          label: 'Fleet Intelligence',   icon: 'insights'   },
         { id: 'downtime-analytics', label: 'Downtime Analytics',  icon: 'timer_off'  },
         { id: 'cost-analysis',      label: 'Cost Analysis (TCO)', icon: 'price_check'},
       ],
