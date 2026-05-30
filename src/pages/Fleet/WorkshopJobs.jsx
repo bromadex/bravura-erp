@@ -7,6 +7,7 @@ import TxnCodeBadge from '../../components/TxnCodeBadge'
 import { generateTxnCode } from '../../utils/txnCode'
 import { auditLog } from '../../engine/auditEngine'
 import { exportXLSX } from '../../engine/reportingEngine'
+import { postFleetGL, loadFleetGLConfig } from '../../lib/fleetGL'
 import toast from 'react-hot-toast'
 
 const today = new Date().toISOString().split('T')[0]
@@ -250,6 +251,23 @@ export default function WorkshopJobs() {
       }
 
       await auditLog({ module: 'fleet', action: 'CLOSE', entityType: 'work_order', entityId: selected.id, entityName: selected.wo_number })
+
+      // GL posting — silent-fail, fire-and-forget
+      if (actualCost > 0) {
+        loadFleetGLConfig(supabase).then(glConfig => {
+          postFleetGL(supabase, {
+            type:      'maintenance_close',
+            amount:    actualCost,
+            assetId:   selected.asset_id,
+            assetName: selected.asset_name || selected.asset_reg || selected.wo_number,
+            reference: `FLEET-MAINT-${selected.id}`,
+            glConfig,
+            entryDate: closeForm.actual_end_date || today,
+            userId:    user?.id || '',
+          })
+        }).catch(e => console.warn('Fleet GL config load failed:', e.message))
+      }
+
       toast.success(`WO ${selected.wo_number} closed`)
       setShowCloseModal(false)
       setSelected(null)

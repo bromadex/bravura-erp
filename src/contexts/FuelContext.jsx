@@ -6,6 +6,7 @@ import { generateTxnCode } from '../utils/txnCode'
 import { postToGL, hasGLEntry } from '../engine/accountingEngine'
 import { pushNotificationFromTemplate, pushNotificationToRole } from '../engine/notificationEngine'
 import { startWorkflow } from '../engine/workflowEngine'
+import { postFleetGL, loadFleetGLConfig } from '../lib/fleetGL'
 
 const FuelContext = createContext(null)
 
@@ -276,6 +277,23 @@ export function FuelProvider({ children }) {
         })
       } catch (glErr) {
         console.warn('GL posting skipped:', glErr.message)
+      }
+    } else {
+      // Fallback: try fleet_gl_config accounts (silent-fail)
+      const totalCost = parseFloat(issuance.total_cost) || (qty * (parseFloat(issuance.unit_cost) || 0))
+      if (totalCost > 0) {
+        loadFleetGLConfig(supabase).then(glConfig => {
+          postFleetGL(supabase, {
+            type:      'fuel_issuance',
+            amount:    totalCost,
+            assetId:   issuance.asset_id || id,
+            assetName: issuance.vehicle || issuance.equipment_name || '',
+            reference: `FLEET-FUEL-${id}`,
+            glConfig,
+            entryDate: issuance.date,
+            userId:    issuance.user_name || '',
+          })
+        }).catch(e => console.warn('Fleet GL config load failed:', e.message))
       }
     }
 

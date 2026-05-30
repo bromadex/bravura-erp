@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { useFleet } from '../../contexts/FleetContext'
 import { supabase } from '../../lib/supabase'
@@ -61,6 +61,17 @@ export default function FleetCostAnalysis() {
   const [expandedRow, setExpandedRow] = useState(null)
   const [tcoData,     setTcoData]     = useState([])
   const [tcoLoading,  setTcoLoading]  = useState(false)
+
+  // ── Fleet P&L state (from fleet_pnl view) ──────────────
+  const [pnlData,        setPnlData]        = useState([])
+  const [pnlLoading,     setPnlLoading]     = useState(false)
+  const [pnlSortKey,     setPnlSortKey]     = useState('total_cost')
+  const [pnlSortDir,     setPnlSortDir]     = useState('desc')
+  const [pnlCcFilter,    setPnlCcFilter]    = useState('')
+
+  // ── Cost Centre state ─────────────────────────────────
+  const [ccData,    setCcData]    = useState([])
+  const [ccLoading, setCcLoading] = useState(false)
 
   // ── Budget state – localStorage keyed by year ──────────
   const budgetKey = `fleet_cost_budget_${thisYear}`
@@ -221,7 +232,102 @@ export default function FleetCostAnalysis() {
       .catch(() => setTcoLoading(false))
   }, [tab])
 
-  const tabs = ['Fleet Overview', 'Per-Vehicle TCO', 'Cost Benchmarking', 'Budget vs Actual', 'Asset TCO (DB)']
+  // ── Load Fleet P&L from fleet_pnl view ─────────────────
+  useEffect(() => {
+    if (tab !== 5) return
+    setPnlLoading(true)
+    supabase.from('fleet_pnl').select('*')
+      .then(({ data }) => { setPnlData(data || []); setPnlLoading(false) })
+      .catch(() => setPnlLoading(false))
+  }, [tab])
+
+  // ── Load Cost Centre breakdown ─────────────────────────
+  useEffect(() => {
+    if (tab !== 6) return
+    setCcLoading(true)
+    supabase.from('fleet_pnl')
+      .select('id,asset_name,cost_centre_id,fuel_cost,maintenance_cost,breakdown_cost,total_depreciation,total_cost')
+      .then(({ data }) => { setCcData(data || []); setCcLoading(false) })
+      .catch(() => setCcLoading(false))
+  }, [tab])
+
+  // ── Sorted P&L data ────────────────────────────────────
+  const sortedPnl = useMemo(() => {
+    const filtered = pnlCcFilter
+      ? pnlData.filter(r => (r.cost_centre_id || 'Unassigned') === pnlCcFilter)
+      : pnlData
+    return [...filtered].sort((a, b) => {
+      const av = Number(a[pnlSortKey] || 0)
+      const bv = Number(b[pnlSortKey] || 0)
+      return pnlSortDir === 'asc' ? av - bv : bv - av
+    })
+  }, [pnlData, pnlSortKey, pnlSortDir, pnlCcFilter])
+
+  const pnlCostCentres = useMemo(() =>
+    [...new Set(pnlData.map(r => r.cost_centre_id || 'Unassigned'))].sort()
+  , [pnlData])
+
+  // ── Cost Centre summary from fleet_pnl ────────────────
+  const ccSummary = useMemo(() => {
+    const map = {}
+    ccData.forEach(r => {
+      const cc = r.cost_centre_id || 'Unassigned'
+      if (!map[cc]) map[cc] = { cc, assets: 0, fuel: 0, maintenance: 0, breakdown: 0, depreciation: 0, total: 0 }
+      map[cc].assets++
+      map[cc].fuel        += Number(r.fuel_cost        || 0)
+      map[cc].maintenance += Number(r.maintenance_cost  || 0)
+      map[cc].breakdown   += Number(r.breakdown_cost    || 0)
+      map[cc].depreciation+= Number(r.total_depreciation|| 0)
+      map[cc].total       += Number(r.total_cost        || 0)
+    })
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [ccData])
+
+  // ── Sort handler for P&L table ─────────────────────────
+  const handlePnlSort = useCallback((key) => {
+    setPnlSortKey(prev => {
+      if (prev === key) { setPnlSortDir(d => d === 'desc' ? 'asc' : 'desc'); return key }
+      setPnlSortDir('desc')
+      return key
+    })
+  }, [])
+
+  // ── Export P&L to CSV ─────────────────────────────────
+  const exportPnlCSV = useCallback(() => {
+    if (!sortedPnl.length) { toast.error('No P&L data to export'); return }
+    const headers = ['Asset','Category','Fleet #','Fuel Cost','Maintenance','Breakdown','Depreciation','Total Cost','Cost/km','Cost/hr']
+    const rows = sortedPnl.map(r => [
+      r.asset_name || '',
+      r.asset_category || '',
+      r.fleet_number || '',
+      Number(r.fuel_cost||0).toFixed(2),
+      Number(r.maintenance_cost||0).toFixed(2),
+      Number(r.breakdown_cost||0).toFixed(2),
+      Number(r.total_depreciation||0).toFixed(2),
+      Number(r.total_cost||0).toFixed(2),
+      r.cost_per_km ? Number(r.cost_per_km).toFixed(4) : '',
+      r.cost_per_hour ? Number(r.cost_per_hour).toFixed(4) : '',
+    ])
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `Fleet_PnL_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${sortedPnl.length} assets`)
+  }, [sortedPnl])
+
+  const pnlTotals = useMemo(() => ({
+    fuel:    sortedPnl.reduce((s,r) => s + Number(r.fuel_cost||0), 0),
+    maint:   sortedPnl.reduce((s,r) => s + Number(r.maintenance_cost||0), 0),
+    break:   sortedPnl.reduce((s,r) => s + Number(r.breakdown_cost||0), 0),
+    dep:     sortedPnl.reduce((s,r) => s + Number(r.total_depreciation||0), 0),
+    total:   sortedPnl.reduce((s,r) => s + Number(r.total_cost||0), 0),
+  }), [sortedPnl])
+
+  const tabs = ['Fleet Overview', 'Per-Vehicle TCO', 'Cost Benchmarking', 'Budget vs Actual', 'Asset TCO (DB)', 'Fleet P&L', 'Cost Centres']
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><Spinner /></div>
 
@@ -792,6 +898,291 @@ export default function FleetCostAnalysis() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          TAB 6 — FLEET P&L PER VEHICLE (from fleet_pnl view)
+      ════════════════════════════════════════════════ */}
+      {tab === 5 && (
+        <div>
+          {pnlLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spinner /></div>
+          ) : (
+            <>
+              {/* Controls */}
+              <div className="card" style={{ padding: '12px 16px', marginBottom: 12 }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <div className="form-group" style={{ minWidth: 180, margin: 0 }}>
+                    <label style={{ fontSize: 11 }}>Filter by Cost Centre</label>
+                    <select className="form-control" value={pnlCcFilter} onChange={e => setPnlCcFilter(e.target.value)}>
+                      <option value="">All Cost Centres</option>
+                      {pnlCostCentres.map(cc => <option key={cc} value={cc}>{cc}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={exportPnlCSV} style={{ marginBottom: 2 }}>
+                    <span className="material-icons" style={{ fontSize: 15 }}>download</span> Export CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Top 5 cost bar chart */}
+              {sortedPnl.filter(r => Number(r.total_cost) > 0).length > 0 && (
+                <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Top 5 Highest-Cost Assets</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {sortedPnl.filter(r => Number(r.total_cost) > 0).slice(0, 5).map((r, i) => {
+                      const maxCost = Number(sortedPnl.find(x => Number(x.total_cost) > 0)?.total_cost || 1)
+                      const costKm  = Number(r.cost_per_km || 0)
+                      const barColor = costKm > 2 ? 'var(--red)' : costKm > 1 ? 'var(--yellow)' : 'var(--teal)'
+                      const barW    = ((Number(r.total_cost) / maxCost) * 100).toFixed(1)
+                      return (
+                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: ASSET_COLORS[i], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#0b0f1a', flexShrink: 0 }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>{r.asset_name || r.asset_code || '—'}</span>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--gold)' }}>{fmtMoney(Number(r.total_cost))}</span>
+                            </div>
+                            <div style={{ height: 10, background: 'var(--surface2)', borderRadius: 5, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${barW}%`, background: barColor, borderRadius: 5, transition: 'width .4s' }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 14, marginTop: 3, fontSize: 11, color: 'var(--text-dim)' }}>
+                              <span>Fuel: <span style={{ color: 'var(--yellow)' }}>{fmtMoney(Number(r.fuel_cost||0))}</span></span>
+                              <span>Maint: <span style={{ color: 'var(--blue)' }}>{fmtMoney(Number(r.maintenance_cost||0))}</span></span>
+                              <span>Depr: <span style={{ color: 'var(--teal)' }}>{fmtMoney(Number(r.total_depreciation||0))}</span></span>
+                              {r.cost_per_km && <span>K/km: <span style={{ color: barColor }}>{Number(r.cost_per_km).toFixed(3)}</span></span>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* P&L Table */}
+              {sortedPnl.length === 0 ? (
+                <EmptyState icon="receipt_long" message="No fleet P&L data available" />
+              ) : (
+                <div className="table-wrap">
+                  <table className="stock-table">
+                    <thead>
+                      <tr>
+                        <th>Asset</th>
+                        <th>Category</th>
+                        {[
+                          { key: 'fuel_cost',          label: 'Fuel' },
+                          { key: 'maintenance_cost',   label: 'Maintenance' },
+                          { key: 'breakdown_cost',     label: 'Breakdown' },
+                          { key: 'total_depreciation', label: 'Depreciation' },
+                          { key: 'total_cost',         label: 'Total Cost' },
+                          { key: 'cost_per_km',        label: 'Cost/km' },
+                          { key: 'cost_per_hour',      label: 'Cost/hr' },
+                        ].map(col => (
+                          <th
+                            key={col.key}
+                            style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                            onClick={() => handlePnlSort(col.key)}
+                          >
+                            {col.label}
+                            {pnlSortKey === col.key && (
+                              <span className="material-icons" style={{ fontSize: 12, verticalAlign: 'middle', marginLeft: 2 }}>
+                                {pnlSortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+                              </span>
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedPnl.map(r => {
+                        const costKm = Number(r.cost_per_km || 0)
+                        const kmColor = costKm > 2 ? 'var(--red)' : costKm > 1 ? 'var(--yellow)' : costKm > 0 ? 'var(--teal)' : 'var(--text-dim)'
+                        return (
+                          <tr key={r.id}>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>{r.asset_name || r.asset_code || '—'}</div>
+                              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.fleet_number || ''}</div>
+                            </td>
+                            <td style={{ fontSize: 12, color: 'var(--text-mid)' }}>{r.asset_category || '—'}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.fuel_cost) > 0 ? 'var(--yellow)' : 'var(--text-dim)' }}>
+                              {Number(r.fuel_cost) > 0 ? fmtMoney(Number(r.fuel_cost)) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.maintenance_cost) > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>
+                              {Number(r.maintenance_cost) > 0 ? fmtMoney(Number(r.maintenance_cost)) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.breakdown_cost) > 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                              {Number(r.breakdown_cost) > 0 ? fmtMoney(Number(r.breakdown_cost)) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.total_depreciation) > 0 ? 'var(--teal)' : 'var(--text-dim)' }}>
+                              {Number(r.total_depreciation) > 0 ? fmtMoney(Number(r.total_depreciation)) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: Number(r.total_cost) > 0 ? 'var(--gold)' : 'var(--text-dim)' }}>
+                              {Number(r.total_cost) > 0 ? fmtMoney(Number(r.total_cost)) : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: kmColor }}>
+                              {r.cost_per_km ? `${Number(r.cost_per_km).toFixed(3)}/km` : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-mid)' }}>
+                              {r.cost_per_hour ? `${Number(r.cost_per_hour).toFixed(3)}/hr` : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {/* Summary row */}
+                      <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
+                        <td colSpan={2} style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)', letterSpacing: 1 }}>FLEET TOTAL</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--yellow)' }}>{fmtMoney(pnlTotals.fuel)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--blue)' }}>{fmtMoney(pnlTotals.maint)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--red)' }}>{fmtMoney(pnlTotals.break)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--teal)' }}>{fmtMoney(pnlTotals.dep)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{fmtMoney(pnlTotals.total)}</td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          TAB 7 — COST CENTRES
+      ════════════════════════════════════════════════ */}
+      {tab === 6 && (
+        <div>
+          {ccLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spinner /></div>
+          ) : ccSummary.length === 0 ? (
+            <EmptyState icon="account_tree" message="No cost centre data — assign cost centres to assets in the Asset Registry" />
+          ) : (
+            <>
+              {/* Cost bar by cost centre */}
+              <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Cost by Cost Centre</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {ccSummary.filter(r => r.total > 0).slice(0, 8).map((r, i) => {
+                    const maxTotal = ccSummary[0]?.total || 1
+                    const barW = ((r.total / maxTotal) * 100).toFixed(1)
+                    return (
+                      <div key={r.cc} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{ width: 120, fontSize: 12, fontWeight: 600, textAlign: 'right', flexShrink: 0, color: 'var(--text-mid)' }}>
+                          {r.cc}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{r.assets} asset{r.assets !== 1 ? 's' : ''}</span>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--gold)', fontWeight: 700 }}>{fmtMoney(r.total)}</span>
+                          </div>
+                          <div style={{ height: 12, background: 'var(--surface2)', borderRadius: 5, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${barW}%`, background: ASSET_COLORS[i % ASSET_COLORS.length], borderRadius: 5, transition: 'width .4s' }} />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Cost centre detail table */}
+              <div className="table-wrap">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>Cost Centre</th>
+                      <th style={{ textAlign: 'right' }}># Assets</th>
+                      <th style={{ textAlign: 'right' }}>Fuel Cost</th>
+                      <th style={{ textAlign: 'right' }}>Maintenance</th>
+                      <th style={{ textAlign: 'right' }}>Breakdown</th>
+                      <th style={{ textAlign: 'right' }}>Depreciation</th>
+                      <th style={{ textAlign: 'right' }}>Total Cost</th>
+                      <th style={{ textAlign: 'right' }}>Cost / Asset</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ccSummary.map(r => (
+                      <tr key={r.cc}>
+                        <td style={{ fontWeight: 600 }}>{r.cc}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)' }}>{r.assets}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: r.fuel > 0 ? 'var(--yellow)' : 'var(--text-dim)' }}>
+                          {r.fuel > 0 ? fmtMoney(r.fuel) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: r.maintenance > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>
+                          {r.maintenance > 0 ? fmtMoney(r.maintenance) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: r.breakdown > 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                          {r.breakdown > 0 ? fmtMoney(r.breakdown) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: r.depreciation > 0 ? 'var(--teal)' : 'var(--text-dim)' }}>
+                          {r.depreciation > 0 ? fmtMoney(r.depreciation) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: r.total > 0 ? 'var(--gold)' : 'var(--text-dim)' }}>
+                          {r.total > 0 ? fmtMoney(r.total) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-mid)' }}>
+                          {r.assets > 0 ? fmtMoney(r.total / r.assets) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: 'var(--surface2)', fontWeight: 700 }}>
+                      <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)', letterSpacing: 1 }}>TOTAL</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)' }}>{ccSummary.reduce((s,r) => s + r.assets, 0)}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--yellow)' }}>{fmtMoney(ccSummary.reduce((s,r) => s + r.fuel, 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--blue)' }}>{fmtMoney(ccSummary.reduce((s,r) => s + r.maintenance, 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--red)' }}>{fmtMoney(ccSummary.reduce((s,r) => s + r.breakdown, 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--teal)' }}>{fmtMoney(ccSummary.reduce((s,r) => s + r.depreciation, 0))}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: 'var(--gold)' }}>{fmtMoney(ccSummary.reduce((s,r) => s + r.total, 0))}</td>
+                      <td />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Asset-level detail with cost centre filter */}
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, padding: '0 2px' }}>Asset-Level Detail</div>
+                <div className="table-wrap">
+                  <table className="stock-table">
+                    <thead>
+                      <tr>
+                        <th>Asset</th>
+                        <th>Cost Centre</th>
+                        <th style={{ textAlign: 'right' }}>Fuel</th>
+                        <th style={{ textAlign: 'right' }}>Maintenance</th>
+                        <th style={{ textAlign: 'right' }}>Breakdown</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ccData.sort((a,b) => Number(b.total_cost||0) - Number(a.total_cost||0)).map(r => (
+                        <tr key={r.id}>
+                          <td style={{ fontWeight: 600 }}>{r.asset_name || '—'}</td>
+                          <td style={{ fontSize: 12, color: 'var(--text-mid)' }}>{r.cost_centre_id || 'Unassigned'}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.fuel_cost) > 0 ? 'var(--yellow)' : 'var(--text-dim)' }}>
+                            {Number(r.fuel_cost) > 0 ? fmtMoney(Number(r.fuel_cost)) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.maintenance_cost) > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>
+                            {Number(r.maintenance_cost) > 0 ? fmtMoney(Number(r.maintenance_cost)) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', color: Number(r.breakdown_cost) > 0 ? 'var(--red)' : 'var(--text-dim)' }}>
+                            {Number(r.breakdown_cost) > 0 ? fmtMoney(Number(r.breakdown_cost)) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 600, color: Number(r.total_cost) > 0 ? 'var(--gold)' : 'var(--text-dim)' }}>
+                            {Number(r.total_cost) > 0 ? fmtMoney(Number(r.total_cost)) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}
