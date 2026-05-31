@@ -515,6 +515,13 @@ const ALL_MODULES = {
     label: 'Projects', icon: 'folder_open', color: '#f59e0b',
     sections: [
       {
+        label: 'Project Management', pages: [
+          { id: 'dashboard',           label: 'Project Dashboard',   icon: 'dashboard'         },
+          { id: 'project-tasks',       label: 'Task Board',          icon: 'task_alt'          },
+          { id: 'project-templates',   label: 'Templates',           icon: 'assignment'        },
+        ],
+      },
+      {
         label: 'Job Costing', pages: [
           { id: 'jobs',                label: 'Jobs Register',       icon: 'work'              },
           { id: 'job-cost-sheet',      label: 'Job Cost Sheet',      icon: 'receipt_long'      },

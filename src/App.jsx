@@ -349,6 +349,10 @@ const PettyCashReconciliation = lazy(() => import('./pages/Projects/PettyCashRec
 const Jobs                    = lazy(() => import('./pages/Projects/Jobs'))
 const JobCostSheet            = lazy(() => import('./pages/Projects/JobCostSheet'))
 const JobCostingReport        = lazy(() => import('./pages/Projects/JobCostingReport'))
+// Phase P1-P3 — Project Management
+const ProjectDashboard        = lazy(() => import('./pages/Projects/ProjectDashboard'))
+const ProjectTasks            = lazy(() => import('./pages/Projects/ProjectTasks'))
+const ProjectTemplates        = lazy(() => import('./pages/Projects/ProjectTemplates'))
 
 // Accounting
 const ChartOfAccounts  = lazy(() => import('./pages/Accounting/ChartOfAccounts'))
@@ -918,6 +922,10 @@ function AppRoutes() {
           <Route path="jobs"                        element={<Jobs />}               />
           <Route path="job-cost-sheet"              element={<JobCostSheet />}       />
           <Route path="job-costing-report"          element={<JobCostingReport />}   />
+          {/* Phase P1-P3 — Project Management */}
+          <Route path="dashboard"                   element={<ProjectDashboard />}   />
+          <Route path="project-tasks"               element={<ProjectTasks />}       />
+          <Route path="project-templates"           element={<ProjectTemplates />}   />
         </Route>
 
         {/* ── ACCOUNTING ───────────────────────────────────── */}

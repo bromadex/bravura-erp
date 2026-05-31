@@ -28,9 +28,17 @@ const STATUS_BADGE_CLS = {
   'Cancelled':   'badge-red',
 }
 
+const CONTRACT_TYPES = ['fixed_price', 'time_and_material', 'milestone', 'progress']
+const CONTRACT_TYPE_LABELS = {
+  fixed_price: 'Fixed Price', time_and_material: 'Time & Material',
+  milestone: 'Milestone', progress: 'Progress',
+}
+
 const emptyForm = () => ({
   title: '', client_name: '', status: 'Open',
   start_date: new Date().toISOString().split('T')[0], end_date: '',
+  actual_start_date: '', actual_finish_date: '',
+  site_location: '', contract_type: 'fixed_price',
   department: '', cost_center: '', project_manager: '',
   budget_materials: '', budget_labour: '', budget_overhead: '', budget_other: '',
   contract_value: '', notes: '',
@@ -71,7 +79,7 @@ export default function Jobs() {
     try {
       const { data, error } = await supabase
         .from('jobs')
-        .select('*, job_cost_entries(amount)')
+        .select('*, job_cost_entries(amount), project_tasks(id, status)')
         .order('created_at', { ascending: false })
       if (error) throw error
       const enriched = (data || []).map(job => {
@@ -81,7 +89,9 @@ export default function Jobs() {
           + (parseFloat(job.budget_overhead) || 0)
           + (parseFloat(job.budget_other) || 0)
         const utilisation_pct = total_budget > 0 ? (actual_total / total_budget) * 100 : 0
-        return { ...job, actual_total, total_budget, utilisation_pct }
+        const task_count = (job.project_tasks || []).length
+        const done_count = (job.project_tasks || []).filter(t => t.status === 'completed').length
+        return { ...job, actual_total, total_budget, utilisation_pct, task_count, done_count }
       })
       setJobs(enriched)
     } catch (err) {
@@ -156,20 +166,24 @@ export default function Jobs() {
   const openEdit = (job) => {
     setEditing(job)
     setForm({
-      title:            job.title || '',
-      client_name:      job.client_name || '',
-      status:           job.status || 'Open',
-      start_date:       job.start_date || '',
-      end_date:         job.end_date || '',
-      department:       job.department || '',
-      cost_center:      job.cost_center || '',
-      project_manager:  job.project_manager || '',
-      budget_materials: job.budget_materials ?? '',
-      budget_labour:    job.budget_labour ?? '',
-      budget_overhead:  job.budget_overhead ?? '',
-      budget_other:     job.budget_other ?? '',
-      contract_value:   job.contract_value ?? '',
-      notes:            job.notes || '',
+      title:              job.title || '',
+      client_name:        job.client_name || '',
+      status:             job.status || 'Open',
+      start_date:         job.start_date || '',
+      end_date:           job.end_date || '',
+      actual_start_date:  job.actual_start_date || '',
+      actual_finish_date: job.actual_finish_date || '',
+      site_location:      job.site_location || '',
+      contract_type:      job.contract_type || 'fixed_price',
+      department:         job.department || '',
+      cost_center:        job.cost_center || '',
+      project_manager:    job.project_manager || '',
+      budget_materials:   job.budget_materials ?? '',
+      budget_labour:      job.budget_labour ?? '',
+      budget_overhead:    job.budget_overhead ?? '',
+      budget_other:       job.budget_other ?? '',
+      contract_value:     job.contract_value ?? '',
+      notes:              job.notes || '',
     })
     setShowForm(true)
   }
@@ -180,12 +194,16 @@ export default function Jobs() {
     try {
       const payload = {
         ...form,
-        budget_materials: parseFloat(form.budget_materials) || 0,
-        budget_labour:    parseFloat(form.budget_labour) || 0,
-        budget_overhead:  parseFloat(form.budget_overhead) || 0,
-        budget_other:     parseFloat(form.budget_other) || 0,
-        contract_value:   form.contract_value !== '' ? parseFloat(form.contract_value) : null,
-        updated_at:       new Date().toISOString(),
+        budget_materials:   parseFloat(form.budget_materials) || 0,
+        budget_labour:      parseFloat(form.budget_labour) || 0,
+        budget_overhead:    parseFloat(form.budget_overhead) || 0,
+        budget_other:       parseFloat(form.budget_other) || 0,
+        contract_value:     form.contract_value !== '' ? parseFloat(form.contract_value) : null,
+        actual_start_date:  form.actual_start_date || null,
+        actual_finish_date: form.actual_finish_date || null,
+        site_location:      form.site_location || null,
+        contract_type:      form.contract_type || 'fixed_price',
+        updated_at:         new Date().toISOString(),
       }
       if (editing) {
         const { error } = await supabase.from('jobs').update(payload).eq('id', editing.id)
@@ -336,6 +354,7 @@ export default function Jobs() {
                   <th style={{ textAlign: 'right' }}>Contract Value</th>
                   <th>Start</th>
                   <th>End</th>
+                  <th>Tasks</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -390,6 +409,24 @@ export default function Jobs() {
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
                       {job.end_date ? fmtDate(job.end_date) : '—'}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{job.task_count || 0}</span>
+                        {job.task_count > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                            ({job.done_count || 0} done)
+                          </span>
+                        )}
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          title="View Tasks"
+                          style={{ color: 'var(--blue)' }}
+                          onClick={() => navigate(`/module/projects/project-tasks?job=${job.id}`)}
+                        >
+                          <span className="material-icons" style={{ fontSize: 13 }}>task_alt</span>
+                        </button>
+                      </div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
@@ -467,6 +504,25 @@ export default function Jobs() {
             </div>
           </div>
 
+          {/* Row 2b: Site Location + Contract Type */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label className="form-label">Site / Location</label>
+              <input
+                className="form-control"
+                value={form.site_location}
+                onChange={e => setF('site_location', e.target.value)}
+                placeholder="e.g. Hwange Mine, Block 7"
+              />
+            </div>
+            <div>
+              <label className="form-label">Contract Type</label>
+              <select className="form-control" value={form.contract_type} onChange={e => setF('contract_type', e.target.value)}>
+                {CONTRACT_TYPES.map(ct => <option key={ct} value={ct}>{CONTRACT_TYPE_LABELS[ct]}</option>)}
+              </select>
+            </div>
+          </div>
+
           {/* Row 3: Department + Cost Center */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
@@ -489,10 +545,10 @@ export default function Jobs() {
             </div>
           </div>
 
-          {/* Row 4: Start Date + End Date */}
+          {/* Row 4: Planned Dates */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
-              <label className="form-label">Start Date</label>
+              <label className="form-label">Planned Start Date</label>
               <input
                 type="date"
                 className="form-control"
@@ -501,12 +557,34 @@ export default function Jobs() {
               />
             </div>
             <div>
-              <label className="form-label">End Date</label>
+              <label className="form-label">Planned End Date</label>
               <input
                 type="date"
                 className="form-control"
                 value={form.end_date}
                 onChange={e => setF('end_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Row 4b: Actual Dates */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label className="form-label">Actual Start Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={form.actual_start_date}
+                onChange={e => setF('actual_start_date', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Actual Finish Date</label>
+              <input
+                type="date"
+                className="form-control"
+                value={form.actual_finish_date}
+                onChange={e => setF('actual_finish_date', e.target.value)}
               />
             </div>
           </div>
